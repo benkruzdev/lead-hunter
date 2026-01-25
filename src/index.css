@@ -1,0 +1,258 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* LeadHunter - Turkish Lead Prospecting SaaS Design System
+   Inspired by: Linear's sharp typography, Notion's clean aesthetic
+   Color Philosophy: Trust (deep teal), Energy (vibrant accents), Clarity (clean whites)
+*/
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+@layer base {
+  :root {
+    /* Base Colors */
+    --background: 0 0% 99%;
+    --foreground: 220 20% 10%;
+
+    /* Card & Surfaces */
+    --card: 0 0% 100%;
+    --card-foreground: 220 20% 10%;
+    
+    /* Popover */
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 20% 10%;
+
+    /* Primary - Deep Teal */
+    --primary: 175 84% 32%;
+    --primary-foreground: 0 0% 100%;
+
+    /* Secondary - Light Gray */
+    --secondary: 220 14% 96%;
+    --secondary-foreground: 220 20% 25%;
+
+    /* Muted */
+    --muted: 220 14% 95%;
+    --muted-foreground: 220 10% 46%;
+
+    /* Accent - Vibrant Teal */
+    --accent: 175 70% 41%;
+    --accent-foreground: 0 0% 100%;
+
+    /* Destructive */
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    /* Success */
+    --success: 142 71% 45%;
+    --success-foreground: 0 0% 100%;
+
+    /* Warning */
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+
+    /* Info */
+    --info: 199 89% 48%;
+    --info-foreground: 0 0% 100%;
+
+    /* Borders & Inputs */
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 175 84% 32%;
+
+    --radius: 0.625rem;
+
+    /* Sidebar */
+    --sidebar-background: 220 20% 98%;
+    --sidebar-foreground: 220 15% 30%;
+    --sidebar-primary: 175 84% 32%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 175 50% 95%;
+    --sidebar-accent-foreground: 175 84% 25%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 175 84% 32%;
+
+    /* Custom Lead Status Colors */
+    --lead-hot: 0 84% 60%;
+    --lead-warm: 38 92% 50%;
+    --lead-cold: 199 89% 48%;
+
+    /* Gradients */
+    --gradient-hero: linear-gradient(135deg, hsl(175 84% 32%) 0%, hsl(190 80% 42%) 100%);
+    --gradient-card: linear-gradient(180deg, hsl(0 0% 100%) 0%, hsl(220 14% 98%) 100%);
+    --gradient-shine: linear-gradient(110deg, transparent 25%, hsla(0, 0%, 100%, 0.3) 50%, transparent 75%);
+
+    /* Shadows */
+    --shadow-sm: 0 1px 2px 0 hsla(220, 20%, 10%, 0.05);
+    --shadow-md: 0 4px 6px -1px hsla(220, 20%, 10%, 0.08), 0 2px 4px -2px hsla(220, 20%, 10%, 0.04);
+    --shadow-lg: 0 10px 15px -3px hsla(220, 20%, 10%, 0.08), 0 4px 6px -4px hsla(220, 20%, 10%, 0.04);
+    --shadow-xl: 0 20px 25px -5px hsla(220, 20%, 10%, 0.1), 0 8px 10px -6px hsla(220, 20%, 10%, 0.04);
+    --shadow-glow: 0 0 40px -10px hsl(175 84% 32% / 0.3);
+  }
+
+  .dark {
+    --background: 220 20% 10%;
+    --foreground: 0 0% 98%;
+    --card: 220 18% 13%;
+    --card-foreground: 0 0% 98%;
+    --popover: 220 18% 13%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 175 70% 45%;
+    --primary-foreground: 220 20% 10%;
+    --secondary: 220 15% 20%;
+    --secondary-foreground: 0 0% 90%;
+    --muted: 220 15% 18%;
+    --muted-foreground: 220 10% 55%;
+    --accent: 175 60% 40%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 62% 50%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 220 15% 20%;
+    --input: 220 15% 20%;
+    --ring: 175 70% 45%;
+    --sidebar-background: 220 18% 11%;
+    --sidebar-foreground: 220 10% 70%;
+    --sidebar-primary: 175 70% 45%;
+    --sidebar-primary-foreground: 220 20% 10%;
+    --sidebar-accent: 220 15% 18%;
+    --sidebar-accent-foreground: 175 70% 50%;
+    --sidebar-border: 220 15% 18%;
+    --sidebar-ring: 175 70% 45%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html {
+    font-family: 'Inter', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+
+  /* Typography */
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-semibold tracking-tight;
+  }
+}
+
+@layer components {
+  /* Hero gradient background */
+  .hero-gradient {
+    background: var(--gradient-hero);
+  }
+
+  /* Card with gradient */
+  .card-gradient {
+    background: var(--gradient-card);
+  }
+
+  /* Glass effect */
+  .glass {
+    @apply bg-white/80 backdrop-blur-sm;
+  }
+
+  /* Shine animation for buttons */
+  .shine {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .shine::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: var(--gradient-shine);
+    transform: translateX(-100%);
+    transition: transform 0.5s ease;
+  }
+
+  .shine:hover::before {
+    transform: translateX(100%);
+  }
+
+  /* Shadow utilities */
+  .shadow-soft {
+    box-shadow: var(--shadow-md);
+  }
+
+  .shadow-card {
+    box-shadow: var(--shadow-lg);
+  }
+
+  .shadow-glow {
+    box-shadow: var(--shadow-glow);
+  }
+
+  /* Status chips */
+  .chip-hot {
+    @apply bg-red-100 text-red-700 border-red-200;
+  }
+
+  .chip-warm {
+    @apply bg-amber-100 text-amber-700 border-amber-200;
+  }
+
+  .chip-cold {
+    @apply bg-blue-100 text-blue-700 border-blue-200;
+  }
+
+  .chip-open {
+    @apply bg-emerald-100 text-emerald-700 border-emerald-200;
+  }
+
+  .chip-closed {
+    @apply bg-gray-100 text-gray-500 border-gray-200;
+  }
+
+  /* Sidebar item active state */
+  .sidebar-item-active {
+    @apply bg-sidebar-accent text-sidebar-accent-foreground font-medium;
+  }
+
+  /* Loading skeleton animation */
+  @keyframes skeleton-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+
+  .skeleton-loading {
+    animation: skeleton-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
+  /* Fade in animation */
+  @keyframes fade-in {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .animate-fade-in {
+    animation: fade-in 0.4s ease-out;
+  }
+
+  /* Slide in from right */
+  @keyframes slide-in-right {
+    from { opacity: 0; transform: translateX(100%); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+
+  .animate-slide-in-right {
+    animation: slide-in-right 0.3s ease-out;
+  }
+}
+
+@layer utilities {
+  /* Text gradient */
+  .text-gradient {
+    background: var(--gradient-hero);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+}
