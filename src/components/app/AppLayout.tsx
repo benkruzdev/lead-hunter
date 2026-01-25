@@ -1,51 +1,85 @@
 import { NavLink, Outlet, useNavigate, useLocation } from "react-router-dom";
-import { 
-  Search, 
-  List, 
-  FileDown, 
-  CreditCard, 
-  Settings, 
-  LogOut, 
+import {
+  Search,
+  List,
+  FileDown,
+  CreditCard,
+  Settings,
+  LogOut,
   Menu,
   X,
   ChevronDown,
-  User
+  User,
+  Globe
 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/contexts/AuthContext";
+import { useQuery } from "@tanstack/react-query";
+import { getProfile, getCredits } from "@/lib/api";
+import { useTranslation } from "react-i18next";
 
 const sidebarItems = [
-  { icon: Search, label: "Arama", path: "/app/search" },
-  { icon: List, label: "Lead Listeleri", path: "/app/lists" },
-  { icon: FileDown, label: "CSV Exportlar", path: "/app/exports" },
-  { icon: CreditCard, label: "Faturalandırma", path: "/app/billing" },
-  { icon: Settings, label: "Ayarlar", path: "/app/settings" },
+  { icon: Search, label: "layout.search", path: "/app/search" },
+  { icon: List, label: "layout.leadLists", path: "/app/lists" },
+  { icon: FileDown, label: "layout.exports", path: "/app/exports" },
+  { icon: CreditCard, label: "layout.billing", path: "/app/billing" },
+  { icon: Settings, label: "layout.settings", path: "/app/settings" },
 ];
-
-const pageTitles: Record<string, string> = {
-  "/app/search": "İşletme Ara",
-  "/app/lists": "Lead Listeleri",
-  "/app/exports": "CSV Exportlar",
-  "/app/billing": "Faturalandırma",
-  "/app/settings": "Ayarlar",
-};
 
 export default function AppLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
+  const { user, signOut } = useAuth();
+  const { t, i18n } = useTranslation();
+
+  // Fetch profile and credits from backend
+  const { data: profileData } = useQuery({
+    queryKey: ["profile"],
+    queryFn: getProfile,
+    enabled: !!user,
+  });
+
+  const { data: creditsData } = useQuery({
+    queryKey: ["credits"],
+    queryFn: getCredits,
+    enabled: !!user,
+    refetchInterval: 30000, // Auto-refresh every 30 seconds
+  });
+
+  const profile = profileData?.profile;
+  const credits = creditsData?.credits ?? 0;
+
+  // Get display name (full_name or email)
+  const displayName = profile?.full_name || profile?.email || "User";
+  const initials = displayName
+    .split(" ")
+    .map((n) => n[0])
+    .join("")
+    .toUpperCase()
+    .substring(0, 2);
 
   const currentPath = location.pathname;
-  const pageTitle = pageTitles[currentPath] || "Dashboard";
+  const pageTitle = sidebarItems.find((item) => currentPath.startsWith(item.path))?.label || "Dashboard";
+
+  const handleLogout = async () => {
+    await signOut();
+    navigate("/login");
+  };
+
+  const toggleLanguage = () => {
+    const newLang = i18n.language === "tr" ? "en" : "tr";
+    i18n.changeLanguage(newLang);
+  };
 
   return (
     <div className="min-h-screen bg-muted/30 flex">
       {/* Sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 w-64 bg-sidebar border-r transform transition-transform duration-200 lg:translate-x-0 lg:static ${
-          sidebarOpen ? "translate-x-0" : "-translate-x-full"
-        }`}
+        className={`fixed inset-y-0 left-0 z-50 w-64 bg-sidebar border-r transform transition-transform duration-200 lg:translate-x-0 lg:static ${sidebarOpen ? "translate-x-0" : "-translate-x-full"
+          }`}
       >
         <div className="flex flex-col h-full">
           {/* Logo */}
@@ -65,14 +99,13 @@ export default function AppLayout() {
                   key={item.path}
                   to={item.path}
                   onClick={() => setSidebarOpen(false)}
-                  className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
-                    isActive
+                  className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${isActive
                       ? "bg-sidebar-accent text-sidebar-accent-foreground"
                       : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                  }`}
+                    }`}
                 >
                   <item.icon className="w-5 h-5" />
-                  {item.label}
+                  {t(item.label)}
                 </NavLink>
               );
             })}
@@ -81,10 +114,19 @@ export default function AppLayout() {
           {/* Credits badge */}
           <div className="p-4 border-t">
             <div className="bg-sidebar-accent rounded-lg p-4">
-              <p className="text-xs text-sidebar-foreground/70 mb-1">Kalan Kredi</p>
-              <p className="text-2xl font-bold text-sidebar-primary">1.250</p>
-              <Button size="sm" variant="outline" className="w-full mt-3 text-xs">
-                Kredi Satın Al
+              <p className="text-xs text-sidebar-foreground/70 mb-1">
+                {t("common.creditsRemaining")}
+              </p>
+              <p className="text-2xl font-bold text-sidebar-primary">
+                {credits.toLocaleString()}
+              </p>
+              <Button
+                size="sm"
+                variant="outline"
+                className="w-full mt-3 text-xs"
+                onClick={() => navigate("/app/billing")}
+              >
+                {t("layout.buyCredits")}
               </Button>
             </div>
           </div>
@@ -110,7 +152,7 @@ export default function AppLayout() {
             {sidebarOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
           </button>
 
-          <h1 className="text-xl font-semibold">{pageTitle}</h1>
+          <h1 className="text-xl font-semibold">{t(pageTitle)}</h1>
 
           <div className="ml-auto flex items-center gap-4">
             {/* User menu */}
@@ -120,9 +162,9 @@ export default function AppLayout() {
                 className="flex items-center gap-2 p-2 rounded-lg hover:bg-muted transition-colors"
               >
                 <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-sm font-semibold">
-                  AY
+                  {initials}
                 </div>
-                <span className="hidden sm:block text-sm font-medium">Ahmet Yılmaz</span>
+                <span className="hidden sm:block text-sm font-medium">{displayName}</span>
                 <ChevronDown className="w-4 h-4 text-muted-foreground" />
               </button>
 
@@ -139,17 +181,28 @@ export default function AppLayout() {
                       className="flex items-center gap-2 px-3 py-2 text-sm rounded-md hover:bg-muted"
                     >
                       <User className="w-4 h-4" />
-                      Profil
+                      {t("layout.profile")}
                     </NavLink>
                     <button
                       onClick={() => {
+                        toggleLanguage();
                         setUserMenuOpen(false);
-                        navigate("/");
+                      }}
+                      className="flex items-center gap-2 px-3 py-2 text-sm rounded-md hover:bg-muted w-full text-left"
+                    >
+                      <Globe className="w-4 h-4" />
+                      {i18n.language === "tr" ? "English" : "Türkçe"}
+                    </button>
+                    <hr className="my-2" />
+                    <button
+                      onClick={async () => {
+                        setUserMenuOpen(false);
+                        await handleLogout();
                       }}
                       className="flex items-center gap-2 px-3 py-2 text-sm rounded-md hover:bg-muted w-full text-left text-destructive"
                     >
                       <LogOut className="w-4 h-4" />
-                      Çıkış Yap
+                      {t("auth.logout")}
                     </button>
                   </div>
                 </>
@@ -166,3 +219,4 @@ export default function AppLayout() {
     </div>
   );
 }
+

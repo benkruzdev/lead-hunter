@@ -7,8 +7,8 @@ type AuthContextType = {
     profile: Profile | null;
     session: Session | null;
     loading: boolean;
-    signIn: (email: string, password: string) => Promise<void>;
-    signUp: (data: SignUpData) => Promise<void>;
+    signIn: (email: string, password: string, rememberMe?: boolean) => Promise<void>;
+    signUp: (data: SignUpData, recaptchaToken: string) => Promise<void>;
     signInWithGoogle: () => Promise<void>;
     signOut: () => Promise<void>;
     resetPassword: (email: string) => Promise<void>;
@@ -84,17 +84,26 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }, []);
 
     // Sign in with email/password
-    const signIn = async (email: string, password: string) => {
+    const signIn = async (email: string, password: string, rememberMe = false) => {
         const { error } = await supabase.auth.signInWithPassword({
             email,
             password,
         });
 
         if (error) throw error;
+
+        // Set session persistence based on Remember Me
+        if (rememberMe) {
+            // Session persists (default Supabase behavior)
+            await supabase.auth.setSession({
+                access_token: (await supabase.auth.getSession()).data.session!.access_token,
+                refresh_token: (await supabase.auth.getSession()).data.session!.refresh_token,
+            });
+        }
     };
 
     // Sign up with email/password
-    const signUp = async ({ email, password, fullName, phone }: SignUpData) => {
+    const signUp = async ({ email, password, fullName, phone }: SignUpData, recaptchaToken: string) => {
         const { error } = await supabase.auth.signUp({
             email,
             password,
@@ -102,6 +111,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 data: {
                     full_name: fullName,
                     phone,
+                    recaptcha_token: recaptchaToken,
                 },
             },
         });

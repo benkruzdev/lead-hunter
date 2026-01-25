@@ -17,7 +17,7 @@ export type Profile = {
   email: string;
   language: 'tr' | 'en';
   credits: number;
-  plan: 'free' | 'solo' | 'team';
+  plan: 'solo' | 'team';
   onboarding_completed: boolean;
   created_at: string;
   updated_at: string;
@@ -29,14 +29,14 @@ export type CreditTransaction = {
   amount: number;
   balance_after: number;
   description: string;
-  transaction_type: 
-    | 'search_page'
-    | 'lead_add'
-    | 'enrichment'
-    | 'plan_renew'
-    | 'manual_add'
-    | 'manual_deduct'
-    | 'refund';
+  transaction_type:
+  | 'search_page'
+  | 'lead_add'
+  | 'enrichment'
+  | 'plan_renew'
+  | 'manual_add'
+  | 'manual_deduct'
+  | 'refund';
   metadata: Record<string, any> | null;
   created_at: string;
 };

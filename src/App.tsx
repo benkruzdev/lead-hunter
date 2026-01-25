@@ -8,6 +8,8 @@ import "@/lib/i18n"; // Initialize i18n
 import Landing from "./pages/Landing";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
 import Pricing from "./pages/Pricing";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 import AppLayout from "./components/app/AppLayout";
@@ -33,6 +35,8 @@ const App = () => (
             <Route path="/" element={<Landing />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/pricing" element={<Pricing />} />
 
             {/* App routes (protected) */}
