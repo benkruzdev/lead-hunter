@@ -1,0 +1,25 @@
+# Render Blueprint
+# https://render.com/docs/blueprint-spec
+
+services:
+  # Backend API Service
+  - type: web
+    name: leadhunter-api
+    env: node
+    region: frankfurt  # or oregon, singapore, etc.
+    plan: free  # Change to starter/standard for production
+    rootDir: api
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3001
+      - key: SUPABASE_URL
+        sync: false  # Set manually in Render dashboard
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false  # Set manually in Render dashboard (keep secret!)
+      - key: FRONTEND_URL
+        sync: false  # Set to your Vercel URL
