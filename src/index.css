@@ -7,6 +7,7 @@
    Color Philosophy: Trust (deep teal), Energy (vibrant accents), Clarity (clean whites)
 */
 
+
 @layer base {
   :root {
     /* Base Colors */
@@ -16,7 +17,7 @@
     /* Card & Surfaces */
     --card: 0 0% 100%;
     --card-foreground: 220 20% 10%;
-    
+
     /* Popover */
     --popover: 0 0% 100%;
     --popover-foreground: 220 20% 10%;
@@ -135,12 +136,18 @@
   }
 
   /* Typography */
-  h1, h2, h3, h4, h5, h6 {
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
     @apply font-semibold tracking-tight;
   }
 }
 
 @layer components {
+
   /* Hero gradient background */
   .hero-gradient {
     background: var(--gradient-hero);
@@ -216,8 +223,15 @@
 
   /* Loading skeleton animation */
   @keyframes skeleton-pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.5; }
+
+    0%,
+    100% {
+      opacity: 1;
+    }
+
+    50% {
+      opacity: 0.5;
+    }
   }
 
   .skeleton-loading {
@@ -226,8 +240,15 @@
 
   /* Fade in animation */
   @keyframes fade-in {
-    from { opacity: 0; transform: translateY(10px); }
-    to { opacity: 1; transform: translateY(0); }
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
   }
 
   .animate-fade-in {
@@ -236,8 +257,15 @@
 
   /* Slide in from right */
   @keyframes slide-in-right {
-    from { opacity: 0; transform: translateX(100%); }
-    to { opacity: 1; transform: translateX(0); }
+    from {
+      opacity: 0;
+      transform: translateX(100%);
+    }
+
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
   }
 
   .animate-slide-in-right {
@@ -246,6 +274,7 @@
 }
 
 @layer utilities {
+
   /* Text gradient */
   .text-gradient {
     background: var(--gradient-hero);
