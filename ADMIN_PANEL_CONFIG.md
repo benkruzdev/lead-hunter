@@ -6,33 +6,57 @@ Third-party integration keys (reCAPTCHA, Google OAuth, etc.) will be configured 
 
 ### Frontend Changes
 
-1. **reCAPTCHA (Optional)**
+1. **reCAPTCHA (REQUIRED per PRODUCT_SPEC.md 5.1)**
    - `main.tsx`: GoogleReCaptchaProvider wraps app only if `VITE_RECAPTCHA_SITE_KEY` exists
-   - `Register.tsx`: Registration works with or without reCAPTCHA
-   - If reCAPTCHA not configured: registration succeeds with empty token
-   - UI shows no error, just logs warning in console
+   - `Register.tsx`: **Registration is BLOCKED if reCAPTCHA not configured**
+     - Shows error alert: "reCAPTCHA yapılandırılmadı (Admin Panel)"
+     - All form fields are disabled
+     - Submit button is disabled
+     - User cannot proceed with registration
+   - If reCAPTCHA configured: Registration proceeds normally with token verification
 
-2. **Google OAuth (via Supabase)**
-   - Buttons always visible (UI decision)
-   - If not configured in Supabase: OAuth flow fails gracefully with error message
+2. **Google OAuth (Optional via Supabase)**
+   - Buttons always visible in UI
+   - When clicked and OAuth not configured: Shows error message
+   - Error: "Google OAuth yapılandırılmadı (Admin Panel)"
+   - Flow does not proceed, user notified to contact admin
    - Configuration: Supabase Dashboard > Authentication > Providers > Google
 
 ### Backend Considerations
 
-When implementing backend reCAPTCHA verification:
+Backend must validate reCAPTCHA token on registration:
 
 ```javascript
-// Backend should handle missing reCAPTCHA token gracefully
-if (recaptchaToken) {
-  // Verify with Google reCAPTCHA API
-  const isValid = await verifyRecaptcha(recaptchaToken);
-  if (!isValid) {
-    throw new Error('reCAPTCHA verification failed');
+// Backend registration endpoint
+app.post('/auth/register', async (req, res) => {
+  const { recaptchaToken } = req.body;
+  
+  if (!recaptchaToken) {
+    return res.status(400).json({
+      error: 'reCAPTCHA token required',
+      message: 'Registration requires reCAPTCHA verification'
+    });
   }
-} else {
-  // reCAPTCHA not configured - log warning but allow registration
-  console.warn('reCAPTCHA token not provided - feature not configured');
-}
+  
+  // Verify with Google reCAPTCHA API
+  const recaptchaSecret = process.env.RECAPTCHA_SECRET_KEY;
+  if (!recaptchaSecret) {
+    return res.status(503).json({
+      error: 'Service not configured',
+      message: 'reCAPTCHA not configured on server'
+    });
+  }
+  
+  const isValid = await verifyRecaptcha(recaptchaToken, recaptchaSecret);
+  if (!isValid) {
+    return res.status(400).json({
+      error: 'reCAPTCHA verification failed',
+      message: 'Invalid reCAPTCHA token'
+    });
+  }
+  
+  // Proceed with registration...
+});
 ```
 
 ### Environment Variables

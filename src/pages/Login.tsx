@@ -7,6 +7,7 @@ import { useState } from "react";
 import { Eye, EyeOff, Mail, Lock, ArrowRight } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { useConfig } from "@/contexts/ConfigContext";
 import { useTranslation } from "react-i18next";
 import { useToast } from "@/hooks/use-toast";
 
@@ -19,6 +20,7 @@ export default function Login() {
   const navigate = useNavigate();
   const location = useLocation();
   const { signIn, signInWithGoogle } = useAuth();
+  const { config } = useConfig();
   const { t } = useTranslation();
   const { toast } = useToast();
 
@@ -57,11 +59,21 @@ export default function Login() {
       // OAuth redirect will handle navigation
     } catch (error: any) {
       console.error("Google login error:", error);
-      toast({
-        title: t("auth.errors.googleLoginFailed", "Google login failed"),
-        description: error.message || t("auth.errors.tryAgain", "Please try again"),
-        variant: "destructive",
-      });
+
+      // Check if error is due to missing OAuth configuration
+      if (error.message?.includes("provider") || error.message?.includes("not enabled")) {
+        toast({
+          title: t("auth.errors.oauthNotConfigured", "Google OAuth not configured"),
+          description: t("auth.errors.contactAdmin", "Please contact administrator to configure Google OAuth (Admin Panel)"),
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: t("auth.errors.googleLoginFailed", "Google login failed"),
+          description: error.message || t("auth.errors.tryAgain", "Please try again"),
+          variant: "destructive",
+        });
+      }
     }
   };
 

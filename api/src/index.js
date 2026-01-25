@@ -9,6 +9,7 @@ dotenv.config();
 import healthRoutes from './routes/health.js';
 import authRoutes from './routes/auth.js';
 import creditsRoutes from './routes/credits.js';
+import configRoutes from './routes/config.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -35,6 +36,7 @@ app.use((req, res, next) => {
 app.use('/api/health', healthRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/credits', creditsRoutes);
+app.use('/api/config', configRoutes);
 
 // Root endpoint
 app.get('/', (req, res) => {
@@ -45,7 +47,8 @@ app.get('/', (req, res) => {
         endpoints: {
             health: '/api/health',
             auth: '/api/auth',
-            credits: '/api/credits'
+            credits: '/api/credits',
+            config: '/api/config'
         }
     });
 });
@@ -62,7 +65,8 @@ app.use((req, res) => {
             '/api/auth/verify',
             '/api/credits/balance',
             '/api/credits/history',
-            '/api/credits/deduct'
+            '/api/credits/deduct',
+            '/api/config/auth'
         ]
     });
 });
@@ -96,6 +100,7 @@ Available endpoints:
   - GET  /api/credits/balance
   - GET  /api/credits/history
   - POST /api/credits/deduct
+  - GET  /api/config/auth
   `);
 });
 
