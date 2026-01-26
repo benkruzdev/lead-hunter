@@ -1,6 +1,6 @@
 import express from 'express';
 import { supabaseAdmin } from '../config/supabase.js';
-import { requireAdmin } from '../middleware/auth.js';
+import { requireAuth, requireAdmin } from '../middleware/auth.js';
 
 const router = express.Router();
 
@@ -8,7 +8,7 @@ const router = express.Router();
  * GET /api/admin/config
  * Get system configuration (admin only)
  */
-router.get('/config', requireAdmin, async (req, res) => {
+router.get('/config', requireAuth, requireAdmin, async (req, res) => {
     try {
         const { data, error } = await supabaseAdmin
             .from('system_settings')
@@ -35,7 +35,7 @@ router.get('/config', requireAdmin, async (req, res) => {
  * PATCH /api/admin/config
  * Update system configuration (admin only)
  */
-router.patch('/config', requireAdmin, async (req, res) => {
+router.patch('/config', requireAuth, requireAdmin, async (req, res) => {
     try {
         const {
             recaptcha_enabled,
