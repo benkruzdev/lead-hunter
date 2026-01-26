@@ -179,3 +179,28 @@ export async function updateAdminConfig(data: {
     });
 }
 
+/**
+ * Register new user with reCAPTCHA verification
+ * POST /api/auth/register
+ */
+export async function registerUser(data: {
+    email: string;
+    password: string;
+    fullName: string;
+    phone: string;
+    recaptchaToken: string;
+}) {
+    return apiRequest<{
+        success: boolean;
+        message: string;
+        user: {
+            id: string;
+            email: string;
+        };
+    }>('/api/auth/register', {
+        method: 'POST',
+        body: JSON.stringify(data),
+    });
+}
+
+

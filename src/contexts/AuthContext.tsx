@@ -104,19 +104,33 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     // Sign up with email/password
     const signUp = async ({ email, password, fullName, phone }: SignUpData, recaptchaToken: string) => {
-        const { error } = await supabase.auth.signUp({
-            email,
-            password,
-            options: {
-                data: {
-                    full_name: fullName,
-                    phone,
-                    recaptcha_token: recaptchaToken,
-                },
-            },
-        });
+        // Import registerUser from api.ts
+        const { registerUser } = await import('@/lib/api');
 
-        if (error) throw error;
+        try {
+            // Call backend register endpoint (includes reCAPTCHA verification)
+            await registerUser({
+                email,
+                password,
+                fullName,
+                phone,
+                recaptchaToken
+            });
+
+            // After successful registration, auto-login
+            await signIn(email, password);
+
+            // Check if session exists (email confirmation might be required)
+            const { data: { session } } = await supabase.auth.getSession();
+
+            if (!session) {
+                // Email confirmation required - throw special error
+                throw new Error('Please check your email to confirm your account before logging in.');
+            }
+        } catch (error: any) {
+            // Propagate error as-is (don't wrap in new Error)
+            throw error;
+        }
     };
 
     // Sign in with Google OAuth
