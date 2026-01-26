@@ -18,14 +18,18 @@ export const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey, {
 // Helper to verify user JWT token
 export async function verifyUserToken(token) {
     if (!token) {
+        console.error('[verifyUserToken] No token provided');
         return { user: null, error: 'No token provided' };
     }
 
+    console.log('[verifyUserToken] Calling supabaseAdmin.auth.getUser()');
     const { data, error } = await supabaseAdmin.auth.getUser(token);
 
     if (error || !data.user) {
+        console.error('[verifyUserToken] Validation failed:', error?.message);
         return { user: null, error: error?.message || 'Invalid token' };
     }
 
+    console.log('[verifyUserToken] Token valid for user:', data.user.id, data.user.email);
     return { user: data.user, error: null };
 }

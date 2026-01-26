@@ -8,6 +8,7 @@ export async function requireAuth(req, res, next) {
         const authHeader = req.headers.authorization;
 
         if (!authHeader || !authHeader.startsWith('Bearer ')) {
+            console.log('[requireAuth] Missing or invalid Authorization header:', authHeader);
             return res.status(401).json({
                 error: 'Unauthorized',
                 message: 'Missing or invalid Authorization header'
@@ -15,15 +16,19 @@ export async function requireAuth(req, res, next) {
         }
 
         const token = authHeader.replace('Bearer ', '');
+        console.log('[requireAuth] Validating token (length: %d)', token.length);
+
         const { user, error } = await verifyUserToken(token);
 
         if (error || !user) {
+            console.error('[requireAuth] Token validation failed:', error);
             return res.status(401).json({
                 error: 'Unauthorized',
                 message: error || 'Invalid token'
             });
         }
 
+        console.log('[requireAuth] Token valid for user:', user.id);
         // Attach user to request object
         req.user = user;
         next();
