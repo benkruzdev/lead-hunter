@@ -30,6 +30,8 @@ export async function verifyUserToken(token) {
         return { user: null, error: error?.message || 'Invalid token' };
     }
 
-    console.log('[verifyUserToken] Token valid for user:', data.user.id, data.user.email);
+    console.log('[verifyUserToken] Token valid - User ID:', data.user.id, 'Email:', data.user.email);
+    console.log('[verifyUserToken] Full user object:', JSON.stringify(data.user, null, 2));
+
     return { user: data.user, error: null };
 }

@@ -47,26 +47,44 @@ export async function requireAuth(req, res, next) {
 export async function requireAdmin(req, res, next) {
     try {
         if (!req.user) {
+            console.error('[requireAdmin] No req.user - authentication failed');
             return res.status(401).json({
                 error: 'Unauthorized',
                 message: 'User not authenticated'
             });
         }
 
+        console.log('[requireAdmin] AUTH USER:', JSON.stringify(req.user, null, 2));
+        const userId = req.user?.id;
+
+        if (!userId) {
+            console.error('[requireAdmin] req.user.id is missing');
+            return res.status(401).json({
+                error: 'Unauthorized',
+                message: 'User ID not found'
+            });
+        }
+
+        console.log('[requireAdmin] Looking up admin role for user ID:', userId);
+
         const { supabaseAdmin } = await import('../config/supabase.js');
         const { data: profile, error } = await supabaseAdmin
             .from('profiles')
             .select('role')
-            .eq('id', req.user.id)
+            .eq('id', userId)
             .single();
 
+        console.log('[requireAdmin] ADMIN LOOKUP - id:', userId, 'profile:', profile, 'error:', error);
+
         if (error || !profile || profile.role !== 'admin') {
+            console.error('[requireAdmin] Access denied - role check failed');
             return res.status(403).json({
                 error: 'Forbidden',
                 message: 'Admin access required'
             });
         }
 
+        console.log('[requireAdmin] Admin verified successfully');
         next();
     } catch (err) {
         console.error('Admin middleware error:', err);
