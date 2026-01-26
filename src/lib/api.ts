@@ -138,3 +138,44 @@ export async function verifyToken(token: string) {
         body: JSON.stringify({ token }),
     });
 }
+
+/**
+ * Get admin configuration (admin only)
+ * GET /api/admin/config
+ */
+export async function getAdminConfig() {
+    return apiRequest<{
+        config: {
+            id: number;
+            recaptcha_enabled: boolean;
+            recaptcha_site_key: string | null;
+            recaptcha_secret_key: string | null;
+            google_oauth_enabled: boolean;
+            google_client_id: string | null;
+            google_client_secret: string | null;
+            updated_at: string;
+        };
+    }>('/api/admin/config');
+}
+
+/**
+ * Update admin configuration (admin only)
+ * PATCH /api/admin/config
+ */
+export async function updateAdminConfig(data: {
+    recaptcha_enabled?: boolean;
+    recaptcha_site_key?: string;
+    recaptcha_secret_key?: string;
+    google_oauth_enabled?: boolean;
+    google_client_id?: string;
+    google_client_secret?: string;
+}) {
+    return apiRequest<{
+        success: boolean;
+        config: any;
+    }>('/api/admin/config', {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+    });
+}
+

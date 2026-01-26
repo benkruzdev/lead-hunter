@@ -11,18 +11,29 @@ const router = express.Router();
  */
 router.get('/auth', async (req, res) => {
     try {
-        // TODO: In future, fetch from system_settings table when Admin Panel is implemented
-        // const settings = await db.query('SELECT * FROM system_settings WHERE id = 1');
+        // Fetch from system_settings table
+        const { supabaseAdmin } = await import('../config/supabase.js');
+        const { data: settings, error } = await supabaseAdmin
+            .from('system_settings')
+            .select('recaptcha_enabled, recaptcha_site_key, google_oauth_enabled')
+            .eq('id', 1)
+            .single();
 
-        // For now, return disabled config
-        // This will be updated when Admin Panel configuration is implemented
-        const config = {
-            recaptchaEnabled: false,
-            recaptchaSiteKey: null,
-            googleOAuthEnabled: false,
-        };
+        if (error || !settings) {
+            console.error('Failed to fetch system settings:', error);
+            // Fallback to disabled config (safe default)
+            return res.json({
+                recaptchaEnabled: false,
+                recaptchaSiteKey: null,
+                googleOAuthEnabled: false,
+            });
+        }
 
-        res.json(config);
+        res.json({
+            recaptchaEnabled: settings.recaptcha_enabled || false,
+            recaptchaSiteKey: settings.recaptcha_site_key || null,
+            googleOAuthEnabled: settings.google_oauth_enabled || false,
+        });
     } catch (error) {
         console.error('Config fetch error:', error);
 

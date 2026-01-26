@@ -10,6 +10,7 @@ import healthRoutes from './routes/health.js';
 import authRoutes from './routes/auth.js';
 import creditsRoutes from './routes/credits.js';
 import configRoutes from './routes/config.js';
+import adminRoutes from './routes/admin.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -37,6 +38,8 @@ app.use('/api/health', healthRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/credits', creditsRoutes);
 app.use('/api/config', configRoutes);
+app.use('/api/admin', adminRoutes);
+
 
 // Root endpoint
 app.get('/', (req, res) => {

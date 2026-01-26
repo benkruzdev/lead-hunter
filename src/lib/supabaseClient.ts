@@ -18,10 +18,12 @@ export type Profile = {
   language: 'tr' | 'en';
   credits: number;
   plan: 'solo' | 'team';
+  role: 'user' | 'admin';
   onboarding_completed: boolean;
   created_at: string;
   updated_at: string;
 };
+
 
 export type CreditTransaction = {
   id: string;

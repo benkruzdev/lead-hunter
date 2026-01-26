@@ -10,7 +10,8 @@ import {
   X,
   ChevronDown,
   User,
-  Globe
+  Globe,
+  Shield
 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -32,7 +33,7 @@ export default function AppLayout() {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, signOut } = useAuth();
+  const { user, signOut, profile: authProfile, refreshProfile } = useAuth();
   const { t, i18n } = useTranslation();
 
   // Fetch profile and credits from backend
@@ -100,8 +101,8 @@ export default function AppLayout() {
                   to={item.path}
                   onClick={() => setSidebarOpen(false)}
                   className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${isActive
-                      ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                      : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                    ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                    : "text-sidebar-foreground hover:bg-sidebar-accent/50"
                     }`}
                 >
                   <item.icon className="w-5 h-5" />
@@ -109,6 +110,21 @@ export default function AppLayout() {
                 </NavLink>
               );
             })}
+
+            {/* Admin Panel (conditional) */}
+            {authProfile?.role === 'admin' && (
+              <NavLink
+                to="/app/admin"
+                onClick={() => setSidebarOpen(false)}
+                className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${currentPath.startsWith('/app/admin')
+                  ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                  : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                  }`}
+              >
+                <Shield className="w-5 h-5" />
+                Admin Panel
+              </NavLink>
+            )}
           </nav>
 
           {/* Credits badge */}

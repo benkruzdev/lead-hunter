@@ -21,7 +21,9 @@ import ListDetail from "./pages/app/ListDetail";
 import ExportsPage from "./pages/app/ExportsPage";
 import BillingPage from "./pages/app/BillingPage";
 import SettingsPage from "./pages/app/SettingsPage";
+import AdminConfigPage from "./pages/admin/AdminConfigPage";
 import NotFound from "./pages/NotFound";
+
 
 const queryClient = new QueryClient();
 
@@ -66,8 +68,10 @@ const AppContent = () => {
                   <Route path="exports" element={<ExportsPage />} />
                   <Route path="billing" element={<BillingPage />} />
                   <Route path="settings" element={<SettingsPage />} />
+                  <Route path="admin" element={<AdminConfigPage />} />
                 </Route>
               </Route>
+
 
               {/* Catch-all */}
               <Route path="*" element={<NotFound />} />
