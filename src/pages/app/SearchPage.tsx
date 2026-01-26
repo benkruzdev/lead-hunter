@@ -1,4 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useAuth } from "@/contexts/AuthContext";
+import OnboardingTour from "@/components/onboarding/OnboardingTour";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -26,6 +28,7 @@ import {
   ExternalLink,
   Loader2,
   AlertCircle,
+  FileDown,
 } from "lucide-react";
 import {
   Sheet,
@@ -40,16 +43,6 @@ import {
 } from "@/components/ui/tooltip";
 
 const cities = ["İstanbul", "Ankara", "İzmir", "Bursa", "Antalya"];
-const categories = [
-  "Restoran",
-  "Kuaför",
-  "Diş Kliniği",
-  "Emlak Ofisi",
-  "Oto Servis",
-  "Avukat",
-  "Veteriner",
-  "Cafe",
-];
 
 // Mock data
 const mockResults = [
@@ -134,7 +127,10 @@ const mockResults = [
 ];
 
 export default function SearchPage() {
+  const { profile } = useAuth();
+  const [showOnboarding, setShowOnboarding] = useState(false);
   const [city, setCity] = useState("");
+  const [district, setDistrict] = useState("");
   const [category, setCategory] = useState("");
   const [minRating, setMinRating] = useState([0]);
   const [minReviews, setMinReviews] = useState("");
@@ -143,6 +139,17 @@ export default function SearchPage() {
   const [results, setResults] = useState<typeof mockResults>([]);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [detailItem, setDetailItem] = useState<(typeof mockResults)[0] | null>(null);
+
+  // Show onboarding tour for first-time users
+  useEffect(() => {
+    if (profile && profile.onboarding_completed === false) {
+      setShowOnboarding(true);
+    }
+  }, [profile]);
+
+  const handleOnboardingComplete = () => {
+    setShowOnboarding(false);
+  };
 
   const handleSearch = () => {
     setIsSearching(true);
@@ -173,13 +180,14 @@ export default function SearchPage() {
       {/* Filter Panel */}
       <div className="bg-card rounded-xl border shadow-soft p-6">
         <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-4">
+          {/* Şehir */}
           <div className="space-y-2">
             <Label className="flex items-center gap-2">
               <MapPin className="w-4 h-4 text-muted-foreground" />
               Şehir
             </Label>
             <Select value={city} onValueChange={setCity}>
-              <SelectTrigger>
+              <SelectTrigger data-onboarding="city-select">
                 <SelectValue placeholder="Şehir seçin" />
               </SelectTrigger>
               <SelectContent>
@@ -192,25 +200,42 @@ export default function SearchPage() {
             </Select>
           </div>
 
+          {/* İlçe */}
           <div className="space-y-2">
             <Label className="flex items-center gap-2">
-              <Tag className="w-4 h-4 text-muted-foreground" />
-              Kategori
+              <MapPin className="w-4 h-4 text-muted-foreground" />
+              İlçe
             </Label>
-            <Select value={category} onValueChange={setCategory}>
-              <SelectTrigger>
-                <SelectValue placeholder="Kategori seçin" />
+            <Select value={district} onValueChange={setDistrict} disabled={!city}>
+              <SelectTrigger data-onboarding="district-select">
+                <SelectValue placeholder="İlçe seçin" />
               </SelectTrigger>
               <SelectContent>
-                {categories.map((c) => (
-                  <SelectItem key={c} value={c}>
-                    {c}
+                {city && ["Kadıköy", "Beşiktaş", "Şişli", "Fatih", "Üsküdar", "Beyoğlu"].map((d) => (
+                  <SelectItem key={d} value={d}>
+                    {d}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
 
+          {/* Kategori (Input per spec: "kategori yaz") */}
+          <div className="space-y-2">
+            <Label className="flex items-center gap-2">
+              <Tag className="w-4 h-4 text-muted-foreground" />
+              Kategori
+            </Label>
+            <Input
+              data-onboarding="category-input"
+              type="text"
+              placeholder="ör. Restoran, Kafe"
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+            />
+          </div>
+
+          {/* Min Rating */}
           <div className="space-y-2">
             <Label className="flex items-center gap-2">
               <Star className="w-4 h-4 text-muted-foreground" />
@@ -225,21 +250,10 @@ export default function SearchPage() {
             />
           </div>
 
-          <div className="space-y-2">
-            <Label className="flex items-center gap-2">
-              <MessageSquare className="w-4 h-4 text-muted-foreground" />
-              Min. Yorum
-            </Label>
-            <Input
-              type="number"
-              placeholder="ör. 50"
-              value={minReviews}
-              onChange={(e) => setMinReviews(e.target.value)}
-            />
-          </div>
-
+          {/* Search Button */}
           <div className="flex items-end">
             <Button
+              data-onboarding="search-button"
               onClick={handleSearch}
               className="w-full"
               disabled={!city || !category || isSearching}
@@ -303,6 +317,7 @@ export default function SearchPage() {
                 </TooltipContent>
               </Tooltip>
               <Button
+                data-onboarding="add-to-list"
                 disabled={selectedIds.length === 0}
                 onClick={() => {
                   alert(`${selectedIds.length} lead listenize eklendi!`);
@@ -311,6 +326,17 @@ export default function SearchPage() {
               >
                 <Plus className="w-4 h-4" />
                 Seçilenleri Ekle ({selectedIds.length})
+              </Button>
+              <Button
+                data-onboarding="export-csv"
+                variant="outline"
+                disabled={selectedIds.length === 0}
+                onClick={() => {
+                  alert(`${selectedIds.length} lead CSV olarak indiriliyor...`);
+                }}
+              >
+                <FileDown className="w-4 h-4" />
+                CSV İndir ({selectedIds.length})
               </Button>
             </div>
           </div>
@@ -373,9 +399,8 @@ export default function SearchPage() {
                     <td className="p-4 text-muted-foreground">{item.reviews.toLocaleString()}</td>
                     <td className="p-4">
                       <span
-                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${
-                          item.isOpen ? "chip-open" : "chip-closed"
-                        }`}
+                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${item.isOpen ? "chip-open" : "chip-closed"
+                          }`}
                       >
                         {item.isOpen ? "Açık" : "Kapalı"}
                       </span>
@@ -403,7 +428,7 @@ export default function SearchPage() {
           </div>
           <h3 className="text-lg font-semibold mb-2">İşletme Aramaya Başlayın</h3>
           <p className="text-muted-foreground max-w-md mx-auto">
-            Şehir ve kategori seçerek Türkiye genelindeki işletmeleri arayın. 
+            Şehir ve kategori seçerek Türkiye genelindeki işletmeleri arayın.
             Sonuçlardan lead listenizi oluşturun.
           </p>
         </div>
@@ -421,9 +446,8 @@ export default function SearchPage() {
                     {detailItem.category}
                   </span>
                   <span
-                    className={`px-2.5 py-0.5 rounded-full text-xs font-medium border ${
-                      detailItem.isOpen ? "chip-open" : "chip-closed"
-                    }`}
+                    className={`px-2.5 py-0.5 rounded-full text-xs font-medium border ${detailItem.isOpen ? "chip-open" : "chip-closed"
+                      }`}
                   >
                     {detailItem.isOpen ? "Açık" : "Kapalı"}
                   </span>
@@ -493,6 +517,11 @@ export default function SearchPage() {
           )}
         </SheetContent>
       </Sheet>
+
+      {/* Onboarding Tour */}
+      {showOnboarding && profile && !profile.onboarding_completed && (
+        <OnboardingTour onComplete={handleOnboardingComplete} />
+      )}
     </div>
   );
 }

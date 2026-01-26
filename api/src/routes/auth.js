@@ -46,18 +46,18 @@ router.get('/profile', requireAuth, async (req, res) => {
     }
 });
 
-/**
- * Update user's profile
- * PATCH /api/auth/profile
- * Body: { full_name?, phone? }
- */
 router.patch('/profile', requireAuth, async (req, res) => {
     try {
-        const { full_name, phone } = req.body;
+        const { full_name, phone, onboarding_completed } = req.body;
 
         const updates = {};
         if (full_name !== undefined) updates.full_name = full_name;
         if (phone !== undefined) updates.phone = phone;
+
+        // Handle onboarding completion (can only be set to true, not reverted)
+        if (onboarding_completed === true) {
+            updates.onboarding_completed = true;
+        }
 
         if (Object.keys(updates).length === 0) {
             return res.status(400).json({
