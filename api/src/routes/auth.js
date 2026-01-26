@@ -249,10 +249,14 @@ router.post('/register', async (req, res) => {
         }
 
         if (!allowedHosts.includes(verifyData.hostname)) {
-            console.error('[Register] Invalid hostname:', verifyData.hostname);
+            console.error('[Register] Invalid hostname:', { received: verifyData.hostname, allowedHosts });
             return res.status(400).json({
                 error: 'Invalid reCAPTCHA hostname',
-                message: 'reCAPTCHA hostname mismatch'
+                message: 'reCAPTCHA hostname mismatch',
+                debug: {
+                    receivedHostname: verifyData.hostname,
+                    allowedHosts
+                }
             });
         }
 
