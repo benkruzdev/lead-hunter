@@ -132,6 +132,7 @@ export default function SearchPage() {
   const [district, setDistrict] = useState("");
   const [availableDistricts, setAvailableDistricts] = useState<string[]>([]);
   const [category, setCategory] = useState("");
+  const [keyword, setKeyword] = useState("");
   const [minRating, setMinRating] = useState([0]);
   const [minReviews, setMinReviews] = useState("");
   const [isSearching, setIsSearching] = useState(false);
@@ -232,8 +233,8 @@ export default function SearchPage() {
             </Select>
           </div>
 
-          {/* Kategori (Input + Suggestion Chips per spec) */}
-          <div className="space-y-2 lg:col-span-2">
+          {/* Kategori (Free text input per PRODUCT_SPEC) */}
+          <div className="space-y-2">
             <Label className="flex items-center gap-2">
               <Tag className="w-4 h-4 text-muted-foreground" />
               Kategori
@@ -246,30 +247,21 @@ export default function SearchPage() {
               value={category}
               onChange={(e) => setCategory(e.target.value)}
             />
-            {/* Suggestion Chips */}
-            <div className="flex flex-wrap gap-2">
-              {[
-                "Restoran",
-                "Kafe",
-                "Berber",
-                "Kuaför",
-                "Market",
-                "Eczane",
-                "Veteriner",
-                "Emlak",
-              ].map((suggestion) => (
-                <Button
-                  key={suggestion}
-                  variant="outline"
-                  size="sm"
-                  type="button"
-                  className="h-7 px-2.5 text-xs"
-                  onClick={() => setCategory(suggestion)}
-                >
-                  {suggestion}
-                </Button>
-              ))}
-            </div>
+          </div>
+
+          {/* Anahtar Kelime */}
+          <div className="space-y-2">
+            <Label className="flex items-center gap-2">
+              <Tag className="w-4 h-4 text-muted-foreground" />
+              Anahtar Kelime
+            </Label>
+            <Input
+              id="keyword-input"
+              type="text"
+              placeholder="Örn: vegan, 24 saat, paket servis"
+              value={keyword}
+              onChange={(e) => setKeyword(e.target.value)}
+            />
           </div>
 
           {/* Min Rating */}
@@ -301,7 +293,10 @@ export default function SearchPage() {
               min="0"
               placeholder="En az yorum sayısı"
               value={minReviews}
-              onChange={(e) => setMinReviews(e.target.value)}
+              onChange={(e) => {
+                const value = Number(e.target.value);
+                setMinReviews(value < 0 ? "0" : e.target.value);
+              }}
             />
           </div>
 
