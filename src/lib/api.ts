@@ -77,10 +77,6 @@ export async function updateProfile(data: {
 }
 
 /**
- * Get current credit balance
- * GET /api/credits/balance
- */
-export async function getCredits() {
     return apiRequest<{
         credits: number;
     }>('/api/credits/balance');
@@ -204,3 +200,80 @@ export async function registerUser(data: {
 }
 
 
+// ============================================================================
+// SEARCH API (Phase 4 PR4)
+// ============================================================================
+
+export interface SearchParams {
+    province: string;
+    district?: string;
+    category: string;
+    keyword?: string;
+    minRating?: number;
+    minReviews?: number;
+}
+
+export interface SearchResult {
+    id: number;
+    name: string;
+    category: string;
+    district: string;
+    rating: number;
+    reviews: number;
+    isOpen: boolean;
+    phone: string;
+    website: string;
+    address: string;
+    hours: string;
+}
+
+export interface SearchResponse {
+    sessionId: string;
+    results: SearchResult[];
+    totalResults: number;
+    currentPage: number;
+}
+
+export interface SearchPageResponse {
+    results: SearchResult[];
+    currentPage: number;
+    totalResults: number;
+    creditCost: number;
+    alreadyViewed: boolean;
+}
+
+/**
+ * Perform search (0 credits - initial search is free)
+ * POST /api/search
+ */
+export async function performSearch(params: SearchParams): Promise<SearchResponse> {
+    return apiRequest<SearchResponse>('/api/search', {
+        method: 'POST',
+        body: JSON.stringify(params),
+    });
+}
+
+/**
+ * Get specific page of search results
+ * GET /api/search/:sessionId/page/:pageNumber
+ * 
+ * Cost:
+ * - 10 credits if page not viewed before
+ * - 0 credits if page already viewed
+ * 
+ * Throws 402 error if insufficient credits:
+ * {
+ *   error: 'Insufficient credits',
+ *   message: 'Yeterli krediniz yok',
+ *   required: 10,
+ *   available: 5
+ * }
+ */
+export async function getSearchPage(
+    sessionId: string,
+    pageNumber: number
+): Promise<SearchPageResponse> {
+    return apiRequest<SearchPageResponse>(
+        `/api/search/${sessionId}/page/${pageNumber}`
+    );
+}

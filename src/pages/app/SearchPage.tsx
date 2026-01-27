@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import { performSearch, getSearchPage, SearchResult } from "@/lib/api";
 import OnboardingTour from "@/components/onboarding/OnboardingTour";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -92,11 +93,13 @@ export default function SearchPage() {
   const [detailItem, setDetailItem] = useState<(typeof mockResults)[0] | null>(null);
 
   // Pagination state (PR3)
+  const [sessionId, setSessionId] = useState<string | null>(null); // PR4: Backend session tracking
   const [currentPage, setCurrentPage] = useState(1);
   const [totalResults, setTotalResults] = useState(0);
   const [viewedPages, setViewedPages] = useState<Set<number>>(new Set([1]));
   const [showPaginationModal, setShowPaginationModal] = useState(false);
   const [pendingPage, setPendingPage] = useState<number | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null); // PR4: Error handling
 
   const resultsPerPage = 20;
   const totalPages = Math.ceil(totalResults / resultsPerPage);
@@ -125,17 +128,33 @@ export default function SearchPage() {
     setShowOnboarding(false);
   };
 
-  const handleSearch = () => {
+  const handleSearch = async () => {
     setIsSearching(true);
-    setCurrentPage(1); // Reset to page 1 on new search
-    setViewedPages(new Set([1])); // Reset viewed pages, page 1 is free
-    // Simulate API call
-    setTimeout(() => {
-      setResults(mockResults);
-      setTotalResults(mockResults.length); // Set total results count
+    setErrorMessage(null);
+    setCurrentPage(1);
+    setViewedPages(new Set([1]));
+
+    try {
+      // Call backend API (0 credits)
+      const response = await performSearch({
+        province: city,
+        district: district || undefined,
+        category,
+        keyword: keyword || undefined,
+        minRating: minRating[0] || undefined,
+        minReviews: minReviews ? Number(minReviews) : undefined,
+      });
+
+      setSessionId(response.sessionId);
+      setResults(response.results as any[]);
+      setTotalResults(response.totalResults);
       setIsSearching(false);
       setHasSearched(true);
-    }, 1500);
+    } catch (error) {
+      console.error('[SearchPage] Search failed:', error);
+      setErrorMessage('Arama başarısız oldu. Lütfen tekrar deneyin.');
+      setIsSearching(false);
+    }
   };
 
   const handlePageChange = (newPage: number) => {
@@ -152,14 +171,46 @@ export default function SearchPage() {
     setShowPaginationModal(true);
   };
 
-  const confirmPageChange = () => {
-    if (pendingPage === null) return;
+  const confirmPageChange = async () => {
+    if (pendingPage === null || !sessionId) return;
 
-    // Mark page as viewed (simulate credit deduction UI-only)
-    setViewedPages(prev => new Set([...prev, pendingPage]));
-    setCurrentPage(pendingPage);
-    setShowPaginationModal(false);
-    setPendingPage(null);
+    setErrorMessage(null);
+
+    try {
+      // Call backend API (10 credits or 0 if already viewed)
+      const response = await getSearchPage(sessionId, pendingPage);
+
+      // Update page results
+      const startIndex = (pendingPage - 1) * 20;
+      const updatedResults = [...results];
+      response.results.forEach((item, i) => {
+        updatedResults[startIndex + i] = item as any;
+      });
+
+      setResults(updatedResults);
+      setViewedPages(prev => new Set([...prev, pendingPage]));
+      setCurrentPage(pendingPage);
+      setShowPaginationModal(false);
+      setPendingPage(null);
+
+      // Refresh profile to get updated credits (PR4)
+      if (response.creditCost > 0) {
+        // Trigger profile reload in AuthContext
+        window.location.reload(); // Simple solution for now
+      }
+    } catch (error: any) {
+      console.error('[SearchPage] Page change failed:', error);
+
+      // Handle 402 Insufficient Credits
+      if (error.message?.includes('Yeterli krediniz yok') || error.message?.includes('Insufficient')) {
+        setErrorMessage('Yeterli krediniz yok. Lütfen kredi satın alın.');
+      } else {
+        setErrorMessage('Sayfa yüklenemedi. Lütfen tekrar deneyin.');
+      }
+
+      setShowPaginationModal(false);
+      setPendingPage(null);
+    }
   };
 
   const toggleSelect = (id: number) => {
@@ -178,6 +229,22 @@ export default function SearchPage() {
 
   return (
     <div className="space-y-6 animate-fade-in">
+      {/* Error Message (PR4 Backend Integration) */}
+      {errorMessage && (
+        <div className="bg-destructive/10 border border-destructive text-destructive rounded-xl p-4 flex items-center gap-3">
+          <AlertCircle className="w-5 h-5 flex-shrink-0" />
+          <p className="text-sm font-medium">{errorMessage}</p>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="ml-auto"
+            onClick={() => setErrorMessage(null)}
+          >
+            <X className="w-4 h-4" />
+          </Button>
+        </div>
+      )}
+
       {/* Filter Panel */}
       <div className="bg-card rounded-xl border shadow-soft p-6">
         <div className="grid sm:grid-cols-2 lg:grid-cols-6 gap-4">

@@ -1,0 +1,202 @@
+import express from 'express';
+import { requireAuth } from '../middleware/auth.js';
+import { supabaseAdmin } from '../config/supabase.js';
+
+const router = express.Router();
+
+/**
+ * POST /api/search
+ * Perform search (0 credits - initial search is free per PRODUCT_SPEC)
+ * 
+ * Request body:
+ * - province: string
+ * - district: string (optional)
+ * - category: string
+ * - keyword: string (optional)
+ * - minRating: number (optional)
+ * - minReviews: number (optional)
+ * 
+ * Response:
+ * - sessionId: UUID
+ * - results: array (page 1, 20 items)
+ * - totalResults: number
+ * - currentPage: 1
+ */
+router.post('/', requireAuth, async (req, res) => {
+    try {
+        const { province, district, category, keyword, minRating, minReviews } = req.body;
+        const userId = req.user.id;
+
+        console.log('[Search] New search request:', { province, district, category, userId });
+
+        // TODO: Actual search logic with Google Maps API
+        // For now, return mock data
+        const mockResults = generateMockResults(200, province, category);
+
+        // Create search session
+        const { data: session, error: sessionError } = await supabaseAdmin
+            .from('search_sessions')
+            .insert({
+                user_id: userId,
+                province,
+                district,
+                category,
+                min_rating: minRating || null,
+                min_reviews: minReviews || null,
+                total_results: mockResults.length,
+                viewed_pages: [1] // Page 1 is always free
+            })
+            .select()
+            .single();
+
+        if (sessionError) {
+            console.error('[Search] Failed to create session:', sessionError);
+            return res.status(500).json({
+                error: 'Failed to create search session',
+                details: sessionError.message
+            });
+        }
+
+        console.log('[Search] Session created:', session.id);
+
+        // Return first page (20 results)
+        res.json({
+            sessionId: session.id,
+            results: mockResults.slice(0, 20), // Page 1
+            totalResults: mockResults.length,
+            currentPage: 1
+        });
+    } catch (err) {
+        console.error('[Search] Error:', err);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+/**
+ * GET /api/search/:sessionId/page/:pageNumber
+ * Get specific page of search results
+ * 
+ * Cost: 
+ * - 10 credits if page not viewed before
+ * - 0 credits if page already viewed
+ * 
+ * Responses:
+ * - 200: Success with results
+ * - 402: Insufficient credits
+ * - 404: Session not found
+ */
+router.get('/:sessionId/page/:pageNumber', requireAuth, async (req, res) => {
+    try {
+        const { sessionId, pageNumber } = req.params;
+        const userId = req.user.id;
+        const page = parseInt(pageNumber);
+
+        console.log('[Search] Page request:', { sessionId, page, userId });
+
+        // Get search session
+        const { data: session, error: sessionError } = await supabaseAdmin
+            .from('search_sessions')
+            .select('*')
+            .eq('id', sessionId)
+            .eq('user_id', userId)
+            .single();
+
+        if (sessionError || !session) {
+            console.error('[Search] Session not found:', sessionError);
+            return res.status(404).json({ error: 'Search session not found' });
+        }
+
+        // Check if page already viewed (free)
+        const alreadyViewed = session.viewed_pages.includes(page);
+        const creditCost = alreadyViewed ? 0 : 10;
+
+        console.log('[Search] Page viewed check:', { page, alreadyViewed, creditCost });
+
+        if (!alreadyViewed) {
+            // Check credits
+            const { data: profile } = await supabaseAdmin
+                .from('profiles')
+                .select('credits')
+                .eq('id', userId)
+                .single();
+
+            if ((profile?.credits || 0) < creditCost) {
+                console.log('[Search] Insufficient credits:', { required: creditCost, available: profile?.credits });
+                return res.status(402).json({
+                    error: 'Insufficient credits',
+                    message: 'Yeterli krediniz yok',
+                    required: creditCost,
+                    available: profile?.credits || 0
+                });
+            }
+
+            // Deduct credits using RPC
+            const { data: newCredits, error: deductError } = await supabaseAdmin
+                .rpc('decrement_credits', {
+                    user_id: userId,
+                    amount: creditCost
+                });
+
+            if (deductError) {
+                console.error('[Search] Credit deduction failed:', deductError);
+                return res.status(500).json({ error: 'Failed to deduct credits' });
+            }
+
+            console.log('[Search] Credits deducted:', { amount: creditCost, newBalance: newCredits });
+
+            // Mark page as viewed
+            await supabaseAdmin
+                .from('search_sessions')
+                .update({
+                    viewed_pages: [...session.viewed_pages, page]
+                })
+                .eq('id', sessionId);
+
+            console.log('[Search] Page added to viewed:', page);
+        }
+
+        // Get results for this page
+        // TODO: Fetch from actual data source
+        const mockResults = generateMockResults(session.total_results, session.province, session.category);
+        const startIndex = (page - 1) * 20;
+        const endIndex = startIndex + 20;
+        const pageResults = mockResults.slice(startIndex, endIndex);
+
+        res.json({
+            results: pageResults,
+            currentPage: page,
+            totalResults: session.total_results,
+            creditCost,
+            alreadyViewed
+        });
+    } catch (err) {
+        console.error('[Search] Page fetch error:', err);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+/**
+ * Generate mock search results
+ * TODO: Replace with actual Google Maps API integration
+ */
+function generateMockResults(count, province, category) {
+    const categories = ["Restoran", "Kafe", "Berber", "Kuaför", "Market", "Eczane", "Veteriner", "Emlak"];
+    const districts = ["Kadıköy", "Beşiktaş", "Şişli", "Fatih", "Üsküdar", "Beyoğlu", "Çankaya", "Keçiören"];
+    const adjectives = ["Modern", "Lezzet", "Tarihi", "Yeni", "Anadolu", "Karadeniz", "Ege", "Akdeniz"];
+
+    return Array.from({ length: count }, (_, i) => ({
+        id: i + 1,
+        name: `${adjectives[i % adjectives.length]} ${category || categories[i % categories.length]} ${Math.floor(i / 10) + 1}`,
+        category: category || categories[i % categories.length],
+        district: districts[i % districts.length],
+        rating: Number((3.5 + Math.random() * 1.5).toFixed(1)),
+        reviews: Math.floor(Math.random() * 3000) + 100,
+        isOpen: i % 3 !== 0,
+        phone: `+90 ${210 + (i % 6)}${(i % 10).toString().padStart(2, '0')} 555 ${String(1000 + i).slice(-4)}`,
+        website: `www.business${i + 1}.com`,
+        address: `${province || 'İstanbul'} / ${districts[i % districts.length]} Mah. No:${i + 1}`,
+        hours: i % 3 === 0 ? "09:00 - 23:00" : "08:00 - 22:00",
+    }));
+}
+
+export default router;
