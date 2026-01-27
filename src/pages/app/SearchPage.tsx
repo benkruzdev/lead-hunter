@@ -41,8 +41,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-
-const cities = ["İstanbul", "Ankara", "İzmir", "Bursa", "Antalya"];
+import turkeyData from "@/data/turkey.json";
 
 // Mock data
 const mockResults = [
@@ -131,6 +130,7 @@ export default function SearchPage() {
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [city, setCity] = useState("");
   const [district, setDistrict] = useState("");
+  const [availableDistricts, setAvailableDistricts] = useState<string[]>([]);
   const [category, setCategory] = useState("");
   const [minRating, setMinRating] = useState([0]);
   const [minReviews, setMinReviews] = useState("");
@@ -139,6 +139,18 @@ export default function SearchPage() {
   const [results, setResults] = useState<typeof mockResults>([]);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [detailItem, setDetailItem] = useState<(typeof mockResults)[0] | null>(null);
+
+  // Update available districts when city changes
+  useEffect(() => {
+    if (city) {
+      const selectedProvince = turkeyData.provinces.find((p) => p.name === city);
+      setAvailableDistricts(selectedProvince?.districts || []);
+      setDistrict(""); // Reset district when city changes
+    } else {
+      setAvailableDistricts([]);
+      setDistrict("");
+    }
+  }, [city]);
 
   // Show onboarding tour for first-time users
   useEffect(() => {
@@ -187,13 +199,13 @@ export default function SearchPage() {
               Şehir
             </Label>
             <Select value={city} onValueChange={setCity}>
-              <SelectTrigger data-onboarding="city-select">
+              <SelectTrigger data-onboarding="city-select" id="city-select">
                 <SelectValue placeholder="Şehir seçin" />
               </SelectTrigger>
               <SelectContent>
-                {cities.map((c) => (
-                  <SelectItem key={c} value={c}>
-                    {c}
+                {turkeyData.provinces.map((province) => (
+                  <SelectItem key={province.id} value={province.name}>
+                    {province.name}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -207,11 +219,11 @@ export default function SearchPage() {
               İlçe
             </Label>
             <Select value={district} onValueChange={setDistrict} disabled={!city}>
-              <SelectTrigger data-onboarding="district-select">
-                <SelectValue placeholder="İlçe seçin" />
+              <SelectTrigger data-onboarding="district-select" id="district-select">
+                <SelectValue placeholder={city ? "İlçe seçin" : "Önce şehir seçin"} />
               </SelectTrigger>
               <SelectContent>
-                {city && ["Kadıköy", "Beşiktaş", "Şişli", "Fatih", "Üsküdar", "Beyoğlu"].map((d) => (
+                {availableDistricts.map((d) => (
                   <SelectItem key={d} value={d}>
                     {d}
                   </SelectItem>
