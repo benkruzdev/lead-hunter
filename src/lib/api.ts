@@ -83,6 +83,16 @@ export async function updateProfile(data: {
 }
 
 /**
+ * Get current credit balance
+ * GET /api/credits/balance
+ */
+export async function getCredits() {
+    return apiRequest<{
+        credits: number;
+    }>('/api/credits/balance');
+}
+
+/**
  * Get credit transaction history
  * GET /api/credits/history
  */
