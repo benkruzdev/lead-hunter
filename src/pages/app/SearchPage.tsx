@@ -77,7 +77,7 @@ const generateMockResults = (count: number = 200) => {
 const mockResults = generateMockResults(200);
 
 export default function SearchPage() {
-  const { profile } = useAuth();
+  const { profile, refreshProfile } = useAuth();
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [city, setCity] = useState("");
   const [district, setDistrict] = useState("");
@@ -102,8 +102,8 @@ export default function SearchPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null); // PR4: Error handling
 
   const resultsPerPage = 20;
-  const totalPages = Math.ceil(totalResults / resultsPerPage);
-  const pagedResults = results.slice((currentPage - 1) * resultsPerPage, currentPage * resultsPerPage);
+  const totalPages = Math.max(1, Math.ceil(totalResults / resultsPerPage));
+  // PR4.1: Backend returns 20 results per page, no frontend slicing needed
 
   // Update available districts when city changes
   useEffect(() => {
@@ -146,8 +146,9 @@ export default function SearchPage() {
       });
 
       setSessionId(response.sessionId);
-      setResults(response.results as any[]);
+      setResults(response.results as any[]); // Backend returns 20 results for page 1
       setTotalResults(response.totalResults);
+      setCurrentPage(1);
       setIsSearching(false);
       setHasSearched(true);
     } catch (error) {
@@ -160,9 +161,13 @@ export default function SearchPage() {
   const handlePageChange = (newPage: number) => {
     if (newPage === currentPage) return;
 
+    // Page boundary validation (PR4.1)
+    if (newPage < 1 || newPage > totalPages) return;
+
     // Check if page already viewed (free)
     if (viewedPages.has(newPage)) {
-      setCurrentPage(newPage);
+      // Already viewed - fetch without modal
+      confirmPageChange(newPage, true);
       return;
     }
 
@@ -171,32 +176,30 @@ export default function SearchPage() {
     setShowPaginationModal(true);
   };
 
-  const confirmPageChange = async () => {
-    if (pendingPage === null || !sessionId) return;
+  const confirmPageChange = async (pageToFetch?: number, skipModal: boolean = false) => {
+    const targetPage = pageToFetch || pendingPage;
+    if (targetPage === null || !sessionId) return;
 
     setErrorMessage(null);
 
     try {
       // Call backend API (10 credits or 0 if already viewed)
-      const response = await getSearchPage(sessionId, pendingPage);
+      const response = await getSearchPage(sessionId, targetPage);
 
-      // Update page results
-      const startIndex = (pendingPage - 1) * 20;
-      const updatedResults = [...results];
-      response.results.forEach((item, i) => {
-        updatedResults[startIndex + i] = item as any;
-      });
+      // PR4.1: Backend returns 20 results for the requested page
+      // Replace current results with new page results
+      setResults(response.results as any[]);
+      setViewedPages(prev => new Set([...prev, targetPage]));
+      setCurrentPage(targetPage);
 
-      setResults(updatedResults);
-      setViewedPages(prev => new Set([...prev, pendingPage]));
-      setCurrentPage(pendingPage);
-      setShowPaginationModal(false);
-      setPendingPage(null);
+      if (!skipModal) {
+        setShowPaginationModal(false);
+        setPendingPage(null);
+      }
 
-      // Refresh profile to get updated credits (PR4)
+      // PR4.1: Use refreshProfile instead of window.reload
       if (response.creditCost > 0) {
-        // Trigger profile reload in AuthContext
-        window.location.reload(); // Simple solution for now
+        await refreshProfile();
       }
     } catch (error: any) {
       console.error('[SearchPage] Page change failed:', error);
@@ -208,8 +211,10 @@ export default function SearchPage() {
         setErrorMessage('Sayfa yüklenemedi. Lütfen tekrar deneyin.');
       }
 
-      setShowPaginationModal(false);
-      setPendingPage(null);
+      if (!skipModal) {
+        setShowPaginationModal(false);
+        setPendingPage(null);
+      }
     }
   };
 
@@ -220,10 +225,11 @@ export default function SearchPage() {
   };
 
   const toggleSelectAll = () => {
-    if (selectedIds.length === pagedResults.length && pagedResults.length > 0) {
+    // PR4.1: results already contains only current page (20 items)
+    if (selectedIds.length === results.length && results.length > 0) {
       setSelectedIds([]);
     } else {
-      setSelectedIds(pagedResults.map((r) => r.id));
+      setSelectedIds(results.map((r) => r.id));
     }
   };
 
@@ -484,7 +490,7 @@ export default function SearchPage() {
                 </tr>
               </thead>
               <tbody>
-                {pagedResults.map((item) => (
+                {results.map((item) => (
                   <tr
                     key={item.id}
                     className="border-b hover:bg-muted/30 transition-colors"
@@ -684,7 +690,7 @@ export default function SearchPage() {
             >
               İptal
             </Button>
-            <Button onClick={confirmPageChange}>
+            <Button onClick={() => confirmPageChange()}>
               Onayla (10 kredi)
             </Button>
           </DialogFooter>

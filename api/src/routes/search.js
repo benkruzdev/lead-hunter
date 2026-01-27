@@ -91,6 +91,14 @@ router.get('/:sessionId/page/:pageNumber', requireAuth, async (req, res) => {
         const userId = req.user.id;
         const page = parseInt(pageNumber);
 
+        // PR4.1: Page number validation
+        if (!Number.isInteger(page) || page < 1) {
+            return res.status(400).json({
+                error: 'Invalid page',
+                message: 'Invalid page number'
+            });
+        }
+
         console.log('[Search] Page request:', { sessionId, page, userId });
 
         // Get search session
@@ -106,8 +114,18 @@ router.get('/:sessionId/page/:pageNumber', requireAuth, async (req, res) => {
             return res.status(404).json({ error: 'Search session not found' });
         }
 
-        // Check if page already viewed (free)
-        const alreadyViewed = session.viewed_pages.includes(page);
+        // PR4.1: Upper bound validation
+        const totalPages = Math.max(1, Math.ceil(session.total_results / 20));
+        if (page > totalPages) {
+            return res.status(404).json({
+                error: 'Page not found',
+                message: 'Requested page is out of range'
+            });
+        }
+
+        // PR4.1: Null safety for viewed_pages
+        const viewedPages = Array.isArray(session.viewed_pages) ? session.viewed_pages : [];
+        const alreadyViewed = viewedPages.includes(page);
         const creditCost = alreadyViewed ? 0 : 10;
 
         console.log('[Search] Page viewed check:', { page, alreadyViewed, creditCost });
@@ -148,7 +166,7 @@ router.get('/:sessionId/page/:pageNumber', requireAuth, async (req, res) => {
             await supabaseAdmin
                 .from('search_sessions')
                 .update({
-                    viewed_pages: [...session.viewed_pages, page]
+                    viewed_pages: [...viewedPages, page]
                 })
                 .eq('id', sessionId);
 

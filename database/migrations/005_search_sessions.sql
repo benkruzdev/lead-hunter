@@ -60,7 +60,8 @@ CREATE POLICY "Users can create own search sessions"
 CREATE POLICY "Users can update own search sessions"
     ON public.search_sessions
     FOR UPDATE
-    USING (auth.uid() = user_id);
+    USING (auth.uid() = user_id)
+    WITH CHECK (auth.uid() = user_id);
 
 -- ============================================================================
 -- CREDIT DEDUCTION FUNCTION
