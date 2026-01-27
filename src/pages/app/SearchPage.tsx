@@ -41,6 +41,14 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import turkeyData from "@/data/turkey.json";
 
 // Mock data generator (temporary for PR3 testing - will be replaced with real API)
@@ -83,6 +91,17 @@ export default function SearchPage() {
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [detailItem, setDetailItem] = useState<(typeof mockResults)[0] | null>(null);
 
+  // Pagination state (PR3)
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalResults, setTotalResults] = useState(0);
+  const [viewedPages, setViewedPages] = useState<Set<number>>(new Set([1]));
+  const [showPaginationModal, setShowPaginationModal] = useState(false);
+  const [pendingPage, setPendingPage] = useState<number | null>(null);
+
+  const resultsPerPage = 20;
+  const totalPages = Math.ceil(totalResults / resultsPerPage);
+  const pagedResults = results.slice((currentPage - 1) * resultsPerPage, currentPage * resultsPerPage);
+
   // Update available districts when city changes
   useEffect(() => {
     if (city) {
@@ -108,12 +127,39 @@ export default function SearchPage() {
 
   const handleSearch = () => {
     setIsSearching(true);
+    setCurrentPage(1); // Reset to page 1 on new search
+    setViewedPages(new Set([1])); // Reset viewed pages, page 1 is free
     // Simulate API call
     setTimeout(() => {
       setResults(mockResults);
+      setTotalResults(mockResults.length); // Set total results count
       setIsSearching(false);
       setHasSearched(true);
     }, 1500);
+  };
+
+  const handlePageChange = (newPage: number) => {
+    if (newPage === currentPage) return;
+
+    // Check if page already viewed (free)
+    if (viewedPages.has(newPage)) {
+      setCurrentPage(newPage);
+      return;
+    }
+
+    // Show modal for unviewed page (10 credits)
+    setPendingPage(newPage);
+    setShowPaginationModal(true);
+  };
+
+  const confirmPageChange = () => {
+    if (pendingPage === null) return;
+
+    // Mark page as viewed (simulate credit deduction UI-only)
+    setViewedPages(prev => new Set([...prev, pendingPage]));
+    setCurrentPage(pendingPage);
+    setShowPaginationModal(false);
+    setPendingPage(null);
   };
 
   const toggleSelect = (id: number) => {
@@ -123,10 +169,10 @@ export default function SearchPage() {
   };
 
   const toggleSelectAll = () => {
-    if (selectedIds.length === results.length) {
+    if (selectedIds.length === pagedResults.length && pagedResults.length > 0) {
       setSelectedIds([]);
     } else {
-      setSelectedIds(results.map((r) => r.id));
+      setSelectedIds(pagedResults.map((r) => r.id));
     }
   };
 
@@ -288,7 +334,10 @@ export default function SearchPage() {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 border-b bg-muted/30">
             <div className="flex items-center gap-4">
               <span className="text-sm text-muted-foreground">
-                {results.length} sonuç bulundu
+                {totalResults} sonuç bulundu
+              </span>
+              <span className="text-sm text-muted-foreground">
+                Sayfa {currentPage} / {totalPages}
               </span>
               {selectedIds.length > 0 && (
                 <span className="text-sm font-medium text-primary">
@@ -368,7 +417,7 @@ export default function SearchPage() {
                 </tr>
               </thead>
               <tbody>
-                {results.map((item) => (
+                {pagedResults.map((item) => (
                   <tr
                     key={item.id}
                     className="border-b hover:bg-muted/30 transition-colors"
@@ -412,6 +461,43 @@ export default function SearchPage() {
               </tbody>
             </table>
           </div>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex justify-center items-center gap-2 p-4 border-t bg-muted/10">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={currentPage === 1}
+                onClick={() => handlePageChange(currentPage - 1)}
+              >
+                Önceki
+              </Button>
+
+              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                const pageNum = i + 1;
+                return (
+                  <Button
+                    key={pageNum}
+                    variant={currentPage === pageNum ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => handlePageChange(pageNum)}
+                  >
+                    {pageNum}
+                  </Button>
+                );
+              })}
+
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={currentPage === totalPages}
+                onClick={() => handlePageChange(currentPage + 1)}
+              >
+                Sonraki
+              </Button>
+            </div>
+          )}
         </div>
       ) : (
         <div className="bg-card rounded-xl border shadow-soft p-12 text-center">
@@ -509,6 +595,34 @@ export default function SearchPage() {
           )}
         </SheetContent>
       </Sheet>
+
+      {/* Credit Confirmation Modal (PR3) */}
+      <Dialog open={showPaginationModal} onOpenChange={setShowPaginationModal}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Sayfa Değiştir</DialogTitle>
+            <DialogDescription>
+              Sayfa {pendingPage} görüntülemek için 10 kredi harcanacak.
+              <br />
+              Kalan krediniz: {profile?.credits || 0}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowPaginationModal(false);
+                setPendingPage(null);
+              }}
+            >
+              İptal
+            </Button>
+            <Button onClick={confirmPageChange}>
+              Onayla (10 kredi)
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Onboarding Tour */}
       {showOnboarding && profile && !profile.onboarding_completed && (
