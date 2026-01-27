@@ -43,87 +43,29 @@ import {
 } from "@/components/ui/tooltip";
 import turkeyData from "@/data/turkey.json";
 
-// Mock data
-const mockResults = [
-  {
-    id: 1,
-    name: "Karadeniz Pidecisi",
-    category: "Restoran",
-    district: "Kadıköy",
-    rating: 4.8,
-    reviews: 1247,
-    isOpen: true,
-    phone: "+90 216 555 1234",
-    website: "www.karadenizpide.com",
-    address: "Moda Cad. No:42, Kadıköy/İstanbul",
-    hours: "09:00 - 23:00",
-  },
-  {
-    id: 2,
-    name: "Lezzet Sokağı",
-    category: "Restoran",
-    district: "Beşiktaş",
-    rating: 4.6,
-    reviews: 892,
-    isOpen: true,
-    phone: "+90 212 555 5678",
-    website: "www.lezzetsokagi.com.tr",
-    address: "Etiler Mah. No:15, Beşiktaş/İstanbul",
-    hours: "11:00 - 22:00",
-  },
-  {
-    id: 3,
-    name: "Anadolu Mutfağı",
-    category: "Restoran",
-    district: "Üsküdar",
-    rating: 4.9,
-    reviews: 2134,
-    isOpen: true,
-    phone: "+90 216 555 9012",
-    website: "www.anadolumutfagi.com",
-    address: "Çengelköy Mah. No:8, Üsküdar/İstanbul",
-    hours: "08:00 - 23:00",
-  },
-  {
-    id: 4,
-    name: "Beyoğlu Meyhanesi",
-    category: "Restoran",
-    district: "Beyoğlu",
-    rating: 4.5,
-    reviews: 756,
-    isOpen: false,
-    phone: "+90 212 555 3456",
-    website: "www.beyoglumeyhanesi.com",
-    address: "İstiklal Cad. No:123, Beyoğlu/İstanbul",
-    hours: "18:00 - 02:00",
-  },
-  {
-    id: 5,
-    name: "Tarihi Sultanahmet Köftecisi",
-    category: "Restoran",
-    district: "Fatih",
-    rating: 4.7,
-    reviews: 3421,
-    isOpen: true,
-    phone: "+90 212 555 7890",
-    website: "www.sultanahmetkoftecisi.com",
-    address: "Sultanahmet Mey. No:1, Fatih/İstanbul",
-    hours: "10:00 - 21:00",
-  },
-  {
-    id: 6,
-    name: "Modern Cafe & Bistro",
-    category: "Cafe",
-    district: "Şişli",
-    rating: 4.4,
-    reviews: 543,
-    isOpen: true,
-    phone: "+90 212 555 2345",
-    website: "www.moderncafe.com.tr",
-    address: "Nişantaşı Mah. No:56, Şişli/İstanbul",
-    hours: "08:00 - 00:00",
-  },
-];
+// Mock data generator (temporary for PR3 testing - will be replaced with real API)
+// Generates 200 results to test pagination modal, confirm/cancel, and same-page-free logic
+const generateMockResults = (count: number = 200) => {
+  const categories = ["Restoran", "Kafe", "Berber", "Kuaför", "Market", "Eczane", "Veteriner", "Emlak"];
+  const districts = ["Kadıköy", "Beşiktaş", "Şişli", "Fatih", "Üsküdar", "Beyoğlu", "Çankaya", "Keçiören"];
+  const adjectives = ["Modern", "Lezzet", "Tarihi", "Yeni", "Anadolu", "Karadeniz", "Ege", "Akdeniz"];
+
+  return Array.from({ length: count }, (_, i) => ({
+    id: i + 1,
+    name: `${adjectives[i % adjectives.length]} ${categories[i % categories.length]} ${Math.floor(i / 10) + 1}`,
+    category: categories[i % categories.length],
+    district: districts[i % districts.length],
+    rating: Number((3.5 + Math.random() * 1.5).toFixed(1)),
+    reviews: Math.floor(Math.random() * 3000) + 100,
+    isOpen: i % 3 !== 0,
+    phone: `+90 ${210 + (i % 6)}${(i % 10).toString().padStart(2, '0')} 555 ${String(1000 + i).slice(-4)}`,
+    website: `www.business${i + 1}.com`,
+    address: `${districts[i % districts.length]} Mah. No:${i + 1}, İstanbul`,
+    hours: i % 3 === 0 ? "09:00 - 23:00" : "08:00 - 22:00",
+  }));
+};
+
+const mockResults = generateMockResults(200);
 
 export default function SearchPage() {
   const { profile } = useAuth();
