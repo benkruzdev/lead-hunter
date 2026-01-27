@@ -77,6 +77,20 @@ const resources = {
                 buyCredits: 'Kredi Satın Al',
             },
 
+            // Search History
+            searchHistory: {
+                title: 'Arama Geçmişi',
+                description: 'Son 30 gün içinde yaptığınız aramalar',
+                noHistory: 'Arama Geçmişi Yok',
+                noHistoryDesc: 'Henüz bir arama yapmadınız',
+                newSearch: 'Yeni Arama Yap',
+                continueSearch: 'Devam Et',
+                resultsFound: 'sonuç bulundu',
+                pagesViewed: 'sayfa görüntülendi',
+                keyword: 'Anahtar kelime',
+                timeAgo: '{{time}} önce',
+            },
+
             // Onboarding
             onboarding: {
                 welcome: 'LeadHunter\'a Hoş Geldiniz!',
@@ -167,6 +181,20 @@ const resources = {
                 settings: 'Settings',
                 profile: 'Profile',
                 buyCredits: 'Buy Credits',
+            },
+
+            // Search History
+            searchHistory: {
+                title: 'Search History',
+                description: 'Your searches from the last 30 days',
+                noHistory: 'No Search History',
+                noHistoryDesc: 'You haven\'t performed any searches yet',
+                newSearch: 'New Search',
+                continueSearch: 'Continue',
+                resultsFound: 'results found',
+                pagesViewed: 'pages viewed',
+                keyword: 'Keyword',
+                timeAgo: '{{time}} ago',
             },
 
             // Onboarding

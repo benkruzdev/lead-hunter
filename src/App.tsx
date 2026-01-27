@@ -16,6 +16,7 @@ import Pricing from "./pages/Pricing";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 import AppLayout from "./components/app/AppLayout";
 import SearchPage from "./pages/app/SearchPage";
+import SearchHistoryPage from "./pages/app/SearchHistoryPage";
 import LeadLists from "./pages/app/LeadLists";
 import ListDetail from "./pages/app/ListDetail";
 import ExportsPage from "./pages/app/ExportsPage";
@@ -63,6 +64,7 @@ const AppContent = () => {
               <Route element={<ProtectedRoute />}>
                 <Route path="/app" element={<AppLayout />}>
                   <Route path="search" element={<SearchPage />} />
+                  <Route path="history" element={<SearchHistoryPage />} />
                   <Route path="lists" element={<LeadLists />} />
                   <Route path="lists/:id" element={<ListDetail />} />
                   <Route path="exports" element={<ExportsPage />} />

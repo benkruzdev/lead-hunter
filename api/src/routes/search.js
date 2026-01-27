@@ -41,6 +41,7 @@ router.post('/', requireAuth, async (req, res) => {
                 province,
                 district,
                 category,
+                keyword: keyword || null,
                 min_rating: minRating || null,
                 min_reviews: minReviews || null,
                 total_results: mockResults.length,
@@ -216,5 +217,65 @@ function generateMockResults(count, province, category) {
         hours: i % 3 === 0 ? "09:00 - 23:00" : "08:00 - 22:00",
     }));
 }
+
+/**
+ * GET /api/search/sessions
+ * List user's search sessions (PRODUCT_SPEC 5.4 - Search History)
+ * Only returns active sessions (expires_at > now())
+ */
+router.get('/sessions', requireAuth, async (req, res) => {
+    try {
+        const userId = req.user.id;
+
+        const { data: sessions, error } = await supabaseAdmin
+            .from('search_sessions')
+            .select('id, province, district, category, keyword, total_results, viewed_pages, created_at, expires_at')
+            .eq('user_id', userId)
+            .gt('expires_at', new Date().toISOString())
+            .order('created_at', { ascending: false });
+
+        if (error) {
+            console.error('[Sessions] List error:', error);
+            return res.status(500).json({ error: 'Failed to fetch sessions' });
+        }
+
+        res.json({ sessions });
+    } catch (err) {
+        console.error('[Sessions] Error:', err);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+/**
+ * GET /api/search/sessions/:sessionId
+ * Get specific session detail (PRODUCT_SPEC 5.4 - Continue search)
+ */
+router.get('/sessions/:sessionId', requireAuth, async (req, res) => {
+    try {
+        const { sessionId } = req.params;
+        const userId = req.user.id;
+
+        const { data: session, error } = await supabaseAdmin
+            .from('search_sessions')
+            .select('*')
+            .eq('id', sessionId)
+            .eq('user_id', userId)
+            .single();
+
+        if (error || !session) {
+            return res.status(404).json({ error: 'Session not found' });
+        }
+
+        // Check if expired
+        if (new Date(session.expires_at) < new Date()) {
+            return res.status(410).json({ error: 'Session expired' });
+        }
+
+        res.json({ session });
+    } catch (err) {
+        console.error('[Sessions] Detail error:', err);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
 
 export default router;

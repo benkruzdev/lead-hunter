@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { performSearch, getSearchPage, SearchResult } from "@/lib/api";
+import { useSearchParams, useNavigate } from "react-router-dom";
+import { performSearch, getSearchPage, getSearchSession, SearchResult } from "@/lib/api";
 import OnboardingTour from "@/components/onboarding/OnboardingTour";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -78,6 +79,8 @@ const mockResults = generateMockResults(200);
 
 export default function SearchPage() {
   const { profile, refreshProfile } = useAuth();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [city, setCity] = useState("");
   const [district, setDistrict] = useState("");
@@ -123,6 +126,38 @@ export default function SearchPage() {
       setShowOnboarding(true);
     }
   }, [profile]);
+
+  // PRODUCT_SPEC 5.4 - Load session from URL param (Continue search)
+  useEffect(() => {
+    const sid = searchParams.get('sessionId');
+    if (sid) {
+      loadSession(sid);
+    }
+  }, [searchParams]);
+
+  const loadSession = async (sid: string) => {
+    try {
+      const { session } = await getSearchSession(sid);
+      setCity(session.province || "");
+      setDistrict(session.district || "");
+      setCategory(session.category || "");
+      setKeyword(session.keyword || "");
+      setMinRating([session.min_rating || 0]);
+      setMinReviews(session.min_reviews ? session.min_reviews.toString() : "");
+      setSessionId(sid);
+      setViewedPages(new Set(session.viewed_pages));
+      setTotalResults(session.total_results);
+      setHasSearched(true);
+    } catch (error: any) {
+      console.error('[SearchPage] Session load error:', error);
+      if (error.status === 410) {
+        navigate('/app/history', { replace: true });
+      } else {
+        setErrorMessage('Arama oturumu yüklenemedi.');
+      }
+    }
+  };
+
 
   const handleOnboardingComplete = () => {
     setShowOnboarding(false);

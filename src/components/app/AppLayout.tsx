@@ -11,7 +11,8 @@ import {
   ChevronDown,
   User,
   Globe,
-  Shield
+  Shield,
+  Clock
 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -22,6 +23,7 @@ import { useTranslation } from "react-i18next";
 
 const sidebarItems = [
   { icon: Search, label: "layout.search", path: "/app/search" },
+  { icon: Clock, label: "layout.searchHistory", path: "/app/history" },
   { icon: List, label: "layout.leadLists", path: "/app/lists" },
   { icon: FileDown, label: "layout.exports", path: "/app/exports" },
   { icon: CreditCard, label: "layout.billing", path: "/app/billing" },

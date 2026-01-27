@@ -30,7 +30,9 @@ async function apiRequest<T>(
             error: 'Request failed',
             message: response.statusText,
         }));
-        throw new Error(error.message || error.error || 'Request failed');
+        const err = new Error(error.message || error.error || 'Request failed') as any;
+        err.status = response.status;
+        throw err;
     }
 
     return response.json();
@@ -286,4 +288,38 @@ export async function getSearchPage(
     return apiRequest<SearchPageResponse>(
         `/api/search/${sessionId}/page/${pageNumber}`
     );
+}
+
+// ============================================================================
+// SEARCH SESSIONS API (Section 5.4)
+// ============================================================================
+
+export interface SearchSession {
+    id: string;
+    province: string;
+    district: string | null;
+    category: string;
+    keyword: string | null;
+    min_rating: number | null;
+    min_reviews: number | null;
+    total_results: number;
+    viewed_pages: number[];
+    created_at: string;
+    expires_at: string;
+}
+
+/**
+ * Get user's search sessions (PRODUCT_SPEC 5.4 - Search History)
+ * GET /api/search/sessions
+ */
+export async function getSearchSessions(): Promise<{ sessions: SearchSession[] }> {
+    return apiRequest<{ sessions: SearchSession[] }>('/api/search/sessions');
+}
+
+/**
+ * Get specific session detail (PRODUCT_SPEC 5.4 - Continue search)
+ * GET /api/search/sessions/:sessionId
+ */
+export async function getSearchSession(sessionId: string): Promise<{ session: SearchSession }> {
+    return apiRequest<{ session: SearchSession }>(`/api/search/sessions/${sessionId}`);
 }
