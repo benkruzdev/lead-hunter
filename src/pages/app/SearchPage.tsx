@@ -191,7 +191,7 @@ export default function SearchPage() {
     <div className="space-y-6 animate-fade-in">
       {/* Filter Panel */}
       <div className="bg-card rounded-xl border shadow-soft p-6">
-        <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-6 gap-4">
           {/* Şehir */}
           <div className="space-y-2">
             <Label className="flex items-center gap-2">
@@ -232,19 +232,44 @@ export default function SearchPage() {
             </Select>
           </div>
 
-          {/* Kategori (Input per spec: "kategori yaz") */}
-          <div className="space-y-2">
+          {/* Kategori (Input + Suggestion Chips per spec) */}
+          <div className="space-y-2 lg:col-span-2">
             <Label className="flex items-center gap-2">
               <Tag className="w-4 h-4 text-muted-foreground" />
               Kategori
             </Label>
             <Input
               data-onboarding="category-input"
+              id="category-input"
               type="text"
-              placeholder="ör. Restoran, Kafe"
+              placeholder="ör. Restoran, Kafe, Berber"
               value={category}
               onChange={(e) => setCategory(e.target.value)}
             />
+            {/* Suggestion Chips */}
+            <div className="flex flex-wrap gap-2">
+              {[
+                "Restoran",
+                "Kafe",
+                "Berber",
+                "Kuaför",
+                "Market",
+                "Eczane",
+                "Veteriner",
+                "Emlak",
+              ].map((suggestion) => (
+                <Button
+                  key={suggestion}
+                  variant="outline"
+                  size="sm"
+                  type="button"
+                  className="h-7 px-2.5 text-xs"
+                  onClick={() => setCategory(suggestion)}
+                >
+                  {suggestion}
+                </Button>
+              ))}
+            </div>
           </div>
 
           {/* Min Rating */}
@@ -254,11 +279,29 @@ export default function SearchPage() {
               Min. Puan: {minRating[0].toFixed(1)}
             </Label>
             <Slider
+              id="min-rating-slider"
               value={minRating}
               onValueChange={setMinRating}
+              min={0}
               max={5}
-              step={0.5}
+              step={0.1}
               className="py-2"
+            />
+          </div>
+
+          {/* Min Reviews */}
+          <div className="space-y-2">
+            <Label className="flex items-center gap-2">
+              <MessageSquare className="w-4 h-4 text-muted-foreground" />
+              Min. Yorum
+            </Label>
+            <Input
+              id="min-reviews-input"
+              type="number"
+              min="0"
+              placeholder="En az yorum sayısı"
+              value={minReviews}
+              onChange={(e) => setMinReviews(e.target.value)}
             />
           </div>
 
