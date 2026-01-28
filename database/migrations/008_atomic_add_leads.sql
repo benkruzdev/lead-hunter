@@ -103,6 +103,7 @@ BEGIN
             email,
             rating,
             reviews_count,
+            score,
             raw
         ) VALUES (
             p_user_id,
@@ -114,6 +115,7 @@ BEGIN
             v_lead->>'email',
             (v_lead->>'rating')::NUMERIC,
             COALESCE((v_lead->>'reviews')::INTEGER, (v_lead->>'reviews_count')::INTEGER),
+            v_lead->>'score',
             v_lead
         );
         
