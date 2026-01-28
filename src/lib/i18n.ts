@@ -123,6 +123,13 @@ const resources = {
                 missingListId: 'Liste bulunamadı',
             },
 
+            // Lead Score
+            leadScore: {
+                hot: 'Sıcak',
+                warm: 'Ilık',
+                cold: 'Soğuk',
+            },
+
             // Onboarding
             onboarding: {
                 welcome: 'LeadHunter\'a Hoş Geldiniz!',
@@ -250,6 +257,13 @@ const resources = {
                 addFailed: 'Failed to add leads. Please try again.',
                 loadItemsFailed: 'Failed to load leads',
                 missingListId: 'List not found',
+            },
+
+            // Lead Score
+            leadScore: {
+                hot: 'Hot',
+                warm: 'Warm',
+                cold: 'Cold',
             },
 
             // Onboarding

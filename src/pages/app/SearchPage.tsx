@@ -551,6 +551,9 @@ export default function SearchPage() {
                     Yorum
                   </th>
                   <th className="text-left p-4 text-sm font-medium text-muted-foreground">
+                    Skor
+                  </th>
+                  <th className="text-left p-4 text-sm font-medium text-muted-foreground">
                     Durum
                   </th>
                   <th className="text-left p-4 text-sm font-medium text-muted-foreground">
@@ -581,12 +584,19 @@ export default function SearchPage() {
                     </td>
                     <td className="p-4 text-muted-foreground">{item.reviews.toLocaleString()}</td>
                     <td className="p-4">
-                      <span
-                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${item.isOpen ? "chip-open" : "chip-closed"
-                          }`}
+                      {item.score && (
+                        <Badge variant={item.score === 'hot' ? 'destructive' : item.score === 'warm' ? 'default' : 'secondary'}>
+                          {item.score === 'hot' ? t('leadScore.hot') : item.score === 'warm' ? t('leadScore.warm') : t('leadScore.cold')}
+                        </Badge>
+                      )}
+                    </td>
+                    <td className="p-4">
+                      <Badge
+                        variant={item.isOpen ? "default" : "secondary"}
+                        className={item.isOpen ? "bg-green-500" : ""}
                       >
                         {item.isOpen ? "Açık" : "Kapalı"}
-                      </span>
+                      </Badge>
                     </td>
                     <td className="p-4">
                       <Button

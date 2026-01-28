@@ -1,6 +1,7 @@
 import express from 'express';
 import { requireAuth } from '../middleware/auth.js';
 import { supabaseAdmin } from '../config/supabase.js';
+import { calculateLeadScore } from '../utils/leadScore.js';
 
 const router = express.Router();
 
@@ -261,19 +262,26 @@ function generateMockResults(count, province, category) {
     const districts = ["Kadıköy", "Beşiktaş", "Şişli", "Fatih", "Üsküdar", "Beyoğlu", "Çankaya", "Keçiören"];
     const adjectives = ["Modern", "Lezzet", "Tarihi", "Yeni", "Anadolu", "Karadeniz", "Ege", "Akdeniz"];
 
-    return Array.from({ length: count }, (_, i) => ({
-        id: i + 1,
-        name: `${adjectives[i % adjectives.length]} ${category || categories[i % categories.length]} ${Math.floor(i / 10) + 1}`,
-        category: category || categories[i % categories.length],
-        district: districts[i % districts.length],
-        rating: Number((3.5 + Math.random() * 1.5).toFixed(1)),
-        reviews: Math.floor(Math.random() * 3000) + 100,
-        isOpen: i % 3 !== 0,
-        phone: `+90 ${210 + (i % 6)}${(i % 10).toString().padStart(2, '0')} 555 ${String(1000 + i).slice(-4)}`,
-        website: `www.business${i + 1}.com`,
-        address: `${province || 'İstanbul'} / ${districts[i % districts.length]} Mah. No:${i + 1}`,
-        hours: i % 3 === 0 ? "09:00 - 23:00" : "08:00 - 22:00",
-    }));
+    return Array.from({ length: count }, (_, i) => {
+        const rating = Number((3.5 + Math.random() * 1.5).toFixed(1));
+        const reviews = Math.floor(Math.random() * 3000) + 100;
+        const score = calculateLeadScore(rating, reviews);
+
+        return {
+            id: i + 1,
+            name: `${adjectives[i % adjectives.length]} ${category || categories[i % categories.length]} ${Math.floor(i / 10) + 1}`,
+            category: category || categories[i % categories.length],
+            district: districts[i % districts.length],
+            rating,
+            reviews,
+            score,
+            isOpen: i % 3 !== 0,
+            phone: `+90 ${210 + (i % 6)}${(i % 10).toString().padStart(2, '0')} 555 ${String(1000 + i).slice(-4)}`,
+            website: `www.business${i + 1}.com`,
+            address: `${province || 'İstanbul'} / ${districts[i % districts.length]} Mah. No:${i + 1}`,
+            hours: i % 3 === 0 ? "09:00 - 23:00" : "08:00 - 22:00",
+        };
+    });
 }
 
 /**

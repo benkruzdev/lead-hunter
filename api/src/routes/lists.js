@@ -1,6 +1,7 @@
 import express from 'express';
 import { requireAuth } from '../middleware/auth.js';
 import { supabaseAdmin } from '../config/supabase.js';
+import { calculateLeadScore } from '../utils/leadScore.js';
 
 const router = express.Router();
 
@@ -160,10 +161,16 @@ router.post('/:listId/items', requireAuth, async (req, res) => {
             return res.status(400).json({ error: 'Leads array is required' });
         }
 
+        // Calculate score for each lead before sending to RPC
+        const leadsWithScore = leads.map(lead => ({
+            ...lead,
+            score: calculateLeadScore(lead.rating, lead.reviews || lead.reviews_count)
+        }));
+
         const { data, error } = await supabaseAdmin.rpc('add_leads_to_list_atomic', {
             p_user_id: userId,
             p_list_id: listId,
-            p_leads: leads,
+            p_leads: leadsWithScore,
             p_dry_run: dryRun === true
         });
 
