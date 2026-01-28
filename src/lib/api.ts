@@ -324,3 +324,76 @@ export async function getSearchSessions(): Promise<{ sessions: SearchSession[] }
 export async function getSearchSession(sessionId: string): Promise<{ session: SearchSession }> {
     return apiRequest<{ session: SearchSession }>(`/api/search/sessions/${sessionId}`);
 }
+
+// PRODUCT_SPEC 5.5: Lead Lists
+
+export interface LeadList {
+    id: string;
+    name: string;
+    lead_count: number;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface LeadListItem {
+    id: string;
+    list_id: string;
+    place_id: string;
+    name: string | null;
+    phone: string | null;
+    website: string | null;
+    email: string | null;
+    rating: number | null;
+    reviews_count: number | null;
+    score: string | null;
+    pipeline: string | null;
+    note: string | null;
+    tags: string[] | null;
+    raw: any;
+    created_at: string;
+    updated_at: string;
+}
+
+export async function getLeadLists(): Promise<{ lists: LeadList[] }> {
+    return apiRequest<{ lists: LeadList[] }>('/api/lists');
+}
+
+export async function createLeadList(name: string): Promise<{ list: LeadList }> {
+    return apiRequest<{ list: LeadList }>('/api/lists', {
+        method: 'POST',
+        body: JSON.stringify({ name }),
+    });
+}
+
+export async function getLeadList(listId: string): Promise<{ list: LeadList }> {
+    return apiRequest<{ list: LeadList }>(`/api/lists/${listId}`);
+}
+
+export async function getLeadListItems(listId: string): Promise<{ items: LeadListItem[] }> {
+    return apiRequest<{ items: LeadListItem[] }>(`/api/lists/${listId}/items`);
+}
+
+export async function addLeadsToList(listId: string, leads: any[]): Promise<{ added: number }> {
+    return apiRequest<{ added: number }>(`/api/lists/${listId}/items`, {
+        method: 'POST',
+        body: JSON.stringify({ leads }),
+    });
+}
+
+export async function bulkUpdateListItems(
+    listId: string,
+    itemIds: string[],
+    updates: { tags?: string[]; note?: string; pipeline?: string; score?: string }
+): Promise<{ updated: number }> {
+    return apiRequest<{ updated: number }>(`/api/lists/${listId}/items/bulk`, {
+        method: 'PATCH',
+        body: JSON.stringify({ itemIds, updates }),
+    });
+}
+
+export async function bulkDeleteListItems(listId: string, itemIds: string[]): Promise<{ deleted: number }> {
+    return apiRequest<{ deleted: number }>(`/api/lists/${listId}/items/bulk`, {
+        method: 'DELETE',
+        body: JSON.stringify({ itemIds }),
+    });
+}

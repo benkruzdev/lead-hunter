@@ -12,6 +12,7 @@ import creditsRoutes from './routes/credits.js';
 import configRoutes from './routes/config.js';
 import adminRoutes from './routes/admin.js';
 import searchRoutes from './routes/search.js';
+import listsRoutes from './routes/lists.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -41,7 +42,7 @@ app.use('/api/credits', creditsRoutes);
 app.use('/api/config', configRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/search', searchRoutes);
-
+app.use('/api/lists', listsRoutes);
 
 
 // Root endpoint
