@@ -34,7 +34,10 @@ router.post('/', requireAuth, async (req, res) => {
         const mockResults = generateMockResults(200, province, category);
 
         // Create search session
-        const { data: session, error: sessionError } = await supabaseAdmin
+        let session, sessionError;
+
+        // Try insert with keyword first (Section 5.4)
+        ({ data: session, error: sessionError } = await supabaseAdmin
             .from('search_sessions')
             .insert({
                 user_id: userId,
@@ -48,7 +51,26 @@ router.post('/', requireAuth, async (req, res) => {
                 viewed_pages: [1] // Page 1 is always free
             })
             .select()
-            .single();
+            .single());
+
+        // Fallback: if keyword column doesn't exist, retry without it
+        if (sessionError && (sessionError.message?.includes('keyword') || sessionError.message?.includes('schema cache'))) {
+            console.log('[Search] Keyword column not found, retrying without keyword');
+            ({ data: session, error: sessionError } = await supabaseAdmin
+                .from('search_sessions')
+                .insert({
+                    user_id: userId,
+                    province,
+                    district,
+                    category,
+                    min_rating: minRating || null,
+                    min_reviews: minReviews || null,
+                    total_results: mockResults.length,
+                    viewed_pages: [1]
+                })
+                .select()
+                .single());
+        }
 
         if (sessionError) {
             console.error('[Search] Failed to create session:', sessionError);
