@@ -107,6 +107,8 @@ const resources = {
                 addSuccessWithSkipped: '{{added}} lead eklendi, {{skipped}} zaten listede',
                 insufficientCredits: 'Yeterli krediniz yok. Lütfen kredi satın alın.',
                 addFailed: 'Lead eklenemedi. Lütfen tekrar deneyin.',
+                loadItemsFailed: 'Lead\'ler yüklenemedi',
+                missingListId: 'Liste bulunamadı',
             },
 
             // Onboarding
@@ -180,6 +182,8 @@ const resources = {
                 cancel: 'Cancel',
                 delete: 'Delete',
                 edit: 'Edit',
+                create: 'Create',
+                close: 'Close',
                 back: 'Back',
                 next: 'Next',
                 finish: 'Finish',
@@ -187,6 +191,7 @@ const resources = {
                 search: 'Search',
                 credits: 'Credits',
                 creditsRemaining: 'Credits Remaining',
+                retry: 'Retry',
             },
 
             // Layout
@@ -231,6 +236,8 @@ const resources = {
                 addSuccessWithSkipped: '{{added}} leads added, {{skipped}} already in list',
                 insufficientCredits: 'Insufficient credits. Please purchase credits.',
                 addFailed: 'Failed to add leads. Please try again.',
+                loadItemsFailed: 'Failed to load leads',
+                missingListId: 'List not found',
             },
 
             // Onboarding

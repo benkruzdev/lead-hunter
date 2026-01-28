@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -30,9 +31,11 @@ import {
 import { getLeadListItems, bulkUpdateListItems, bulkDeleteListItems, LeadListItem } from "@/lib/api";
 
 export default function ListDetail() {
+  const { t } = useTranslation();
   const { listId } = useParams<{ listId: string }>();
   const [items, setItems] = useState<LeadListItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
 
   // Bulk operations state
@@ -46,16 +49,33 @@ export default function ListDetail() {
   useEffect(() => {
     if (listId) {
       loadItems();
+    } else {
+      setError(t('leadLists.missingListId'));
+      setIsLoading(false);
     }
   }, [listId]);
 
   const loadItems = async () => {
+    if (!listId) {
+      setError(t('leadLists.missingListId'));
+      setIsLoading(false);
+      return;
+    }
+
     try {
       setIsLoading(true);
-      const { items } = await getLeadListItems(listId!);
-      setItems(items);
-    } catch (error) {
-      console.error('[ListDetail] Failed to load items:', error);
+      setError(null);
+      const response = await getLeadListItems(listId);
+
+      // Normalize response shape
+      const itemsArray = Array.isArray(response)
+        ? response
+        : ((response as any).items ?? (response as any).leadItems ?? []);
+
+      setItems(itemsArray);
+    } catch (err: any) {
+      console.error('[ListDetail] Failed to load items:', err);
+      setError(err?.message || t('leadLists.loadItemsFailed'));
     } finally {
       setIsLoading(false);
     }
@@ -181,6 +201,13 @@ export default function ListDetail() {
       {isLoading ? (
         <div className="flex items-center justify-center py-12">
           <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+        </div>
+      ) : error ? (
+        <div className="bg-card rounded-xl border shadow-soft p-12 text-center">
+          <p className="text-destructive mb-4">{error}</p>
+          <Button onClick={loadItems}>
+            {t('common.retry')}
+          </Button>
         </div>
       ) : items.length === 0 ? (
         <div className="bg-card rounded-xl border shadow-soft p-12 text-center">
