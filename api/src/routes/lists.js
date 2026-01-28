@@ -303,4 +303,4 @@ router.delete('/:listId/items/bulk', requireAuth, async (req, res) => {
     }
 });
 
-module.exports = router;
+export default router;
