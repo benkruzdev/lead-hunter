@@ -20,7 +20,12 @@ router.get('/', requireAuth, async (req, res) => {
 
         if (error) {
             console.error('[Lists] List error:', error);
-            return res.status(500).json({ error: 'Failed to fetch lists' });
+            return res.status(500).json({
+                error: 'Failed to fetch lists',
+                details: error.message || 'Unknown error',
+                code: error.code,
+                hint: error.hint
+            });
         }
 
         // Get item counts for each list
