@@ -1,6 +1,6 @@
-const express = require('express');
-const { requireAuth } = require('../middleware/auth');
-const { supabaseAdmin } = require('../config/supabase');
+import express from 'express';
+import { requireAuth } from '../middleware/auth.js';
+import { supabaseAdmin } from '../config/supabase.js';
 
 const router = express.Router();
 
