@@ -113,6 +113,7 @@ export default function SearchPage() {
   const [isLoadingLists, setIsLoadingLists] = useState(false);
   const [isAddingToList, setIsAddingToList] = useState(false);
   const [dryRunCost, setDryRunCost] = useState<number | null>(null);
+  const [listDialogError, setListDialogError] = useState<string | null>(null);
 
   const resultsPerPage = 20;
   const totalPages = Math.max(1, Math.ceil(totalResults / resultsPerPage));
@@ -815,12 +816,18 @@ export default function SearchPage() {
                 </p>
               </div>
             )}
+            {listDialogError && (
+              <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-3 text-sm text-destructive">
+                {listDialogError}
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => {
               setShowListDialog(false);
               setSelectedListId("");
               setDryRunCost(null);
+              setListDialogError(null);
             }}>
               {t('common.cancel')}
             </Button>
@@ -828,6 +835,7 @@ export default function SearchPage() {
               disabled={!selectedListId || isAddingToList || dryRunCost === null}
               onClick={async () => {
                 setIsAddingToList(true);
+                setListDialogError(null);
                 try {
                   const selectedLeads = results.filter(r => selectedIds.includes(r.id));
                   const result = await addLeadsToList(selectedListId, selectedLeads);
@@ -835,6 +843,7 @@ export default function SearchPage() {
                   setShowListDialog(false);
                   setSelectedListId("");
                   setDryRunCost(null);
+                  setListDialogError(null);
                   setSelectedIds([]);
 
                   await refreshProfile();
@@ -844,9 +853,11 @@ export default function SearchPage() {
                 } catch (error: any) {
                   console.error('[SearchPage] Add to list failed:', error);
                   if (error.status === 402) {
-                    setErrorMessage(t('leadLists.insufficientCredits'));
+                    const requiredText = error.required ? ` ${error.required} kredi gerekli,` : '';
+                    const availableText = error.available !== undefined ? ` ${error.available} kredi mevcut.` : '';
+                    setListDialogError(t('leadLists.insufficientCredits') + requiredText + availableText);
                   } else {
-                    setErrorMessage(t('leadLists.addFailed'));
+                    setListDialogError(t('leadLists.addFailed'));
                   }
                 } finally {
                   setIsAddingToList(false);
