@@ -32,7 +32,8 @@ import { getLeadListItems, bulkUpdateListItems, bulkDeleteListItems, LeadListIte
 
 export default function ListDetail() {
   const { t } = useTranslation();
-  const { listId } = useParams<{ listId: string }>();
+  const params = useParams<{ listId?: string; id?: string }>();
+  const listId = (params.listId || params.id) as string | undefined;
   const [items, setItems] = useState<LeadListItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

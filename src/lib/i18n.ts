@@ -5,6 +5,18 @@ import LanguageDetector from 'i18next-browser-languagedetector';
 const resources = {
     tr: {
         translation: {
+            // Common
+            common: {
+                cancel: 'İptal',
+                save: 'Kaydet',
+                delete: 'Sil',
+                edit: 'Düzenle',
+                create: 'Oluştur',
+                close: 'Kapat',
+                back: 'Geri',
+                retry: 'Tekrar Dene',
+            },
+
             // Auth
             auth: {
                 login: 'Giriş Yap',
