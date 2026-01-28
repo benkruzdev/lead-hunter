@@ -149,86 +149,57 @@ router.post('/:listId/items', requireAuth, async (req, res) => {
     try {
         const userId = req.user.id;
         const { listId } = req.params;
-        const { leads } = req.body;
+        const { leads, dryRun } = req.body;
 
         if (!Array.isArray(leads) || leads.length === 0) {
             return res.status(400).json({ error: 'Leads array is required' });
         }
 
-        // Verify list ownership
-        const { data: list, error: listError } = await supabaseAdmin
-            .from('lead_lists')
-            .select('id')
-            .eq('id', listId)
-            .eq('user_id', userId)
-            .single();
+        const { data, error } = await supabaseAdmin.rpc('add_leads_to_list_atomic', {
+            p_user_id: userId,
+            p_list_id: listId,
+            p_leads: leads,
+            p_dry_run: dryRun === true
+        });
 
-        if (listError || !list) {
-            return res.status(404).json({ error: 'List not found' });
+        if (error) {
+            console.error('[Lists] RPC error:', error);
+
+            switch (error.message) {
+                case 'LIST_NOT_FOUND':
+                    return res.status(404).json({ error: 'List not found' });
+
+                case 'INSUFFICIENT_CREDITS':
+                    try {
+                        const detail = JSON.parse(error.details || '{}');
+                        return res.status(402).json({
+                            error: 'Insufficient credits',
+                            required: detail.required || 0,
+                            available: detail.available || 0
+                        });
+                    } catch (parseError) {
+                        return res.status(402).json({
+                            error: 'Insufficient credits',
+                            required: 0,
+                            available: 0
+                        });
+                    }
+
+                case 'INVALID_PAYLOAD':
+                    return res.status(400).json({ error: 'Invalid payload format' });
+
+                case 'INVALID_LEAD':
+                    return res.status(400).json({
+                        error: 'Invalid lead data',
+                        detail: error.details || 'missing_place_id'
+                    });
+
+                default:
+                    return res.status(500).json({ error: 'Failed to add leads' });
+            }
         }
 
-        // Get existing items to avoid duplicates
-        const { data: existingItems } = await supabaseAdmin
-            .from('lead_list_items')
-            .select('place_id')
-            .eq('list_id', listId);
-
-        const existingPlaceIds = new Set(existingItems?.map(item => item.place_id) || []);
-        const newLeads = leads.filter(lead => !existingPlaceIds.has(lead.place_id || lead.id));
-
-        if (newLeads.length === 0) {
-            return res.json({ added: 0, message: 'All leads already in list' });
-        }
-
-        // Check credits (1 credit per lead)
-        const { data: profile } = await supabaseAdmin
-            .from('profiles')
-            .select('credits')
-            .eq('id', userId)
-            .single();
-
-        if (!profile || profile.credits < newLeads.length) {
-            return res.status(402).json({
-                error: 'Insufficient credits',
-                required: newLeads.length,
-                available: profile?.credits || 0
-            });
-        }
-
-        // Add leads
-        const itemsToInsert = newLeads.map(lead => ({
-            user_id: userId,
-            list_id: listId,
-            place_id: lead.place_id || lead.id?.toString() || `temp_${Date.now()}_${Math.random()}`,
-            name: lead.name,
-            phone: lead.phone,
-            website: lead.website,
-            email: lead.email || null,
-            rating: lead.rating,
-            reviews_count: lead.reviews || lead.reviews_count,
-            raw: lead
-        }));
-
-        const { error: insertError } = await supabaseAdmin
-            .from('lead_list_items')
-            .insert(itemsToInsert);
-
-        if (insertError) {
-            console.error('[Lists] Insert error:', insertError);
-            return res.status(500).json({ error: 'Failed to add leads' });
-        }
-
-        // Deduct credits
-        const { error: creditError } = await supabaseAdmin
-            .from('profiles')
-            .update({ credits: profile.credits - newLeads.length })
-            .eq('id', userId);
-
-        if (creditError) {
-            console.error('[Lists] Credit deduction error:', creditError);
-        }
-
-        res.json({ added: newLeads.length });
+        res.json(data);
     } catch (err) {
         console.error('[Lists] Error:', err);
         res.status(500).json({ error: 'Internal server error' });

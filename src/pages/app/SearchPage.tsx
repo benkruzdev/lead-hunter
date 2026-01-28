@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSearchParams, useNavigate } from "react-router-dom";
-import { performSearch, getSearchPage, getSearchSession, SearchResult } from "@/lib/api";
+import { performSearch, getSearchPage, getSearchSession, SearchResult, getLeadLists, addLeadsToList, LeadList } from "@/lib/api";
 import OnboardingTour from "@/components/onboarding/OnboardingTour";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -78,6 +79,7 @@ const generateMockResults = (count: number = 200) => {
 const mockResults = generateMockResults(200);
 
 export default function SearchPage() {
+  const { t } = useTranslation();
   const { profile, refreshProfile } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -103,6 +105,14 @@ export default function SearchPage() {
   const [showPaginationModal, setShowPaginationModal] = useState(false);
   const [pendingPage, setPendingPage] = useState<number | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null); // PR4: Error handling
+
+  // List selection dialog state
+  const [showListDialog, setShowListDialog] = useState(false);
+  const [userLists, setUserLists] = useState<LeadList[]>([]);
+  const [selectedListId, setSelectedListId] = useState<string>("");
+  const [isLoadingLists, setIsLoadingLists] = useState(false);
+  const [isAddingToList, setIsAddingToList] = useState(false);
+  const [dryRunCost, setDryRunCost] = useState<number | null>(null);
 
   const resultsPerPage = 20;
   const totalPages = Math.max(1, Math.ceil(totalResults / resultsPerPage));
@@ -482,9 +492,18 @@ export default function SearchPage() {
               <Button
                 data-onboarding="add-to-list"
                 disabled={selectedIds.length === 0}
-                onClick={() => {
-                  alert(`${selectedIds.length} lead listenize eklendi!`);
-                  setSelectedIds([]);
+                onClick={async () => {
+                  setIsLoadingLists(true);
+                  setShowListDialog(true);
+                  try {
+                    const { lists } = await getLeadLists();
+                    setUserLists(lists);
+                  } catch (error) {
+                    console.error('[SearchPage] Failed to load lists:', error);
+                    setErrorMessage(t('leadLists.loadListsFailed'));
+                  } finally {
+                    setIsLoadingLists(false);
+                  }
                 }}
               >
                 <Plus className="w-4 h-4" />
@@ -741,6 +760,110 @@ export default function SearchPage() {
             </Button>
             <Button onClick={() => confirmPageChange()}>
               Onayla (10 kredi)
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* List Selection Dialog */}
+      <Dialog open={showListDialog} onOpenChange={setShowListDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t('leadLists.addToListTitle')}</DialogTitle>
+            <DialogDescription>
+              {t('leadLists.leadsSelected', { count: selectedIds.length })}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            {isLoadingLists ? (
+              <div className="text-center py-8">
+                <Loader2 className="w-6 h-6 animate-spin mx-auto text-muted-foreground" />
+              </div>
+            ) : userLists.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-sm text-muted-foreground">{t('leadLists.noListsYet')}</p>
+              </div>
+            ) : (
+              <Select value={selectedListId} onValueChange={async (listId) => {
+                setSelectedListId(listId);
+                setDryRunCost(null);
+                try {
+                  const selectedLeads = results.filter(r => selectedIds.includes(r.id));
+                  const dryRunResult = await addLeadsToList(listId, selectedLeads, { dryRun: true });
+                  setDryRunCost(dryRunResult.creditCost || 0);
+                } catch (error) {
+                  console.error('[SearchPage] DryRun failed:', error);
+                }
+              }}>
+                <SelectTrigger>
+                  <SelectValue placeholder={t('leadLists.selectList')} />
+                </SelectTrigger>
+                <SelectContent>
+                  {userLists.map((list) => (
+                    <SelectItem key={list.id} value={list.id}>
+                      {list.name} ({list.lead_count} lead)
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+            {dryRunCost !== null && (
+              <div className="bg-muted/50 rounded-lg p-4">
+                <p className="text-sm font-medium">{t('leadLists.costLabel', { cost: dryRunCost })}</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {dryRunCost === 0 ? t('leadLists.allDuplicates') : t('leadLists.willAddN', { count: dryRunCost })}
+                </p>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setShowListDialog(false);
+              setSelectedListId("");
+              setDryRunCost(null);
+            }}>
+              {t('common.cancel')}
+            </Button>
+            <Button
+              disabled={!selectedListId || isAddingToList || dryRunCost === null}
+              onClick={async () => {
+                setIsAddingToList(true);
+                try {
+                  const selectedLeads = results.filter(r => selectedIds.includes(r.id));
+                  const result = await addLeadsToList(selectedListId, selectedLeads);
+
+                  setShowListDialog(false);
+                  setSelectedListId("");
+                  setDryRunCost(null);
+                  setSelectedIds([]);
+
+                  await refreshProfile();
+
+                  setErrorMessage(`${result.addedCount} lead eklendi${result.skippedCount ? `, ${result.skippedCount} zaten listede` : ''}`);
+                  setTimeout(() => setErrorMessage(null), 5000);
+                } catch (error: any) {
+                  console.error('[SearchPage] Add to list failed:', error);
+                  if (error.status === 402) {
+                    setErrorMessage(t('leadLists.insufficientCredits'));
+                  } else {
+                    setErrorMessage(t('leadLists.addFailed'));
+                  }
+                } finally {
+                  setIsAddingToList(false);
+                }
+              }}
+            >
+              {isAddingToList ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  {t('leadLists.adding')}
+                </>
+              ) : (
+                <>
+                  <Plus className="w-4 h-4" />
+                  {t('leadLists.addButtonWithCost', { cost: dryRunCost ?? '?' })}
+                </>
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>

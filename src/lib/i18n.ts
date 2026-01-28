@@ -197,6 +197,24 @@ const resources = {
                 timeAgo: '{{time}} ago',
             },
 
+            // Lead Lists
+            leadLists: {
+                addToListTitle: 'Add to List',
+                leadsSelected: '{{count}} leads selected. Choose the list to add them to.',
+                selectList: 'Select list',
+                noListsYet: 'You haven\'t created any lists yet.',
+                costLabel: 'Cost: {{cost}} credits',
+                allDuplicates: 'All leads are already in the list',
+                willAddN: '{{count}} new leads will be added',
+                addButtonWithCost: 'Add ({{cost}} credits)',
+                adding: 'Adding...',
+                loadListsFailed: 'Failed to load lists.',
+                addSuccess: '{{count}} leads added',
+                addSuccessWithSkipped: '{{added}} leads added, {{skipped}} already in list',
+                insufficientCredits: 'Insufficient credits. Please purchase credits.',
+                addFailed: 'Failed to add leads. Please try again.',
+            },
+
             // Onboarding
             onboarding: {
                 welcome: 'Welcome to LeadHunter!',

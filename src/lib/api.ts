@@ -373,10 +373,14 @@ export async function getLeadListItems(listId: string): Promise<{ items: LeadLis
     return apiRequest<{ items: LeadListItem[] }>(`/api/lists/${listId}/items`);
 }
 
-export async function addLeadsToList(listId: string, leads: any[]): Promise<{ added: number }> {
-    return apiRequest<{ added: number }>(`/api/lists/${listId}/items`, {
+export async function addLeadsToList(
+    listId: string,
+    leads: any[],
+    options?: { dryRun?: boolean }
+): Promise<{ addedCount?: number; skippedCount?: number; creditCost?: number; wouldAddCount?: number; wouldSkipCount?: number }> {
+    return apiRequest<any>(`/api/lists/${listId}/items`, {
         method: 'POST',
-        body: JSON.stringify({ leads }),
+        body: JSON.stringify({ leads, dryRun: options?.dryRun }),
     });
 }
 
