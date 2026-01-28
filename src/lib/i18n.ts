@@ -91,6 +91,24 @@ const resources = {
                 timeAgo: '{{time}} önce',
             },
 
+            // Lead Lists
+            leadLists: {
+                addToListTitle: 'Listeye Ekle',
+                leadsSelected: '{{count}} lead seçildi. Eklemek istediğiniz listeyi seçin.',
+                selectList: 'Liste seçin',
+                noListsYet: 'Henüz liste oluşturmadınız.',
+                costLabel: 'Maliyet: {{cost}} kredi',
+                allDuplicates: 'Tüm lead\'ler zaten listede',
+                willAddN: '{{count}} yeni lead eklenecek',
+                addButtonWithCost: 'Ekle ({{cost}} kredi)',
+                adding: 'Ekleniyor...',
+                loadListsFailed: 'Liste yüklenemedi.',
+                addSuccess: '{{count}} lead eklendi',
+                addSuccessWithSkipped: '{{added}} lead eklendi, {{skipped}} zaten listede',
+                insufficientCredits: 'Yeterli krediniz yok. Lütfen kredi satın alın.',
+                addFailed: 'Lead eklenemedi. Lütfen tekrar deneyin.',
+            },
+
             // Onboarding
             onboarding: {
                 welcome: 'LeadHunter\'a Hoş Geldiniz!',
