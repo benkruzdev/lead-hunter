@@ -5,6 +5,7 @@ import { performSearch, getSearchPage, getSearchSession, SearchResult, getLeadLi
 import OnboardingTour from "@/components/onboarding/OnboardingTour";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
