@@ -148,6 +148,20 @@ export default function SearchPage() {
       setViewedPages(new Set(session.viewed_pages));
       setTotalResults(session.total_results);
       setHasSearched(true);
+
+      // PRODUCT_SPEC 5.4: Auto-load page 1 results for resumed session
+      const searchResponse = await performSearch({
+        province: session.province || "",
+        district: session.district || "",
+        category: session.category || "",
+        keyword: session.keyword || "",
+        minRating: session.min_rating || undefined,
+        minReviews: session.min_reviews || undefined,
+        sessionId: sid
+      });
+
+      setResults(searchResponse.results);
+      setCurrentPage(1);
     } catch (error: any) {
       console.error('[SearchPage] Session load error:', error);
       if (error.status === 410) {

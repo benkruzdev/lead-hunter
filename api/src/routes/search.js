@@ -24,8 +24,44 @@ const router = express.Router();
  */
 router.post('/', requireAuth, async (req, res) => {
     try {
-        const { province, district, category, keyword, minRating, minReviews } = req.body;
         const userId = req.user.id;
+        const { province, district, category, keyword, minRating, minReviews, sessionId } = req.body;
+
+        // PRODUCT_SPEC 5.4: Resume existing session
+        if (sessionId) {
+            const { data: existingSession, error: sessionError } = await supabaseAdmin
+                .from('search_sessions')
+                .select('*')
+                .eq('id', sessionId)
+                .eq('user_id', userId)
+                .single();
+
+            if (sessionError || !existingSession) {
+                return res.status(404).json({ error: 'Session not found' });
+            }
+
+            if (new Date(existingSession.expires_at) < new Date()) {
+                return res.status(410).json({ error: 'Session expired' });
+            }
+
+            // Use session filters to generate results
+            const sessionProvince = existingSession.province || existingSession.filters?.province || province;
+            const sessionCategory = existingSession.category || existingSession.filters?.category || category;
+            const mockResults = generateMockResults(200, sessionProvince, sessionCategory);
+
+            // Return page 1 (always free for existing session)
+            return res.json({
+                sessionId: existingSession.id,
+                results: mockResults.slice(0, 20),
+                totalResults: mockResults.length,
+                currentPage: 1
+            });
+        }
+
+        // PRODUCT_SPEC 5.3: Create new session
+        if (!province || !category) {
+            return res.status(400).json({ error: 'Province and category are required' });
+        }
 
         console.log('[Search] New search request:', { province, district, category, userId });
 

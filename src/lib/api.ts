@@ -223,6 +223,7 @@ export interface SearchParams {
     keyword?: string;
     minRating?: number;
     minReviews?: number;
+    sessionId?: string;
 }
 
 export interface SearchResult {
