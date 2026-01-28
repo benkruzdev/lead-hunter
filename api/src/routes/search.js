@@ -251,20 +251,44 @@ router.get('/sessions', requireAuth, async (req, res) => {
 
         const { data: sessions, error } = await supabaseAdmin
             .from('search_sessions')
-            .select('id, province, district, category, keyword, total_results, viewed_pages, created_at, expires_at')
+            .select('*')
             .eq('user_id', userId)
             .gt('expires_at', new Date().toISOString())
             .order('created_at', { ascending: false });
 
         if (error) {
             console.error('[Sessions] List error:', error);
-            return res.status(500).json({ error: 'Failed to fetch sessions' });
+            console.error('[Sessions] Error details:', error.message, error.details);
+            return res.status(500).json({
+                error: 'Failed to fetch sessions',
+                details: error.message
+            });
         }
 
-        res.json({ sessions });
+        // Normalize response for schema compatibility
+        const normalizedSessions = sessions.map(row => ({
+            id: row.id,
+            province: row.province ?? row.filters?.province ?? row.filters?.city ?? null,
+            district: row.district ?? row.filters?.district ?? row.filters?.town ?? null,
+            category: row.category ?? row.filters?.category ?? null,
+            keyword: row.keyword ?? row.filters?.keyword ?? null,
+            min_rating: row.min_rating ?? row.filters?.minRating ?? null,
+            min_reviews: row.min_reviews ?? row.filters?.minReviews ?? null,
+            total_results: row.total_results ?? row.filters?.totalResults ?? 0,
+            viewed_pages: Array.isArray(row.viewed_pages) ? row.viewed_pages :
+                (Array.isArray(row.filters?.viewed_pages) ? row.filters.viewed_pages : []),
+            created_at: row.created_at,
+            expires_at: row.expires_at
+        }));
+
+        res.json({ sessions: normalizedSessions });
     } catch (err) {
         console.error('[Sessions] Error:', err);
-        res.status(500).json({ error: 'Internal server error' });
+        console.error('[Sessions] Error stack:', err.stack);
+        res.status(500).json({
+            error: 'Internal server error',
+            details: err.message
+        });
     }
 });
 
