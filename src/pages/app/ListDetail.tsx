@@ -501,7 +501,8 @@ export default function ListDetail() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="csv">{t('exports.csv')}</SelectItem>
-                  <SelectItem value="xlsx">{t('exports.excel')}</SelectItem>
+                  {/* XLSX temporarily disabled - pending xlsx library implementation */}
+                  {/* <SelectItem value="xlsx">{t('exports.excel')}</SelectItem> */}
                 </SelectContent>
               </Select>
             </div>
