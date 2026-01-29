@@ -55,7 +55,9 @@ app.get('/', (req, res) => {
             health: '/api/health',
             auth: '/api/auth',
             credits: '/api/credits',
-            config: '/api/config'
+            config: '/api/config',
+            search: '/api/search',
+            lists: '/api/lists'
         }
     });
 });
@@ -73,7 +75,13 @@ app.use((req, res) => {
             '/api/credits/balance',
             '/api/credits/history',
             '/api/credits/deduct',
-            '/api/config/auth'
+            '/api/config/auth',
+            '/api/search',
+            '/api/search/sessions',
+            '/api/lists',
+            '/api/lists/:listId',
+            '/api/lists/:listId/items',
+            '/api/lists/:listId/items/:itemId/enrich'
         ]
     });
 });
@@ -108,6 +116,13 @@ Available endpoints:
   - GET  /api/credits/history
   - POST /api/credits/deduct
   - GET  /api/config/auth
+  - POST /api/search
+  - GET  /api/search/sessions
+  - GET  /api/lists
+  - POST /api/lists
+  - GET  /api/lists/:listId/items
+  - POST /api/lists/:listId/items
+  - POST /api/lists/:listId/items/:itemId/enrich
   `);
 });
 
