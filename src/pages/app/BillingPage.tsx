@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -13,31 +12,65 @@ import {
 } from '@/components/ui/dialog';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
-import { CreditCard, Check } from 'lucide-react';
+import { CreditCard } from 'lucide-react';
 import { getCreditPackages, createOrder, getOrders } from '@/lib/api';
 import { formatDistanceToNow } from 'date-fns';
 import { tr, enUS } from 'date-fns/locale';
 
 export default function BillingPage() {
   const { t, i18n } = useTranslation();
-  const queryClient = useQueryClient();
+
+  // State
+  const [packages, setPackages] = useState<any[]>([]);
+  const [orders, setOrders] = useState<any[]>([]);
+  const [isLoadingPackages, setIsLoadingPackages] = useState(true);
+  const [isLoadingOrders, setIsLoadingOrders] = useState(true);
+  const [packagesError, setPackagesError] = useState<string | null>(null);
+  const [ordersError, setOrdersError] = useState<string | null>(null);
+
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
   const [selectedPackage, setSelectedPackage] = useState<any>(null);
   const [paymentMethod, setPaymentMethod] = useState('manual');
   const [isCreatingOrder, setIsCreatingOrder] = useState(false);
   const [orderError, setOrderError] = useState<string | null>(null);
 
-  // Fetch packages
-  const { data: packagesData, isLoading: isLoadingPackages, error: packagesError } = useQuery(
-    ['creditPackages'],
-    getCreditPackages
-  );
+  // Fetch packages on mount
+  useEffect(() => {
+    const fetchPackages = async () => {
+      try {
+        setIsLoadingPackages(true);
+        setPackagesError(null);
+        const data = await getCreditPackages();
+        setPackages(data.packages || []);
+      } catch (error: any) {
+        console.error('[BillingPage] Failed to load packages:', error);
+        setPackagesError(error.message || 'Failed to load packages');
+      } finally {
+        setIsLoadingPackages(false);
+      }
+    };
 
-  // Fetch orders
-  const { data: ordersData, isLoading: isLoadingOrders, error: ordersError } = useQuery(
-    ['orders'],
-    getOrders
-  );
+    fetchPackages();
+  }, []);
+
+  // Fetch orders on mount
+  useEffect(() => {
+    const fetchOrders = async () => {
+      try {
+        setIsLoadingOrders(true);
+        setOrdersError(null);
+        const data = await getOrders();
+        setOrders(data.orders || []);
+      } catch (error: any) {
+        console.error('[BillingPage] Failed to load orders:', error);
+        setOrdersError(error.message || 'Failed to load orders');
+      } finally {
+        setIsLoadingOrders(false);
+      }
+    };
+
+    fetchOrders();
+  }, []);
 
   const handleBuyClick = (pkg: any) => {
     setSelectedPackage(pkg);
@@ -55,14 +88,15 @@ export default function BillingPage() {
       await createOrder(selectedPackage.id, paymentMethod);
 
       // Refresh orders
-      queryClient.invalidateQueries(['orders']);
+      const data = await getOrders();
+      setOrders(data.orders || []);
 
       // Close dialog and show success
       setShowPaymentDialog(false);
       setSelectedPackage(null);
       setPaymentMethod('manual');
 
-      // Show success message (you could use a toast here)
+      // Show success message
       alert(t('billing.orderCreated') + ': ' + t('billing.orderCreatedDesc'));
     } catch (error: any) {
       console.error('[BillingPage] Order creation failed:', error);
@@ -103,9 +137,9 @@ export default function BillingPage() {
           </div>
         )}
 
-        {packagesData && (
+        {!isLoadingPackages && !packagesError && packages.length > 0 && (
           <div className="grid md:grid-cols-3 gap-6">
-            {packagesData.packages.map((pkg, index) => (
+            {packages.map((pkg, index) => (
               <div
                 key={pkg.id}
                 className={`relative bg-card rounded-xl border p-6 transition-all duration-300 hover:shadow-card ${index === 1 ? 'border-primary shadow-glow' : ''
@@ -157,7 +191,7 @@ export default function BillingPage() {
           </div>
         )}
 
-        {ordersData && ordersData.orders.length === 0 && (
+        {!isLoadingOrders && !ordersError && orders.length === 0 && (
           <div className="bg-card rounded-xl border p-8 text-center">
             <p className="text-muted-foreground mb-2">{t('billing.noOrders')}</p>
             <p className="text-sm text-muted-foreground">
@@ -166,7 +200,7 @@ export default function BillingPage() {
           </div>
         )}
 
-        {ordersData && ordersData.orders.length > 0 && (
+        {!isLoadingOrders && !ordersError && orders.length > 0 && (
           <div className="bg-card rounded-xl border shadow-soft overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full">
@@ -182,7 +216,7 @@ export default function BillingPage() {
                       {t('billing.credits')}
                     </th>
                     <th className="text-left p-4 text-sm font-medium text-muted-foreground">
-                      {t('common.status')}
+                      Status
                     </th>
                     <th className="text-left p-4 text-sm font-medium text-muted-foreground">
                       {t('billing.orderDate')}
@@ -190,7 +224,7 @@ export default function BillingPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {ordersData.orders.map((order) => (
+                  {orders.map((order) => (
                     <tr
                       key={order.id}
                       className="border-b hover:bg-muted/30 transition-colors"
