@@ -39,6 +39,22 @@ async function apiRequest<T>(
 }
 
 /**
+ * Enrich lead list item with email and social links
+ * PRODUCT_SPEC 5.7: 1 credit per successful enrichment
+ */
+export async function enrichLeadListItem(listId: string, itemId: string): Promise<{
+    status: 'success' | 'failed';
+    email: string | null;
+    social_links: Record<string, string>;
+    creditSpent: number;
+}> {
+    return apiRequest(`/api/lists/${listId}/items/${itemId}/enrich`, {
+        method: 'POST',
+    });
+}
+
+
+/**
  * Get current user's profile
  * GET /api/auth/profile
  */

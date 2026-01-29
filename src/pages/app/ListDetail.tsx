@@ -28,7 +28,7 @@ import {
   Tags,
   StickyNote,
 } from "lucide-react";
-import { getLeadListItems, bulkUpdateListItems, bulkDeleteListItems, LeadListItem } from "@/lib/api";
+import { getLeadListItems, bulkUpdateListItems, bulkDeleteListItems, enrichLeadListItem, LeadListItem } from "@/lib/api";
 
 export default function ListDetail() {
   const { t } = useTranslation();
@@ -46,6 +46,12 @@ export default function ListDetail() {
   const [bulkTagInput, setBulkTagInput] = useState("");
   const [bulkNoteInput, setBulkNoteInput] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
+
+  // Enrichment state
+  const [showEnrichDialog, setShowEnrichDialog] = useState(false);
+  const [enrichItemId, setEnrichItemId] = useState<string | null>(null);
+  const [isEnriching, setIsEnriching] = useState(false);
+  const [enrichError, setEnrichError] = useState<string | null>(null);
 
   useEffect(() => {
     if (listId) {
@@ -148,6 +154,35 @@ export default function ListDetail() {
     }
   };
 
+  const handleEnrich = async () => {
+    if (!enrichItemId || !listId) return;
+
+    try {
+      setIsEnriching(true);
+      setEnrichError(null);
+
+      const result = await enrichLeadListItem(listId, enrichItemId);
+
+      if (result.status === 'success') {
+        // Reload items to show updated data
+        await loadItems();
+        setShowEnrichDialog(false);
+        setEnrichItemId(null);
+      } else {
+        setEnrichError(t('leadEnrichment.notFound'));
+      }
+    } catch (error: any) {
+      console.error('[ListDetail] Enrichment failed:', error);
+      if (error.status === 402) {
+        setEnrichError(t('leadEnrichment.insufficientCredits'));
+      } else {
+        setEnrichError(t('leadEnrichment.failed'));
+      }
+    } finally {
+      setIsEnriching(false);
+    }
+  };
+
   const allSelected = items.length > 0 && selectedItemIds.length === items.length;
   const someSelected = selectedItemIds.length > 0 && selectedItemIds.length < items.length;
 
@@ -238,6 +273,7 @@ export default function ListDetail() {
                   <th className="p-3 text-left text-sm font-medium">Pipeline</th>
                   <th className="p-3 text-left text-sm font-medium">Not</th>
                   <th className="p-3 text-left text-sm font-medium">Etiketler</th>
+                  <th className="p-3 text-left text-sm font-medium">İşlem</th>
                 </tr>
               </thead>
               <tbody>
@@ -280,6 +316,19 @@ export default function ListDetail() {
                           <span className="text-sm text-muted-foreground">-</span>
                         )}
                       </div>
+                    </td>
+                    <td className="p-3">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setEnrichItemId(item.id);
+                          setShowEnrichDialog(true);
+                          setEnrichError(null);
+                        }}
+                      >
+                        {t('leadEnrichment.title')}
+                      </Button>
                     </td>
                   </tr>
                 ))}
@@ -354,6 +403,42 @@ export default function ListDetail() {
             </Button>
             <Button variant="destructive" onClick={handleBulkDelete} disabled={isProcessing}>
               {isProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Sil'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Enrichment Dialog */}
+      <Dialog open={showEnrichDialog} onOpenChange={(open) => {
+        setShowEnrichDialog(open);
+        if (!open) {
+          setEnrichItemId(null);
+          setEnrichError(null);
+        }
+      }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t('leadEnrichment.confirmTitle')}</DialogTitle>
+            <DialogDescription>
+              {t('leadEnrichment.confirmMessage')}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              {t('leadEnrichment.costNote')}
+            </p>
+            {enrichError && (
+              <div className="bg-destructive/10 text-destructive p-3 rounded-md text-sm">
+                {enrichError}
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowEnrichDialog(false)} disabled={isEnriching}>
+              {t('common.cancel')}
+            </Button>
+            <Button onClick={handleEnrich} disabled={isEnriching}>
+              {isEnriching ? t('leadEnrichment.running') : t('leadEnrichment.title')}
             </Button>
           </DialogFooter>
         </DialogContent>

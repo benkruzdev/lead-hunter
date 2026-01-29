@@ -130,6 +130,19 @@ const resources = {
                 cold: 'Soğuk',
             },
 
+            // Lead Enrichment
+            leadEnrichment: {
+                title: 'Detayları Tamamla',
+                costNote: '1 kredi (sadece başarılı olursa)',
+                running: 'İşleniyor...',
+                success: 'Detaylar güncellendi',
+                notFound: 'Bilgi bulunamadı',
+                failed: 'İşlem başarısız',
+                insufficientCredits: 'Yeterli krediniz yok',
+                confirmTitle: 'Detayları Tamamla',
+                confirmMessage: 'Bu lead için web sitesinden email ve sosyal medya bağlantıları bulunacak.',
+            },
+
             // Onboarding
             onboarding: {
                 welcome: 'LeadHunter\'a Hoş Geldiniz!',
@@ -264,6 +277,19 @@ const resources = {
                 hot: 'Hot',
                 warm: 'Warm',
                 cold: 'Cold',
+            },
+
+            // Lead Enrichment
+            leadEnrichment: {
+                title: 'Complete Details',
+                costNote: '1 credit (only if successful)',
+                running: 'Processing...',
+                success: 'Details updated',
+                notFound: 'No information found',
+                failed: 'Operation failed',
+                insufficientCredits: 'Insufficient credits',
+                confirmTitle: 'Complete Details',
+                confirmMessage: 'Email and social media links will be extracted from the website.',
             },
 
             // Onboarding
