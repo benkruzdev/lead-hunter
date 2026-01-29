@@ -5,6 +5,9 @@ import { generateCSV, generateXLSX } from '../utils/exportUtils.js';
 
 const router = express.Router();
 
+// Exports bucket name - configurable via env
+const BUCKET_NAME = process.env.SUPABASE_EXPORTS_BUCKET || 'exports';
+
 /**
  * POST /api/exports
  * Create a new export
@@ -51,6 +54,25 @@ router.post('/', requireAuth, async (req, res) => {
             return res.status(400).json({ error: 'List has no items to export' });
         }
 
+        // Check if exports bucket exists
+        const { data: buckets, error: bucketsError } = await supabaseAdmin.storage.listBuckets();
+        if (bucketsError) {
+            console.error('[Exports] Failed to list buckets:', bucketsError);
+            return res.status(500).json({
+                error: 'Storage configuration error',
+                details: bucketsError.message
+            });
+        }
+
+        const bucketExists = buckets?.some(b => b.name === BUCKET_NAME);
+        if (!bucketExists) {
+            console.error(`[Exports] Bucket "${BUCKET_NAME}" not found in Supabase Storage`);
+            return res.status(500).json({
+                error: 'Exports bucket not found',
+                details: `Create Supabase Storage bucket named "${BUCKET_NAME}" (PRIVATE) in Dashboard > Storage and redeploy.`
+            });
+        }
+
         // Generate export file and ensure Buffer format
         let fileContent;
         if (format === 'csv') {
@@ -65,10 +87,10 @@ router.post('/', requireAuth, async (req, res) => {
         const fileName = `${list.name.replace(/[^a-z0-9]/gi, '_')}_${Date.now()}.${format}`;
         const storagePath = `${userId}/${fileName}`;
 
-        // Upload to Supabase Storage (private bucket: exports)
+        // Upload to Supabase Storage (private bucket)
         const { data: uploadData, error: uploadError } = await supabaseAdmin
             .storage
-            .from('exports')
+            .from(BUCKET_NAME)
             .upload(storagePath, fileContent, {
                 contentType: format === 'csv' ? 'text/csv' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
                 upsert: false
@@ -76,7 +98,16 @@ router.post('/', requireAuth, async (req, res) => {
 
         if (uploadError) {
             console.error('[Exports] Upload error:', uploadError);
-            console.error('[Exports] Upload details - bucket: exports, path:', storagePath, ', size:', fileContent.length);
+            console.error('[Exports] Upload details - bucket:', BUCKET_NAME, ', path:', storagePath, ', size:', fileContent.length);
+
+            // Detect bucket not found error
+            if (uploadError.message && uploadError.message.toLowerCase().includes('bucket not found')) {
+                return res.status(500).json({
+                    error: 'Exports bucket not found',
+                    details: `Create Supabase Storage bucket named "${BUCKET_NAME}" (PRIVATE) in Dashboard > Storage and redeploy.`
+                });
+            }
+
             return res.status(500).json({ error: 'Failed to upload export file', details: uploadError.message });
         }
 
@@ -103,7 +134,7 @@ router.post('/', requireAuth, async (req, res) => {
         // Generate signed URL for download (valid for 1 hour)
         const { data: signedUrlData, error: signedUrlError } = await supabaseAdmin
             .storage
-            .from('exports')
+            .from(BUCKET_NAME)
             .createSignedUrl(storagePath, 3600);
 
         if (signedUrlError) {
@@ -196,7 +227,7 @@ router.get('/:exportId/download', requireAuth, async (req, res) => {
         // Generate signed URL (valid for 1 hour)
         const { data: signedUrlData, error: signedUrlError } = await supabaseAdmin
             .storage
-            .from('exports')
+            .from(BUCKET_NAME)
             .createSignedUrl(exportRecord.storage_path, 3600);
 
         if (signedUrlError) {
