@@ -21,12 +21,10 @@ router.post('/', requireAuth, async (req, res) => {
             return res.status(400).json({ error: 'listId and format are required' });
         }
 
-        // Temporarily only support CSV
-        if (format !== 'csv') {
+        if (format !== 'csv' && format !== 'xlsx') {
             console.error('[Exports] Invalid format received:', format);
             return res.status(400).json({
-                error: 'Only CSV format is currently supported',
-                details: 'XLSX support will be added soon. Please use CSV format.',
+                error: 'Invalid format. Must be csv or xlsx',
                 received: format
             });
         }
@@ -85,11 +83,8 @@ router.post('/', requireAuth, async (req, res) => {
             // Add UTF-8 BOM for Turkish character support in Excel
             fileContent = Buffer.from('\uFEFF' + csvString, 'utf-8');
         } else {
-            // XLSX temporarily disabled - requires xlsx library implementation
-            return res.status(400).json({
-                error: 'XLSX format temporarily unavailable',
-                details: 'Please use CSV format. XLSX support will be added soon.'
-            });
+            // XLSX: generateXLSX returns Buffer directly from XLSX.write
+            fileContent = generateXLSX(items);
         }
 
         const fileName = `${list.name.replace(/[^a-z0-9]/gi, '_')}_${Date.now()}.${format}`;
