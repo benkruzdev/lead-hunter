@@ -466,3 +466,49 @@ export async function bulkDeleteListItems(listId: string, itemIds: string[]): Pr
         body: JSON.stringify({ itemIds }),
     });
 }
+
+// ============================================================================
+// Billing
+// ============================================================================
+
+export async function getCreditPackages(): Promise<{
+    packages: Array<{
+        id: string;
+        name: string;
+        displayName: string;
+        credits: number;
+        price: number;
+        currency: string;
+    }>;
+}> {
+    return apiRequest('/api/billing/packages');
+}
+
+export async function getOrders(): Promise<{
+    orders: Array<{
+        id: string;
+        packageName: string;
+        amount: number;
+        currency: number;
+        credits: number;
+        status: string;
+        paymentMethod: string;
+        createdAt: string;
+    }>;
+}> {
+    return apiRequest('/api/billing/orders');
+}
+
+export async function createOrder(
+    packageId: string,
+    paymentMethod: string
+): Promise<{
+    orderId: string;
+    amount: number;
+    currency: string;
+}> {
+    return apiRequest('/api/billing/orders', {
+        method: 'POST',
+        body: JSON.stringify({ packageId, paymentMethod }),
+    });
+}

@@ -14,6 +14,7 @@ import adminRoutes from './routes/admin.js';
 import searchRoutes from './routes/search.js';
 import listsRoutes from './routes/lists.js';
 import exportsRoutes from './routes/exports.js';
+import billingRoutes from './routes/billing.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -45,6 +46,7 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/search', searchRoutes);
 app.use('/api/lists', listsRoutes);
 app.use('/api/exports', exportsRoutes);
+app.use('/api/billing', billingRoutes);
 
 
 // Root endpoint

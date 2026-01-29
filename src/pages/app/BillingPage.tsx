@@ -1,163 +1,304 @@
-import { Link } from "react-router-dom";
-import { Button } from "@/components/ui/button";
-import { Check, CreditCard, ArrowRight, Zap, Star, Building2 } from "lucide-react";
-
-const plans = [
-  {
-    name: "Starter",
-    credits: "1.000",
-    price: "299",
-    icon: Zap,
-    description: "Küçük ekipler için",
-    features: ["1.000 arama kredisi", "Sınırsız liste", "CSV export", "E-posta desteği"],
-    current: false,
-  },
-  {
-    name: "Pro",
-    credits: "10.000",
-    price: "999",
-    icon: Star,
-    description: "Büyüyen ekipler için",
-    features: ["10.000 arama kredisi", "Sınırsız liste", "CSV export", "Öncelikli destek", "API erişimi"],
-    current: true,
-  },
-  {
-    name: "Agency",
-    credits: "50.000",
-    price: "2.499",
-    icon: Building2,
-    description: "Ajanslar için",
-    features: ["50.000 arama kredisi", "Sınırsız liste", "CSV export", "7/24 destek", "Özel entegrasyonlar"],
-    current: false,
-  },
-];
-
-const creditHistory = [
-  { date: "2024-01-15", description: "Lead listesine eklendi (İstanbul Restoranlar)", amount: -45 },
-  { date: "2024-01-14", description: "CSV Export", amount: 0 },
-  { date: "2024-01-12", description: "Detay tamamlama", amount: -120 },
-  { date: "2024-01-10", description: "Lead listesine eklendi (Ankara Kuaförler)", amount: -84 },
-  { date: "2024-01-01", description: "Pro plan yenilendi", amount: 10000 },
-];
+import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Label } from '@/components/ui/label';
+import { CreditCard, Check } from 'lucide-react';
+import { getCreditPackages, createOrder, getOrders } from '@/lib/api';
+import { formatDistanceToNow } from 'date-fns';
+import { tr, enUS } from 'date-fns/locale';
 
 export default function BillingPage() {
+  const { t, i18n } = useTranslation();
+  const queryClient = useQueryClient();
+  const [showPaymentDialog, setShowPaymentDialog] = useState(false);
+  const [selectedPackage, setSelectedPackage] = useState<any>(null);
+  const [paymentMethod, setPaymentMethod] = useState('manual');
+  const [isCreatingOrder, setIsCreatingOrder] = useState(false);
+  const [orderError, setOrderError] = useState<string | null>(null);
+
+  // Fetch packages
+  const { data: packagesData, isLoading: isLoadingPackages, error: packagesError } = useQuery(
+    ['creditPackages'],
+    getCreditPackages
+  );
+
+  // Fetch orders
+  const { data: ordersData, isLoading: isLoadingOrders, error: ordersError } = useQuery(
+    ['orders'],
+    getOrders
+  );
+
+  const handleBuyClick = (pkg: any) => {
+    setSelectedPackage(pkg);
+    setShowPaymentDialog(true);
+    setOrderError(null);
+  };
+
+  const handleConfirmOrder = async () => {
+    if (!selectedPackage) return;
+
+    try {
+      setIsCreatingOrder(true);
+      setOrderError(null);
+
+      await createOrder(selectedPackage.id, paymentMethod);
+
+      // Refresh orders
+      queryClient.invalidateQueries(['orders']);
+
+      // Close dialog and show success
+      setShowPaymentDialog(false);
+      setSelectedPackage(null);
+      setPaymentMethod('manual');
+
+      // Show success message (you could use a toast here)
+      alert(t('billing.orderCreated') + ': ' + t('billing.orderCreatedDesc'));
+    } catch (error: any) {
+      console.error('[BillingPage] Order creation failed:', error);
+      setOrderError(error.message || t('billing.orderFailed'));
+    } finally {
+      setIsCreatingOrder(false);
+    }
+  };
+
+  const getStatusBadgeVariant = (status: string) => {
+    switch (status) {
+      case 'completed':
+        return 'default';
+      case 'pending':
+        return 'secondary';
+      case 'failed':
+        return 'destructive';
+      default:
+        return 'outline';
+    }
+  };
+
   return (
     <div className="space-y-8 animate-fade-in">
-      {/* Current plan summary */}
-      <div className="bg-card rounded-xl border shadow-soft p-6">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <h2 className="text-lg font-semibold mb-1">Mevcut Plan: Pro</h2>
-            <p className="text-muted-foreground">
-              Bir sonraki yenileme: 1 Şubat 2024
+      {/* Credit Packages Section */}
+      <div>
+        <h2 className="text-2xl font-bold mb-4">{t('billing.packages')}</h2>
+
+        {isLoadingPackages && (
+          <div className="text-center py-12 text-muted-foreground">
+            {t('common.loading')}
+          </div>
+        )}
+
+        {packagesError && (
+          <div className="bg-destructive/10 text-destructive p-4 rounded-lg">
+            {t('billing.loadPackagesFailed')}
+          </div>
+        )}
+
+        {packagesData && (
+          <div className="grid md:grid-cols-3 gap-6">
+            {packagesData.packages.map((pkg, index) => (
+              <div
+                key={pkg.id}
+                className={`relative bg-card rounded-xl border p-6 transition-all duration-300 hover:shadow-card ${index === 1 ? 'border-primary shadow-glow' : ''
+                  }`}
+              >
+                {index === 1 && (
+                  <div className="absolute -top-3 left-4 px-3 py-1 bg-primary text-primary-foreground text-xs font-medium rounded-full">
+                    {t('billing.popular')}
+                  </div>
+                )}
+
+                <div className="mb-4">
+                  <h3 className="text-xl font-bold mb-2">{pkg.displayName}</h3>
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-3xl font-bold">₺{pkg.price}</span>
+                  </div>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    {pkg.credits.toLocaleString()} {t('billing.credits')}
+                  </p>
+                </div>
+
+                <Button
+                  className="w-full"
+                  variant={index === 1 ? 'default' : 'outline'}
+                  onClick={() => handleBuyClick(pkg)}
+                >
+                  <CreditCard className="w-4 h-4" />
+                  {t('billing.buyNow')}
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Order History Section */}
+      <div>
+        <h3 className="text-lg font-semibold mb-4">{t('billing.orderHistory')}</h3>
+
+        {isLoadingOrders && (
+          <div className="text-center py-8 text-muted-foreground">
+            {t('common.loading')}
+          </div>
+        )}
+
+        {ordersError && (
+          <div className="bg-destructive/10 text-destructive p-4 rounded-lg">
+            {t('billing.loadOrdersFailed')}
+          </div>
+        )}
+
+        {ordersData && ordersData.orders.length === 0 && (
+          <div className="bg-card rounded-xl border p-8 text-center">
+            <p className="text-muted-foreground mb-2">{t('billing.noOrders')}</p>
+            <p className="text-sm text-muted-foreground">
+              {t('billing.noOrdersDesc')}
             </p>
           </div>
-          <div className="flex items-center gap-6">
-            <div className="text-right">
-              <p className="text-sm text-muted-foreground">Kalan Kredi</p>
-              <p className="text-3xl font-bold text-primary">1.250</p>
-            </div>
-            <Button>
-              <CreditCard className="w-4 h-4" />
-              Kredi Satın Al
-            </Button>
-          </div>
-        </div>
-      </div>
+        )}
 
-      {/* Plan cards */}
-      <div>
-        <h3 className="text-lg font-semibold mb-4">Plan Seçenekleri</h3>
-        <div className="grid md:grid-cols-3 gap-6">
-          {plans.map((plan) => (
-            <div
-              key={plan.name}
-              className={`relative bg-card rounded-xl border p-6 transition-all duration-300 hover:shadow-card ${
-                plan.current ? "border-primary shadow-glow" : ""
-              }`}
-            >
-              {plan.current && (
-                <div className="absolute -top-3 left-4 px-3 py-1 bg-primary text-primary-foreground text-xs font-medium rounded-full">
-                  Mevcut Plan
-                </div>
-              )}
-
-              <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mb-4">
-                <plan.icon className="w-6 h-6 text-primary" />
-              </div>
-
-              <h4 className="text-xl font-bold mb-1">{plan.name}</h4>
-              <p className="text-sm text-muted-foreground mb-4">{plan.description}</p>
-
-              <div className="mb-4">
-                <span className="text-3xl font-bold">₺{plan.price}</span>
-                <span className="text-muted-foreground"> / ay</span>
-                <p className="text-sm text-muted-foreground">{plan.credits} kredi dahil</p>
-              </div>
-
-              <ul className="space-y-2 mb-6">
-                {plan.features.map((feature) => (
-                  <li key={feature} className="flex items-center gap-2 text-sm">
-                    <Check className="w-4 h-4 text-primary" />
-                    {feature}
-                  </li>
-                ))}
-              </ul>
-
-              <Button
-                variant={plan.current ? "outline" : "default"}
-                className="w-full"
-                disabled={plan.current}
-              >
-                {plan.current ? "Mevcut Plan" : "Satın Al"}
-                {!plan.current && <ArrowRight className="w-4 h-4" />}
-              </Button>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Credit history */}
-      <div>
-        <h3 className="text-lg font-semibold mb-4">Kredi Hareketleri</h3>
-        <div className="bg-card rounded-xl border shadow-soft overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b bg-muted/20">
-                  <th className="text-left p-4 text-sm font-medium text-muted-foreground">
-                    Tarih
-                  </th>
-                  <th className="text-left p-4 text-sm font-medium text-muted-foreground">
-                    Açıklama
-                  </th>
-                  <th className="text-right p-4 text-sm font-medium text-muted-foreground">
-                    Kredi
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {creditHistory.map((item, index) => (
-                  <tr
-                    key={index}
-                    className="border-b hover:bg-muted/30 transition-colors"
-                  >
-                    <td className="p-4 text-muted-foreground">
-                      {new Date(item.date).toLocaleDateString("tr-TR")}
-                    </td>
-                    <td className="p-4">{item.description}</td>
-                    <td className={`p-4 text-right font-medium ${
-                      item.amount > 0 ? "text-success" : item.amount < 0 ? "text-destructive" : "text-muted-foreground"
-                    }`}>
-                      {item.amount > 0 ? "+" : ""}{item.amount}
-                    </td>
+        {ordersData && ordersData.orders.length > 0 && (
+          <div className="bg-card rounded-xl border shadow-soft overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b bg-muted/20">
+                    <th className="text-left p-4 text-sm font-medium text-muted-foreground">
+                      {t('billing.packageName')}
+                    </th>
+                    <th className="text-left p-4 text-sm font-medium text-muted-foreground">
+                      {t('billing.amount')}
+                    </th>
+                    <th className="text-left p-4 text-sm font-medium text-muted-foreground">
+                      {t('billing.credits')}
+                    </th>
+                    <th className="text-left p-4 text-sm font-medium text-muted-foreground">
+                      {t('common.status')}
+                    </th>
+                    <th className="text-left p-4 text-sm font-medium text-muted-foreground">
+                      {t('billing.orderDate')}
+                    </th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {ordersData.orders.map((order) => (
+                    <tr
+                      key={order.id}
+                      className="border-b hover:bg-muted/30 transition-colors"
+                    >
+                      <td className="p-4">{order.packageName}</td>
+                      <td className="p-4">
+                        ₺{order.amount} {order.currency}
+                      </td>
+                      <td className="p-4">{order.credits.toLocaleString()}</td>
+                      <td className="p-4">
+                        <Badge variant={getStatusBadgeVariant(order.status)}>
+                          {t(`billing.orderStatus.${order.status}`)}
+                        </Badge>
+                      </td>
+                      <td className="p-4 text-muted-foreground">
+                        {formatDistanceToNow(new Date(order.createdAt), {
+                          addSuffix: true,
+                          locale: i18n.language === 'tr' ? tr : enUS,
+                        })}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
+        )}
       </div>
+
+      {/* Payment Method Dialog */}
+      <Dialog open={showPaymentDialog} onOpenChange={setShowPaymentDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t('billing.selectPaymentMethod')}</DialogTitle>
+            <DialogDescription>
+              {selectedPackage && (
+                <>
+                  {selectedPackage.displayName} - {selectedPackage.credits.toLocaleString()}{' '}
+                  {t('billing.credits')}
+                  <br />
+                  {t('billing.costTransparency', {
+                    amount: selectedPackage.price,
+                    currency: selectedPackage.currency,
+                  })}
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+
+          <RadioGroup value={paymentMethod} onValueChange={setPaymentMethod}>
+            <div className="flex items-center space-x-2">
+              <RadioGroupItem value="manual" id="manual" />
+              <Label htmlFor="manual" className="flex-1 cursor-pointer">
+                {t('billing.paymentMethods.manual')}
+              </Label>
+            </div>
+
+            <div className="flex items-center space-x-2 opacity-50">
+              <RadioGroupItem value="paytr" id="paytr" disabled />
+              <Label htmlFor="paytr" className="flex-1">
+                {t('billing.paymentMethods.paytr')}
+                <Badge variant="secondary" className="ml-2">
+                  {t('billing.comingSoon')}
+                </Badge>
+              </Label>
+            </div>
+
+            <div className="flex items-center space-x-2 opacity-50">
+              <RadioGroupItem value="iyzico" id="iyzico" disabled />
+              <Label htmlFor="iyzico" className="flex-1">
+                {t('billing.paymentMethods.iyzico')}
+                <Badge variant="secondary" className="ml-2">
+                  {t('billing.comingSoon')}
+                </Badge>
+              </Label>
+            </div>
+
+            <div className="flex items-center space-x-2 opacity-50">
+              <RadioGroupItem value="shopier" id="shopier" disabled />
+              <Label htmlFor="shopier" className="flex-1">
+                {t('billing.paymentMethods.shopier')}
+                <Badge variant="secondary" className="ml-2">
+                  {t('billing.comingSoon')}
+                </Badge>
+              </Label>
+            </div>
+          </RadioGroup>
+
+          {orderError && (
+            <div className="bg-destructive/10 text-destructive p-3 rounded-md text-sm">
+              {orderError}
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowPaymentDialog(false)}
+              disabled={isCreatingOrder}
+            >
+              {t('common.cancel')}
+            </Button>
+            <Button onClick={handleConfirmOrder} disabled={isCreatingOrder}>
+              {isCreatingOrder ? t('common.loading') : t('common.confirm')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
