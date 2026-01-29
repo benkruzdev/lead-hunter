@@ -1,0 +1,6 @@
+# Exclude backend and database folders from Vercel deployment
+# This prevents Vercel from treating /api as Serverless Functions
+api/
+database/
+**/*.sql
+**/migrations/

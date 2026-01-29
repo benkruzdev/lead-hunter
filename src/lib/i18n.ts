@@ -7,6 +7,7 @@ const resources = {
         translation: {
             // Common
             common: {
+                loading: 'Yükleniyor...',
                 cancel: 'İptal',
                 save: 'Kaydet',
                 delete: 'Sil',
@@ -14,6 +15,12 @@ const resources = {
                 create: 'Oluştur',
                 close: 'Kapat',
                 back: 'Geri',
+                next: 'İleri',
+                finish: 'Tamamla',
+                skip: 'Atla',
+                search: 'Ara',
+                credits: 'Kredi',
+                creditsRemaining: 'Kalan Kredi',
                 retry: 'Tekrar Dene',
             },
 
@@ -59,22 +66,6 @@ const resources = {
                 invalidEmail: 'Geçerli bir e-posta adresi giriniz.',
                 invalidPhone: 'Geçerli bir telefon numarası giriniz (05XX XXX XX XX).',
                 passwordMismatch: 'Şifreler eşleşmiyor.',
-            },
-
-            // Common
-            common: {
-                loading: 'Yükleniyor...',
-                save: 'Kaydet',
-                cancel: 'İptal',
-                delete: 'Sil',
-                edit: 'Düzenle',
-                back: 'Geri',
-                next: 'İleri',
-                finish: 'Tamamla',
-                skip: 'Atla',
-                search: 'Ara',
-                credits: 'Kredi',
-                creditsRemaining: 'Kalan Kredi',
             },
 
             // Layout
