@@ -53,6 +53,55 @@ export async function enrichLeadListItem(listId: string, itemId: string): Promis
     });
 }
 
+/**
+ * Create export
+ * PRODUCT_SPEC 5.8: Export lead lists as CSV or XLSX
+ */
+export async function createExport(
+    listId: string,
+    format: 'csv' | 'xlsx',
+    note?: string
+): Promise<{
+    exportId: string;
+    downloadUrl: string;
+    fileName: string;
+    leadCount: number;
+}> {
+    return apiRequest(`/api/exports`, {
+        method: 'POST',
+        body: JSON.stringify({ listId, format, note }),
+    });
+}
+
+/**
+ * Get user's export history
+ */
+export async function getExports(): Promise<{
+    exports: Array<{
+        id: string;
+        listId: string;
+        listName: string;
+        format: string;
+        fileName: string;
+        leadCount: number;
+        note: string | null;
+        createdAt: string;
+    }>;
+}> {
+    return apiRequest('/api/exports');
+}
+
+/**
+ * Get download URL for an export
+ */
+export async function downloadExport(exportId: string): Promise<{
+    downloadUrl: string;
+    fileName: string;
+}> {
+    return apiRequest(`/api/exports/${exportId}/download`);
+}
+
+
 
 /**
  * Get current user's profile

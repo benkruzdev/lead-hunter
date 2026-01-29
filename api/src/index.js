@@ -13,6 +13,7 @@ import configRoutes from './routes/config.js';
 import adminRoutes from './routes/admin.js';
 import searchRoutes from './routes/search.js';
 import listsRoutes from './routes/lists.js';
+import exportsRoutes from './routes/exports.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -43,6 +44,7 @@ app.use('/api/config', configRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/search', searchRoutes);
 app.use('/api/lists', listsRoutes);
+app.use('/api/exports', exportsRoutes);
 
 
 // Root endpoint
@@ -57,7 +59,8 @@ app.get('/', (req, res) => {
             credits: '/api/credits',
             config: '/api/config',
             search: '/api/search',
-            lists: '/api/lists'
+            lists: '/api/lists',
+            exports: '/api/exports'
         }
     });
 });
@@ -81,7 +84,9 @@ app.use((req, res) => {
             '/api/lists',
             '/api/lists/:listId',
             '/api/lists/:listId/items',
-            '/api/lists/:listId/items/:itemId/enrich'
+            '/api/lists/:listId/items/:itemId/enrich',
+            '/api/exports',
+            '/api/exports/:exportId/download'
         ]
     });
 });

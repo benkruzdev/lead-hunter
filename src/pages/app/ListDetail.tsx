@@ -3,6 +3,7 @@ import { useParams, Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -28,7 +29,7 @@ import {
   Tags,
   StickyNote,
 } from "lucide-react";
-import { getLeadListItems, bulkUpdateListItems, bulkDeleteListItems, enrichLeadListItem, LeadListItem } from "@/lib/api";
+import { getLeadListItems, bulkUpdateListItems, bulkDeleteListItems, enrichLeadListItem, createExport, LeadListItem } from "@/lib/api";
 
 export default function ListDetail() {
   const { t } = useTranslation();
@@ -52,6 +53,13 @@ export default function ListDetail() {
   const [enrichItemId, setEnrichItemId] = useState<string | null>(null);
   const [isEnriching, setIsEnriching] = useState(false);
   const [enrichError, setEnrichError] = useState<string | null>(null);
+
+  // Export state
+  const [showExportDialog, setShowExportDialog] = useState(false);
+  const [exportFormat, setExportFormat] = useState<'csv' | 'xlsx'>('csv');
+  const [exportNote, setExportNote] = useState('');
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
 
   useEffect(() => {
     if (listId) {
@@ -183,6 +191,30 @@ export default function ListDetail() {
     }
   };
 
+  const handleExport = async () => {
+    if (!listId) return;
+
+    try {
+      setIsExporting(true);
+      setExportError(null);
+
+      const result = await createExport(listId, exportFormat, exportNote || undefined);
+
+      // Auto-download using window.location.href to avoid popup blockers
+      window.location.href = result.downloadUrl;
+
+      // Close dialog and reset
+      setShowExportDialog(false);
+      setExportFormat('csv');
+      setExportNote('');
+    } catch (error: any) {
+      console.error('[ListDetail] Export failed:', error);
+      setExportError(error.message || t('exports.createFailed'));
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   const allSelected = items.length > 0 && selectedItemIds.length === items.length;
   const someSelected = selectedItemIds.length > 0 && selectedItemIds.length < items.length;
 
@@ -204,9 +236,9 @@ export default function ListDetail() {
             </p>
           </div>
         </div>
-        <Button variant="outline">
-          <FileDown className="w-4 h-4" />
-          CSV İndir
+        <Button variant="outline" onClick={() => setShowExportDialog(true)}>
+          <FileDown className="w-4 h-4 mr-2" />
+          {t('exports.create')}
         </Button>
       </div>
 
@@ -439,6 +471,61 @@ export default function ListDetail() {
             </Button>
             <Button onClick={handleEnrich} disabled={isEnriching}>
               {isEnriching ? t('leadEnrichment.running') : t('leadEnrichment.title')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Export Dialog */}
+      <Dialog open={showExportDialog} onOpenChange={(open) => {
+        setShowExportDialog(open);
+        if (!open) {
+          setExportFormat('csv');
+          setExportNote('');
+          setExportError(null);
+        }
+      }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t('exports.dialogTitle')}</DialogTitle>
+            <DialogDescription>
+              {t('exports.dialogDescription')}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">{t('exports.format')}</label>
+              <Select value={exportFormat} onValueChange={(value) => setExportFormat(value as 'csv' | 'xlsx')}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="csv">{t('exports.csv')}</SelectItem>
+                  <SelectItem value="excel">{t('exports.excel')}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">{t('exports.noteOptional')}</label>
+              <Textarea
+                placeholder={t('exports.note')}
+                value={exportNote}
+                onChange={(e) => setExportNote(e.target.value)}
+                rows={3}
+              />
+            </div>
+            {exportError && (
+              <div className="bg-destructive/10 text-destructive p-3 rounded-md text-sm">
+                {exportError}
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowExportDialog(false)} disabled={isExporting}>
+              {t('common.cancel')}
+            </Button>
+            <Button onClick={handleExport} disabled={isExporting}>
+              {isExporting ? t('exports.creating') : t('exports.create')}
             </Button>
           </DialogFooter>
         </DialogContent>

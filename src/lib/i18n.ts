@@ -143,6 +143,30 @@ const resources = {
                 confirmMessage: 'Bu lead için web sitesinden email ve sosyal medya bağlantıları bulunacak.',
             },
 
+            // Exports
+            exports: {
+                title: 'Exportlar',
+                create: 'Dışa Aktar',
+                format: 'Format',
+                csv: 'CSV',
+                excel: 'Excel',
+                note: 'Not',
+                noteOptional: 'Not (opsiyonel)',
+                download: 'İndir',
+                downloading: 'İndiriliyor...',
+                creating: 'Oluşturuluyor...',
+                empty: 'Henüz export yok',
+                emptyDescription: 'Liste detayından export oluşturabilirsiniz',
+                fileName: 'Dosya Adı',
+                leadCount: 'Lead Sayısı',
+                createdAt: 'Oluşturulma',
+                listName: 'Liste',
+                createSuccess: 'Export oluşturuldu',
+                createFailed: 'Export oluşturulamadı',
+                dialogTitle: 'Listeyi Dışa Aktar',
+                dialogDescription: 'Listedeki leadleri CSV veya Excel formatında indirin',
+            },
+
             // Onboarding
             onboarding: {
                 welcome: 'LeadHunter\'a Hoş Geldiniz!',
@@ -290,6 +314,30 @@ const resources = {
                 insufficientCredits: 'Insufficient credits',
                 confirmTitle: 'Complete Details',
                 confirmMessage: 'Email and social media links will be extracted from the website.',
+            },
+
+            // Exports
+            exports: {
+                title: 'Exports',
+                create: 'Export',
+                format: 'Format',
+                csv: 'CSV',
+                excel: 'Excel',
+                note: 'Note',
+                noteOptional: 'Note (optional)',
+                download: 'Download',
+                downloading: 'Downloading...',
+                creating: 'Creating...',
+                empty: 'No exports yet',
+                emptyDescription: 'You can create exports from list detail',
+                fileName: 'File Name',
+                leadCount: 'Lead Count',
+                createdAt: 'Created At',
+                listName: 'List',
+                createSuccess: 'Export created',
+                createFailed: 'Failed to create export',
+                dialogTitle: 'Export List',
+                dialogDescription: 'Download leads as CSV or Excel file',
             },
 
             // Onboarding
