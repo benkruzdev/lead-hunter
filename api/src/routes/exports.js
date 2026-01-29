@@ -19,7 +19,8 @@ router.post('/', requireAuth, async (req, res) => {
         }
 
         if (format !== 'csv' && format !== 'xlsx') {
-            return res.status(400).json({ error: 'Invalid format. Must be csv or xlsx' });
+            console.error('[Exports] Invalid format received:', format);
+            return res.status(400).json({ error: 'Invalid format. Must be csv or xlsx', received: format });
         }
 
         // Verify list ownership
@@ -50,10 +51,16 @@ router.post('/', requireAuth, async (req, res) => {
             return res.status(400).json({ error: 'List has no items to export' });
         }
 
-        // Generate export file
-        const fileContent = format === 'csv'
-            ? generateCSV(items)
-            : generateXLSX(items);
+        // Generate export file and ensure Buffer format
+        let fileContent;
+        if (format === 'csv') {
+            const csvString = generateCSV(items);
+            fileContent = Buffer.from(csvString, 'utf-8');
+        } else {
+            // generateXLSX should return Buffer, but ensure it
+            const xlsxContent = generateXLSX(items);
+            fileContent = Buffer.isBuffer(xlsxContent) ? xlsxContent : Buffer.from(xlsxContent);
+        }
 
         const fileName = `${list.name.replace(/[^a-z0-9]/gi, '_')}_${Date.now()}.${format}`;
         const storagePath = `${userId}/${fileName}`;
@@ -69,7 +76,8 @@ router.post('/', requireAuth, async (req, res) => {
 
         if (uploadError) {
             console.error('[Exports] Upload error:', uploadError);
-            return res.status(500).json({ error: 'Failed to upload export file' });
+            console.error('[Exports] Upload details - bucket: exports, path:', storagePath, ', size:', fileContent.length);
+            return res.status(500).json({ error: 'Failed to upload export file', details: uploadError.message });
         }
 
         // Create export record
