@@ -55,8 +55,14 @@ app.use('/api/credits', creditsRoutes);
 app.use('/api/config', configRoutes);
 // SPEC 6.1: Admin routes mounted at secret path (old /api/admin is disabled - returns 404)
 if (process.env.ADMIN_ROUTE_SECRET) {
-    app.use(`/api/${process.env.ADMIN_ROUTE_SECRET}/admin`, adminRoutes);
+    const adminPath = `/api/${process.env.ADMIN_ROUTE_SECRET}/admin`;
+    app.use(adminPath, adminRoutes);
+    console.log(`🔐 Admin routes mounted at: ${adminPath}`);
+} else {
+    console.log('⚠️  Admin routes NOT mounted (ADMIN_ROUTE_SECRET not set)');
 }
+console.log('🚫 /api/admin explicitly disabled (returns 404)');
+
 app.use('/api/search', searchRoutes);
 app.use('/api/lists', listsRoutes);
 app.use('/api/exports', exportsRoutes);
