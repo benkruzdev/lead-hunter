@@ -5,8 +5,9 @@ import { requireAuth, requireAdmin } from '../middleware/auth.js';
 const router = express.Router();
 
 /**
- * GET /api/admin/config
+ * GET /api/${ADMIN_ROUTE_SECRET}/admin/config
  * Get system configuration (admin only)
+ * SPEC 6.1: Admin routes are hidden behind secret path
  */
 router.get('/config', requireAuth, requireAdmin, async (req, res) => {
     try {
@@ -32,8 +33,9 @@ router.get('/config', requireAuth, requireAdmin, async (req, res) => {
 });
 
 /**
- * PATCH /api/admin/config
+ * PATCH /api/${ADMIN_ROUTE_SECRET}/admin/config
  * Update system configuration (admin only)
+ * SPEC 6.1: Admin routes are hidden behind secret path
  */
 router.patch('/config', requireAuth, requireAdmin, async (req, res) => {
     try {
@@ -73,6 +75,88 @@ router.patch('/config', requireAuth, requireAdmin, async (req, res) => {
         res.json({ success: true, config: data });
     } catch (err) {
         console.error('Update admin config error:', err);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+/**
+ * GET /api/${ADMIN_ROUTE_SECRET}/admin/dashboard
+ * Get admin dashboard statistics (admin only)
+ * SPEC 6.2: Admin dashboard metrics
+ */
+router.get('/dashboard', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        const startOfToday = new Date();
+        startOfToday.setUTCHours(0, 0, 0, 0);
+
+        // Total users count
+        const { count: totalUsers, error: usersError } = await supabaseAdmin
+            .from('profiles')
+            .select('*', { count: 'exact', head: true });
+
+        if (usersError) {
+            console.error('Failed to count users:', usersError);
+            return res.status(500).json({
+                error: 'Database error',
+                message: usersError.message
+            });
+        }
+
+        // Daily search count (search_sessions created today)
+        const { count: dailySearchCount, error: searchError } = await supabaseAdmin
+            .from('search_sessions')
+            .select('*', { count: 'exact', head: true })
+            .gte('created_at', startOfToday.toISOString());
+
+        if (searchError) {
+            console.error('Failed to count searches:', searchError);
+            return res.status(500).json({
+                error: 'Database error',
+                message: searchError.message
+            });
+        }
+
+        // Daily credits spent (sum of negative amounts in credit_ledger today)
+        const { data: creditData, error: creditError } = await supabaseAdmin
+            .from('credit_ledger')
+            .select('amount')
+            .lt('amount', 0)
+            .gte('created_at', startOfToday.toISOString());
+
+        if (creditError) {
+            console.error('Failed to query credits:', creditError);
+            return res.status(500).json({
+                error: 'Database error',
+                message: creditError.message
+            });
+        }
+
+        const dailyCreditsSpent = Math.abs(
+            (creditData || []).reduce((sum, row) => sum + row.amount, 0)
+        );
+
+        // Daily exports count
+        const { count: dailyExportsCount, error: exportsError } = await supabaseAdmin
+            .from('exports')
+            .select('*', { count: 'exact', head: true })
+            .gte('created_at', startOfToday.toISOString());
+
+        if (exportsError) {
+            console.error('Failed to count exports:', exportsError);
+            return res.status(500).json({
+                error: 'Database error',
+                message: exportsError.message
+            });
+        }
+
+        res.json({
+            total_users: totalUsers || 0,
+            daily_search_count: dailySearchCount || 0,
+            daily_credits_spent: dailyCreditsSpent,
+            daily_exports_count: dailyExportsCount || 0
+        });
+    } catch (err) {
+        console.error('Get admin dashboard error:', err);
         res.status(500).json({ error: 'Internal server error' });
     }
 });

@@ -5,6 +5,13 @@ import dotenv from 'dotenv';
 // Load environment variables
 dotenv.config();
 
+// SPEC 6.1: Validate ADMIN_ROUTE_SECRET in production
+if (process.env.NODE_ENV === 'production' && !process.env.ADMIN_ROUTE_SECRET) {
+    console.error('❌ FATAL: ADMIN_ROUTE_SECRET environment variable is required in production');
+    console.error('   Set this to a random secret string to secure admin routes.');
+    process.exit(1);
+}
+
 // Import routes
 import healthRoutes from './routes/health.js';
 import authRoutes from './routes/auth.js';
@@ -39,11 +46,17 @@ app.use((req, res, next) => {
 });
 
 // Routes
+// SPEC 6.1: Explicitly disable /api/admin - always return 404
+app.use('/api/admin', (req, res) => res.status(404).json({ error: 'Not Found' }));
+
 app.use('/api/health', healthRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/credits', creditsRoutes);
 app.use('/api/config', configRoutes);
-app.use('/api/admin', adminRoutes);
+// SPEC 6.1: Admin routes mounted at secret path (old /api/admin is disabled - returns 404)
+if (process.env.ADMIN_ROUTE_SECRET) {
+    app.use(`/api/${process.env.ADMIN_ROUTE_SECRET}/admin`, adminRoutes);
+}
 app.use('/api/search', searchRoutes);
 app.use('/api/lists', listsRoutes);
 app.use('/api/exports', exportsRoutes);

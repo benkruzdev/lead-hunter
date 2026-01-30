@@ -23,3 +23,5 @@ services:
         sync: false  # Set manually in Render dashboard (keep secret!)
       - key: FRONTEND_URL
         sync: false  # Set to your Vercel URL
+      - key: ADMIN_ROUTE_SECRET
+        sync: false  # Set to a random secret string (SPEC 6.1 security)
