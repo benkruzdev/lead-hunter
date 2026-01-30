@@ -21,11 +21,12 @@ import {
 } from '@/components/ui/dialog';
 import { User, Mail, Phone, Lock, Globe, Trash2, Save, AlertTriangle } from 'lucide-react';
 import { getProfile, updateUserProfile, changeUserPassword, deleteUserAccount } from '@/lib/api';
-import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function SettingsPage() {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
+  const { signOut } = useAuth();
 
   // Profile state
   const [fullName, setFullName] = useState('');
@@ -138,7 +139,7 @@ export default function SettingsPage() {
       await deleteUserAccount();
 
       // Logout and redirect
-      await supabase.auth.signOut();
+      await signOut();
       navigate('/login');
     } catch (error: any) {
       console.error('[Settings] Account deletion failed:', error);
