@@ -161,4 +161,267 @@ router.get('/dashboard', requireAuth, requireAdmin, async (req, res) => {
     }
 });
 
+/**
+ * GET /api/${ADMIN_ROUTE_SECRET}/admin/users
+ * List users with search and pagination (admin only)
+ * SPEC 6.3: Admin user management
+ */
+router.get('/users', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        const { query = '', limit = 25, offset = 0 } = req.query;
+        const parsedLimit = Math.min(parseInt(limit) || 25, 100);
+        const parsedOffset = parseInt(offset) || 0;
+
+        const selectFields = 'id,full_name,phone,plan,credits,status,role,is_deleted,deleted_at,created_at,updated_at,email';
+
+        let usersQuery = supabaseAdmin
+            .from('profiles')
+            .select(selectFields, { count: 'exact' });
+
+        // Search filter
+        if (query) {
+            usersQuery = usersQuery.or(`email.ilike.%${query}%,full_name.ilike.%${query}%,phone.ilike.%${query}%`);
+        }
+
+        // Apply pagination
+        usersQuery = usersQuery
+            .range(parsedOffset, parsedOffset + parsedLimit - 1)
+            .order('created_at', { ascending: false });
+
+        const { data: users, count, error } = await usersQuery;
+
+        if (error) {
+            // Retry without email if column doesn't exist
+            if (error.message && error.message.includes('email')) {
+                const selectFieldsNoEmail = 'id,full_name,phone,plan,credits,status,role,is_deleted,deleted_at,created_at,updated_at';
+
+                let retryQuery = supabaseAdmin
+                    .from('profiles')
+                    .select(selectFieldsNoEmail, { count: 'exact' });
+
+                if (query) {
+                    retryQuery = retryQuery.or(`full_name.ilike.%${query}%,phone.ilike.%${query}%`);
+                }
+
+                retryQuery = retryQuery
+                    .range(parsedOffset, parsedOffset + parsedLimit - 1)
+                    .order('created_at', { ascending: false });
+
+                const { data: retryUsers, count: retryCount, error: retryError } = await retryQuery;
+
+                if (retryError) {
+                    console.error('Failed to fetch users:', retryError);
+                    return res.status(500).json({
+                        error: 'Database error',
+                        message: retryError.message
+                    });
+                }
+
+                return res.json({
+                    users: retryUsers || [],
+                    total: retryCount || 0
+                });
+            }
+
+            console.error('Failed to fetch users:', error);
+            return res.status(500).json({
+                error: 'Database error',
+                message: error.message
+            });
+        }
+
+        res.json({
+            users: users || [],
+            total: count || 0
+        });
+    } catch (err) {
+        console.error('Get users error:', err);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+/**
+ * GET /api/${ADMIN_ROUTE_SECRET}/admin/users/:id
+ * Get single user by ID (admin only)
+ * SPEC 6.3: Admin user management
+ */
+router.get('/users/:id', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const selectFields = 'id,full_name,phone,plan,credits,status,role,is_deleted,deleted_at,created_at,updated_at,email';
+
+        const { data: user, error } = await supabaseAdmin
+            .from('profiles')
+            .select(selectFields)
+            .eq('id', id)
+            .single();
+
+        if (error) {
+            // Retry without email if column doesn't exist
+            if (error.message && error.message.includes('email')) {
+                const selectFieldsNoEmail = 'id,full_name,phone,plan,credits,status,role,is_deleted,deleted_at,created_at,updated_at';
+
+                const { data: retryUser, error: retryError } = await supabaseAdmin
+                    .from('profiles')
+                    .select(selectFieldsNoEmail)
+                    .eq('id', id)
+                    .single();
+
+                if (retryError) {
+                    if (retryError.code === 'PGRST116') {
+                        return res.status(404).json({
+                            error: 'Not found',
+                            message: 'User not found'
+                        });
+                    }
+                    console.error('Failed to fetch user:', retryError);
+                    return res.status(500).json({
+                        error: 'Database error',
+                        message: retryError.message
+                    });
+                }
+
+                return res.json(retryUser);
+            }
+
+            if (error.code === 'PGRST116') {
+                return res.status(404).json({
+                    error: 'Not found',
+                    message: 'User not found'
+                });
+            }
+            console.error('Failed to fetch user:', error);
+            return res.status(500).json({
+                error: 'Database error',
+                message: error.message
+            });
+        }
+
+        res.json(user);
+    } catch (err) {
+        console.error('Get user error:', err);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+/**
+ * PATCH /api/${ADMIN_ROUTE_SECRET}/admin/users/:id
+ * Update user (admin only)
+ * SPEC 6.3: Admin user management
+ */
+router.patch('/users/:id', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { plan, credits, status, role, is_deleted } = req.body;
+
+        // Validate inputs
+        if (role !== undefined && !['user', 'admin'].includes(role)) {
+            return res.status(400).json({
+                error: 'Invalid input',
+                message: 'Role must be either "user" or "admin"'
+            });
+        }
+
+        if (credits !== undefined) {
+            const parsedCredits = parseInt(credits);
+            if (isNaN(parsedCredits) || parsedCredits < 0) {
+                return res.status(400).json({
+                    error: 'Invalid input',
+                    message: 'Credits must be a non-negative integer'
+                });
+            }
+        }
+
+        // Build updates object
+        const updates = {};
+
+        if (plan !== undefined) updates.plan = plan;
+        if (credits !== undefined) updates.credits = parseInt(credits);
+        if (status !== undefined) updates.status = status;
+        if (role !== undefined) updates.role = role;
+
+        // Handle is_deleted
+        if (is_deleted !== undefined) {
+            const parsedDeleted = is_deleted === true || is_deleted === 'true';
+            updates.is_deleted = parsedDeleted;
+            updates.deleted_at = parsedDeleted ? new Date().toISOString() : null;
+        }
+
+        // Try to set updated_at if column exists
+        updates.updated_at = new Date().toISOString();
+
+        const { data: updatedUser, error } = await supabaseAdmin
+            .from('profiles')
+            .update(updates)
+            .eq('id', id)
+            .select()
+            .single();
+
+        if (error) {
+            // If updated_at column doesn't exist, retry without it
+            if (error.message && (error.message.includes('updated_at') || error.code === '42703')) {
+                delete updates.updated_at;
+
+                const { data: retryUser, error: retryError } = await supabaseAdmin
+                    .from('profiles')
+                    .update(updates)
+                    .eq('id', id)
+                    .select()
+                    .single();
+
+                if (retryError) {
+                    // If status column doesn't exist, return error
+                    if (retryError.message && (retryError.message.includes('status') || retryError.code === '42703')) {
+                        return res.status(400).json({
+                            error: 'Invalid input',
+                            message: 'Status field is not supported in this schema'
+                        });
+                    }
+
+                    if (retryError.code === 'PGRST116') {
+                        return res.status(404).json({
+                            error: 'Not found',
+                            message: 'User not found'
+                        });
+                    }
+                    console.error('Failed to update user:', retryError);
+                    return res.status(500).json({
+                        error: 'Database error',
+                        message: retryError.message
+                    });
+                }
+
+                return res.json(retryUser);
+            }
+
+            // If status column doesn't exist
+            if (error.message && (error.message.includes('status') || error.code === '42703')) {
+                return res.status(400).json({
+                    error: 'Invalid input',
+                    message: 'Status field is not supported in this schema'
+                });
+            }
+
+            if (error.code === 'PGRST116') {
+                return res.status(404).json({
+                    error: 'Not found',
+                    message: 'User not found'
+                });
+            }
+
+            console.error('Failed to update user:', error);
+            return res.status(500).json({
+                error: 'Database error',
+                message: error.message
+            });
+        }
+
+        res.json(updatedUser);
+    } catch (err) {
+        console.error('Update user error:', err);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
 export default router;
