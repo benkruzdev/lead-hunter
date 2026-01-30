@@ -89,17 +89,32 @@ router.get('/dashboard', requireAuth, requireAdmin, async (req, res) => {
         const startOfToday = new Date();
         startOfToday.setUTCHours(0, 0, 0, 0);
 
-        // Total users count
-        const { count: totalUsers, error: usersError } = await supabaseAdmin
+        // Total users count (active users only - exclude soft-deleted)
+        let totalUsers = 0;
+
+        const { count: usersCount, error: usersError } = await supabaseAdmin
             .from('profiles')
-            .select('*', { count: 'exact', head: true });
+            .select('*', { count: 'exact', head: true })
+            .eq('is_deleted', false);
 
         if (usersError) {
-            console.error('Failed to count users:', usersError);
-            return res.status(500).json({
-                error: 'Database error',
-                message: usersError.message
-            });
+            // Fallback: try deleted_at if is_deleted column doesn't exist
+            const { count: totalUsersFallback, error: usersFallbackError } = await supabaseAdmin
+                .from('profiles')
+                .select('*', { count: 'exact', head: true })
+                .is('deleted_at', null);
+
+            if (usersFallbackError) {
+                console.error('Failed to count users:', usersFallbackError);
+                return res.status(500).json({
+                    error: 'Database error',
+                    message: usersFallbackError.message
+                });
+            }
+
+            totalUsers = totalUsersFallback || 0;
+        } else {
+            totalUsers = usersCount || 0;
         }
 
         // Daily search count (search_sessions created today)
@@ -150,7 +165,7 @@ router.get('/dashboard', requireAuth, requireAdmin, async (req, res) => {
         }
 
         res.json({
-            total_users: totalUsers || 0,
+            total_users: totalUsers,
             daily_search_count: dailySearchCount || 0,
             daily_credits_spent: dailyCreditsSpent,
             daily_exports_count: dailyExportsCount || 0
@@ -191,42 +206,53 @@ router.get('/users', requireAuth, requireAdmin, async (req, res) => {
         const { data: users, count, error } = await usersQuery;
 
         if (error) {
-            // Retry without email if column doesn't exist
-            if (error.message && error.message.includes('email')) {
-                const selectFieldsNoEmail = 'id,full_name,phone,plan,credits,status,role,is_deleted,deleted_at,created_at,updated_at';
+            // Check if status column is missing
+            const statusMissing = error.message && (error.message.includes('status') || error.code === '42703');
+            const emailMissing = error.message && error.message.includes('email');
 
-                let retryQuery = supabaseAdmin
-                    .from('profiles')
-                    .select(selectFieldsNoEmail, { count: 'exact' });
+            // Rebuild select fields based on what's missing
+            let fallbackFields = 'id,full_name,phone,plan,credits,role,is_deleted,deleted_at,created_at,updated_at';
+            if (!statusMissing) fallbackFields += ',status';
+            else fallbackFields += ',is_active';
+            if (!emailMissing) fallbackFields += ',email';
 
-                if (query) {
+            let retryQuery = supabaseAdmin
+                .from('profiles')
+                .select(fallbackFields, { count: 'exact' });
+
+            if (query) {
+                if (emailMissing) {
                     retryQuery = retryQuery.or(`full_name.ilike.%${query}%,phone.ilike.%${query}%`);
+                } else {
+                    retryQuery = retryQuery.or(`email.ilike.%${query}%,full_name.ilike.%${query}%,phone.ilike.%${query}%`);
                 }
+            }
 
-                retryQuery = retryQuery
-                    .range(parsedOffset, parsedOffset + parsedLimit - 1)
-                    .order('created_at', { ascending: false });
+            retryQuery = retryQuery
+                .range(parsedOffset, parsedOffset + parsedLimit - 1)
+                .order('created_at', { ascending: false });
 
-                const { data: retryUsers, count: retryCount, error: retryError } = await retryQuery;
+            const { data: retryUsers, count: retryCount, error: retryError } = await retryQuery;
 
-                if (retryError) {
-                    console.error('Failed to fetch users:', retryError);
-                    return res.status(500).json({
-                        error: 'Database error',
-                        message: retryError.message
-                    });
-                }
-
-                return res.json({
-                    users: retryUsers || [],
-                    total: retryCount || 0
+            if (retryError) {
+                console.error('Failed to fetch users:', retryError);
+                return res.status(500).json({
+                    error: 'Database error',
+                    message: retryError.message
                 });
             }
 
-            console.error('Failed to fetch users:', error);
-            return res.status(500).json({
-                error: 'Database error',
-                message: error.message
+            // Map is_active to status if needed
+            const mappedUsers = (retryUsers || []).map(user => {
+                if (statusMissing && user.is_active !== undefined) {
+                    return { ...user, status: user.is_active };
+                }
+                return user;
+            });
+
+            return res.json({
+                users: mappedUsers,
+                total: retryCount || 0
             });
         }
 
@@ -258,44 +284,49 @@ router.get('/users/:id', requireAuth, requireAdmin, async (req, res) => {
             .single();
 
         if (error) {
-            // Retry without email if column doesn't exist
-            if (error.message && error.message.includes('email')) {
-                const selectFieldsNoEmail = 'id,full_name,phone,plan,credits,status,role,is_deleted,deleted_at,created_at,updated_at';
-
-                const { data: retryUser, error: retryError } = await supabaseAdmin
-                    .from('profiles')
-                    .select(selectFieldsNoEmail)
-                    .eq('id', id)
-                    .single();
-
-                if (retryError) {
-                    if (retryError.code === 'PGRST116') {
-                        return res.status(404).json({
-                            error: 'Not found',
-                            message: 'User not found'
-                        });
-                    }
-                    console.error('Failed to fetch user:', retryError);
-                    return res.status(500).json({
-                        error: 'Database error',
-                        message: retryError.message
-                    });
-                }
-
-                return res.json(retryUser);
-            }
-
             if (error.code === 'PGRST116') {
                 return res.status(404).json({
                     error: 'Not found',
                     message: 'User not found'
                 });
             }
-            console.error('Failed to fetch user:', error);
-            return res.status(500).json({
-                error: 'Database error',
-                message: error.message
-            });
+
+            // Check what's missing
+            const statusMissing = error.message && (error.message.includes('status') || error.code === '42703');
+            const emailMissing = error.message && error.message.includes('email');
+
+            // Rebuild select fields
+            let fallbackFields = 'id,full_name,phone,plan,credits,role,is_deleted,deleted_at,created_at,updated_at';
+            if (!statusMissing) fallbackFields += ',status';
+            else fallbackFields += ',is_active';
+            if (!emailMissing) fallbackFields += ',email';
+
+            const { data: retryUser, error: retryError } = await supabaseAdmin
+                .from('profiles')
+                .select(fallbackFields)
+                .eq('id', id)
+                .single();
+
+            if (retryError) {
+                if (retryError.code === 'PGRST116') {
+                    return res.status(404).json({
+                        error: 'Not found',
+                        message: 'User not found'
+                    });
+                }
+                console.error('Failed to fetch user:', retryError);
+                return res.status(500).json({
+                    error: 'Database error',
+                    message: retryError.message
+                });
+            }
+
+            // Map is_active to status if needed
+            if (statusMissing && retryUser.is_active !== undefined) {
+                retryUser.status = retryUser.is_active;
+            }
+
+            return res.json(retryUser);
         }
 
         res.json(user);
@@ -359,10 +390,56 @@ router.patch('/users/:id', requireAuth, requireAdmin, async (req, res) => {
             .single();
 
         if (error) {
-            // If updated_at column doesn't exist, retry without it
+            // Handle missing columns individually
+            let retryNeeded = false;
+            let errorMessage = null;
+
+            // Check for updated_at missing
             if (error.message && (error.message.includes('updated_at') || error.code === '42703')) {
                 delete updates.updated_at;
+                retryNeeded = true;
+            }
 
+            // Check for status missing - fallback to is_active
+            if (error.message && error.message.includes('status') && updates.status !== undefined) {
+                updates.is_active = updates.status;
+                delete updates.status;
+                retryNeeded = true;
+            }
+
+            // Check for is_deleted missing - fallback to just deleted_at
+            if (error.message && error.message.includes('is_deleted') && updates.is_deleted !== undefined) {
+                delete updates.is_deleted;
+                // Keep deleted_at if it was set
+                retryNeeded = true;
+            }
+
+            // Check for deleted_at missing
+            if (error.message && error.message.includes('deleted_at') && updates.deleted_at !== undefined) {
+                delete updates.deleted_at;
+                retryNeeded = true;
+                // If both is_deleted and deleted_at are gone, soft delete not supported
+                if (!updates.is_deleted && is_deleted !== undefined) {
+                    errorMessage = 'Soft delete is not supported in this schema';
+                }
+            }
+
+            // Check for credits missing
+            if (error.message && error.message.includes('credits') && updates.credits !== undefined) {
+                return res.status(400).json({
+                    error: 'Invalid input',
+                    message: 'Credits field is not supported in this schema'
+                });
+            }
+
+            if (errorMessage) {
+                return res.status(400).json({
+                    error: 'Invalid input',
+                    message: errorMessage
+                });
+            }
+
+            if (retryNeeded) {
                 const { data: retryUser, error: retryError } = await supabaseAdmin
                     .from('profiles')
                     .update(updates)
@@ -371,8 +448,8 @@ router.patch('/users/:id', requireAuth, requireAdmin, async (req, res) => {
                     .single();
 
                 if (retryError) {
-                    // If status column doesn't exist, return error
-                    if (retryError.message && (retryError.message.includes('status') || retryError.code === '42703')) {
+                    // Final check for status/is_active both missing
+                    if (retryError.message && retryError.message.includes('is_active') && status !== undefined) {
                         return res.status(400).json({
                             error: 'Invalid input',
                             message: 'Status field is not supported in this schema'
@@ -393,14 +470,6 @@ router.patch('/users/:id', requireAuth, requireAdmin, async (req, res) => {
                 }
 
                 return res.json(retryUser);
-            }
-
-            // If status column doesn't exist
-            if (error.message && (error.message.includes('status') || error.code === '42703')) {
-                return res.status(400).json({
-                    error: 'Invalid input',
-                    message: 'Status field is not supported in this schema'
-                });
             }
 
             if (error.code === 'PGRST116') {
