@@ -298,4 +298,80 @@ router.post('/register', async (req, res) => {
     }
 });
 
+/**
+ * Change user password
+ * POST /api/auth/change-password
+ */
+router.post('/change-password', requireAuth, async (req, res) => {
+    try {
+        const { currentPassword, newPassword } = req.body;
+
+        if (!currentPassword || !newPassword) {
+            return res.status(400).json({
+                error: 'Missing fields',
+                message: 'Current password and new password are required'
+            });
+        }
+
+        // Validate new password (minimum 6 characters for Supabase default)
+        if (newPassword.length < 6) {
+            return res.status(400).json({
+                error: 'Invalid password',
+                message: 'New password must be at least 6 characters'
+            });
+        }
+
+        // Get user email for re-authentication
+        const { data: userData, error: userError } = await supabaseAdmin.auth.admin.getUserById(req.user.id);
+
+        if (userError || !userData.user) {
+            console.error('[ChangePassword] Failed to get user:', userError);
+            return res.status(500).json({
+                error: 'Failed to verify user'
+            });
+        }
+
+        // Verify current password by attempting sign in
+        const { data: signInData, error: signInError } = await supabaseAdmin.auth.signInWithPassword({
+            email: userData.user.email,
+            password: currentPassword
+        });
+
+        if (signInError) {
+            return res.status(401).json({
+                error: 'Invalid current password',
+                message: 'The current password you entered is incorrect'
+            });
+        }
+
+        // Update password
+        const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
+            req.user.id,
+            { password: newPassword }
+        );
+
+        if (updateError) {
+            console.error('[ChangePassword] Failed to update password:', updateError);
+            return res.status(500).json({
+                error: 'Failed to update password',
+                message: updateError.message
+            });
+        }
+
+        console.log('[ChangePassword] Password updated successfully for user:', req.user.id);
+
+        res.json({
+            success: true,
+            message: 'Password changed successfully'
+        });
+
+    } catch (err) {
+        console.error('[ChangePassword] Error:', err);
+        res.status(500).json({
+            error: 'Internal server error',
+            message: 'Failed to change password'
+        });
+    }
+});
+
 export default router;

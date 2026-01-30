@@ -512,3 +512,27 @@ export async function createOrder(
         body: JSON.stringify({ packageId, paymentMethod }),
     });
 }
+
+// ============================================================================
+// Settings / Profile
+// ============================================================================
+
+export async function updateUserProfile(fullName: string, phone: string): Promise<{ success: boolean; profile: any }> {
+    return apiRequest('/api/profile', {
+        method: 'PUT',
+        body: JSON.stringify({ fullName, phone }),
+    });
+}
+
+export async function changeUserPassword(currentPassword: string, newPassword: string): Promise<{ success: boolean }> {
+    return apiRequest('/api/auth/change-password', {
+        method: 'POST',
+        body: JSON.stringify({ currentPassword, newPassword }),
+    });
+}
+
+export async function deleteUserAccount(): Promise<{ success: boolean }> {
+    return apiRequest('/api/profile/delete', {
+        method: 'POST',
+    });
+}
