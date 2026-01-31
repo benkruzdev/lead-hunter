@@ -214,9 +214,12 @@ export async function verifyToken(token: string) {
 
 /**
  * Get admin configuration (admin only)
- * GET /api/admin/config
+ * GET /api/${ADMIN_SECRET}/admin/config
  */
 export async function getAdminConfig() {
+    if (!ADMIN_SECRET) {
+        throw new Error('VITE_ADMIN_ROUTE_SECRET is not configured. Admin panel cannot function.');
+    }
     return apiRequest<{
         config: {
             id: number;
@@ -228,12 +231,12 @@ export async function getAdminConfig() {
             google_client_secret: string | null;
             updated_at: string;
         };
-    }>('/api/admin/config');
+    }>(`/api/${ADMIN_SECRET}/admin/config`);
 }
 
 /**
  * Update admin configuration (admin only)
- * PATCH /api/admin/config
+ * PATCH /api/${ADMIN_SECRET}/admin/config
  */
 export async function updateAdminConfig(data: {
     recaptcha_enabled?: boolean;
@@ -243,10 +246,13 @@ export async function updateAdminConfig(data: {
     google_client_id?: string;
     google_client_secret?: string;
 }) {
+    if (!ADMIN_SECRET) {
+        throw new Error('VITE_ADMIN_ROUTE_SECRET is not configured. Admin panel cannot function.');
+    }
     return apiRequest<{
         success: boolean;
         config: any;
-    }>('/api/admin/config', {
+    }>(`/api/${ADMIN_SECRET}/admin/config`, {
         method: 'PATCH',
         body: JSON.stringify(data),
     });
