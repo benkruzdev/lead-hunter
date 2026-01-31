@@ -187,6 +187,7 @@ router.get('/users', requireAuth, requireAdmin, async (req, res) => {
         const parsedLimit = Math.min(parseInt(limit) || 25, 100);
         const parsedOffset = parseInt(offset) || 0;
 
+        // Try with status first (SPEC field name)
         const selectFields = 'id,full_name,phone,plan,credits,status,role,is_deleted,deleted_at,created_at,updated_at,email';
 
         let usersQuery = supabaseAdmin
@@ -206,53 +207,71 @@ router.get('/users', requireAuth, requireAdmin, async (req, res) => {
         const { data: users, count, error } = await usersQuery;
 
         if (error) {
-            // Check if status column is missing
-            const statusMissing = error.message && (error.message.includes('status') || error.code === '42703');
+            // Check if status column is missing (need to fallback to is_active)
+            const statusMissing = error.message && error.message.includes('status');
             const emailMissing = error.message && error.message.includes('email');
 
-            // Rebuild select fields based on what's missing
-            let fallbackFields = 'id,full_name,phone,plan,credits,role,is_deleted,deleted_at,created_at,updated_at';
-            if (!statusMissing) fallbackFields += ',status';
-            else fallbackFields += ',is_active';
-            if (!emailMissing) fallbackFields += ',email';
+            if (statusMissing || emailMissing) {
+                // Build fallback select fields
+                let fallbackFields = 'id,full_name,phone,plan,credits,role,is_deleted,deleted_at,created_at,updated_at';
 
-            let retryQuery = supabaseAdmin
-                .from('profiles')
-                .select(fallbackFields, { count: 'exact' });
-
-            if (query) {
-                if (emailMissing) {
-                    retryQuery = retryQuery.or(`full_name.ilike.%${query}%,phone.ilike.%${query}%`);
+                // Add status or is_active
+                if (statusMissing) {
+                    fallbackFields += ',is_active';  // Fallback to is_active
                 } else {
-                    retryQuery = retryQuery.or(`email.ilike.%${query}%,full_name.ilike.%${query}%,phone.ilike.%${query}%`);
+                    fallbackFields += ',status';
                 }
-            }
 
-            retryQuery = retryQuery
-                .range(parsedOffset, parsedOffset + parsedLimit - 1)
-                .order('created_at', { ascending: false });
+                // Add email if not missing
+                if (!emailMissing) {
+                    fallbackFields += ',email';
+                }
 
-            const { data: retryUsers, count: retryCount, error: retryError } = await retryQuery;
+                let retryQuery = supabaseAdmin
+                    .from('profiles')
+                    .select(fallbackFields, { count: 'exact' });
 
-            if (retryError) {
-                console.error('Failed to fetch users:', retryError);
-                return res.status(500).json({
-                    error: 'Database error',
-                    message: retryError.message
+                if (query) {
+                    if (emailMissing) {
+                        retryQuery = retryQuery.or(`full_name.ilike.%${query}%,phone.ilike.%${query}%`);
+                    } else {
+                        retryQuery = retryQuery.or(`email.ilike.%${query}%,full_name.ilike.%${query}%,phone.ilike.%${query}%`);
+                    }
+                }
+
+                retryQuery = retryQuery
+                    .range(parsedOffset, parsedOffset + parsedLimit - 1)
+                    .order('created_at', { ascending: false });
+
+                const { data: retryUsers, count: retryCount, error: retryError } = await retryQuery;
+
+                if (retryError) {
+                    console.error('Failed to fetch users:', retryError);
+                    return res.status(500).json({
+                        error: 'Database error',
+                        message: retryError.message
+                    });
+                }
+
+                // Map is_active to status if we used fallback
+                const mappedUsers = (retryUsers || []).map(user => {
+                    if (statusMissing && user.is_active !== undefined) {
+                        const { is_active, ...rest } = user;
+                        return { ...rest, status: is_active };
+                    }
+                    return user;
+                });
+
+                return res.json({
+                    users: mappedUsers,
+                    total: retryCount || 0
                 });
             }
 
-            // Map is_active to status if needed
-            const mappedUsers = (retryUsers || []).map(user => {
-                if (statusMissing && user.is_active !== undefined) {
-                    return { ...user, status: user.is_active };
-                }
-                return user;
-            });
-
-            return res.json({
-                users: mappedUsers,
-                total: retryCount || 0
+            console.error('Failed to fetch users:', error);
+            return res.status(500).json({
+                error: 'Database error',
+                message: error.message
             });
         }
 
@@ -275,6 +294,7 @@ router.get('/users/:id', requireAuth, requireAdmin, async (req, res) => {
     try {
         const { id } = req.params;
 
+        // Try with status first (SPEC field name)
         const selectFields = 'id,full_name,phone,plan,credits,status,role,is_deleted,deleted_at,created_at,updated_at,email';
 
         const { data: user, error } = await supabaseAdmin
@@ -292,41 +312,59 @@ router.get('/users/:id', requireAuth, requireAdmin, async (req, res) => {
             }
 
             // Check what's missing
-            const statusMissing = error.message && (error.message.includes('status') || error.code === '42703');
+            const statusMissing = error.message && error.message.includes('status');
             const emailMissing = error.message && error.message.includes('email');
 
-            // Rebuild select fields
-            let fallbackFields = 'id,full_name,phone,plan,credits,role,is_deleted,deleted_at,created_at,updated_at';
-            if (!statusMissing) fallbackFields += ',status';
-            else fallbackFields += ',is_active';
-            if (!emailMissing) fallbackFields += ',email';
+            if (statusMissing || emailMissing) {
+                // Build fallback select fields
+                let fallbackFields = 'id,full_name,phone,plan,credits,role,is_deleted,deleted_at,created_at,updated_at';
 
-            const { data: retryUser, error: retryError } = await supabaseAdmin
-                .from('profiles')
-                .select(fallbackFields)
-                .eq('id', id)
-                .single();
+                // Add status or is_active
+                if (statusMissing) {
+                    fallbackFields += ',is_active';  // Fallback to is_active
+                } else {
+                    fallbackFields += ',status';
+                }
 
-            if (retryError) {
-                if (retryError.code === 'PGRST116') {
-                    return res.status(404).json({
-                        error: 'Not found',
-                        message: 'User not found'
+                // Add email if not missing
+                if (!emailMissing) {
+                    fallbackFields += ',email';
+                }
+
+                const { data: retryUser, error: retryError } = await supabaseAdmin
+                    .from('profiles')
+                    .select(fallbackFields)
+                    .eq('id', id)
+                    .single();
+
+                if (retryError) {
+                    if (retryError.code === 'PGRST116') {
+                        return res.status(404).json({
+                            error: 'Not found',
+                            message: 'User not found'
+                        });
+                    }
+                    console.error('Failed to fetch user:', retryError);
+                    return res.status(500).json({
+                        error: 'Database error',
+                        message: retryError.message
                     });
                 }
-                console.error('Failed to fetch user:', retryError);
-                return res.status(500).json({
-                    error: 'Database error',
-                    message: retryError.message
-                });
+
+                // Map is_active to status if we used fallback
+                if (statusMissing && retryUser.is_active !== undefined) {
+                    const { is_active, ...rest } = retryUser;
+                    return res.json({ ...rest, status: is_active });
+                }
+
+                return res.json(retryUser);
             }
 
-            // Map is_active to status if needed
-            if (statusMissing && retryUser.is_active !== undefined) {
-                retryUser.status = retryUser.is_active;
-            }
-
-            return res.json(retryUser);
+            console.error('Failed to fetch user:', error);
+            return res.status(500).json({
+                error: 'Database error',
+                message: error.message
+            });
         }
 
         res.json(user);
@@ -369,7 +407,7 @@ router.patch('/users/:id', requireAuth, requireAdmin, async (req, res) => {
 
         if (plan !== undefined) updates.plan = plan;
         if (credits !== undefined) updates.credits = parseInt(credits);
-        if (status !== undefined) updates.status = status;
+        if (status !== undefined) updates.status = status;  // Try status first
         if (role !== undefined) updates.role = role;
 
         // Handle is_deleted
@@ -390,65 +428,60 @@ router.patch('/users/:id', requireAuth, requireAdmin, async (req, res) => {
             .single();
 
         if (error) {
-            // Handle missing columns individually
-            let retryNeeded = false;
-            let errorMessage = null;
+            // Handle column-specific errors independently
+            const retryUpdates = { ...updates };
+            let needsRetry = false;
 
-            // Check for updated_at missing
-            if (error.message && (error.message.includes('updated_at') || error.code === '42703')) {
-                delete updates.updated_at;
-                retryNeeded = true;
+            // Handle updated_at missing
+            if (error.message && error.message.includes('updated_at')) {
+                delete retryUpdates.updated_at;
+                needsRetry = true;
             }
 
-            // Check for status missing - fallback to is_active
-            if (error.message && error.message.includes('status') && updates.status !== undefined) {
-                updates.is_active = updates.status;
-                delete updates.status;
-                retryNeeded = true;
+            // Handle status missing -> fallback to is_active
+            if (error.message && error.message.includes('status') && status !== undefined) {
+                retryUpdates.is_active = status;
+                delete retryUpdates.status;
+                needsRetry = true;
             }
 
-            // Check for is_deleted missing - fallback to just deleted_at
-            if (error.message && error.message.includes('is_deleted') && updates.is_deleted !== undefined) {
-                delete updates.is_deleted;
-                // Keep deleted_at if it was set
-                retryNeeded = true;
+            // Handle is_deleted missing
+            if (error.message && error.message.includes('is_deleted') && is_deleted !== undefined) {
+                delete retryUpdates.is_deleted;
+                needsRetry = true;
             }
 
-            // Check for deleted_at missing
+            // Handle deleted_at missing
             if (error.message && error.message.includes('deleted_at') && updates.deleted_at !== undefined) {
-                delete updates.deleted_at;
-                retryNeeded = true;
-                // If both is_deleted and deleted_at are gone, soft delete not supported
-                if (!updates.is_deleted && is_deleted !== undefined) {
-                    errorMessage = 'Soft delete is not supported in this schema';
+                delete retryUpdates.deleted_at;
+                needsRetry = true;
+                // If both is_deleted and deleted_at are missing, soft delete not supported
+                if (!retryUpdates.is_deleted && is_deleted !== undefined) {
+                    return res.status(400).json({
+                        error: 'Invalid input',
+                        message: 'Soft delete is not supported in this schema'
+                    });
                 }
             }
 
-            // Check for credits missing
-            if (error.message && error.message.includes('credits') && updates.credits !== undefined) {
+            // Handle credits missing
+            if (error.message && error.message.includes('credits') && credits !== undefined) {
                 return res.status(400).json({
                     error: 'Invalid input',
                     message: 'Credits field is not supported in this schema'
                 });
             }
 
-            if (errorMessage) {
-                return res.status(400).json({
-                    error: 'Invalid input',
-                    message: errorMessage
-                });
-            }
-
-            if (retryNeeded) {
+            if (needsRetry) {
                 const { data: retryUser, error: retryError } = await supabaseAdmin
                     .from('profiles')
-                    .update(updates)
+                    .update(retryUpdates)
                     .eq('id', id)
                     .select()
                     .single();
 
                 if (retryError) {
-                    // Final check for status/is_active both missing
+                    // Check if is_active also missing (both status and is_active don't exist)
                     if (retryError.message && retryError.message.includes('is_active') && status !== undefined) {
                         return res.status(400).json({
                             error: 'Invalid input',
@@ -462,7 +495,8 @@ router.patch('/users/:id', requireAuth, requireAdmin, async (req, res) => {
                             message: 'User not found'
                         });
                     }
-                    console.error('Failed to update user:', retryError);
+
+                    console.error('Failed to update user (retry):', retryError);
                     return res.status(500).json({
                         error: 'Database error',
                         message: retryError.message
