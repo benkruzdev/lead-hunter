@@ -324,7 +324,7 @@ export default function SearchPage() {
             </Label>
             <Select value={city} onValueChange={setCity}>
               <SelectTrigger data-onboarding="city-select" id="city-select">
-                <SelectValue placeholder="Şehir seçin" />
+                <SelectValue placeholder={t('searchPage.selectCity')} />
               </SelectTrigger>
               <SelectContent>
                 {turkeyData.provinces.map((province) => (
@@ -340,11 +340,11 @@ export default function SearchPage() {
           <div className="space-y-2">
             <Label className="flex items-center gap-2">
               <MapPin className="w-4 h-4 text-muted-foreground" />
-              İlçe
+              {t('searchPage.district')}
             </Label>
             <Select value={district} onValueChange={setDistrict} disabled={!city}>
               <SelectTrigger data-onboarding="district-select" id="district-select">
-                <SelectValue placeholder={city ? "İlçe seçin" : "Önce şehir seçin"} />
+                <SelectValue placeholder={t('searchPage.selectDistrict')} />
               </SelectTrigger>
               <SelectContent>
                 {availableDistricts.map((d) => (
@@ -360,13 +360,13 @@ export default function SearchPage() {
           <div className="space-y-2">
             <Label className="flex items-center gap-2">
               <Tag className="w-4 h-4 text-muted-foreground" />
-              Kategori
+              {t('searchPage.category')}
             </Label>
             <Input
               data-onboarding="category-input"
               id="category-input"
               type="text"
-              placeholder="ör. Restoran, Kafe, Berber"
+              placeholder={t('searchPage.categoryPlaceholder')}
               value={category}
               onChange={(e) => setCategory(e.target.value)}
             />
@@ -376,12 +376,12 @@ export default function SearchPage() {
           <div className="space-y-2">
             <Label className="flex items-center gap-2">
               <Tag className="w-4 h-4 text-muted-foreground" />
-              Anahtar Kelime
+              {t('searchPage.keyword')}
             </Label>
             <Input
               id="keyword-input"
               type="text"
-              placeholder="Örn: vegan, 24 saat, paket servis"
+              placeholder={t('searchPage.keywordPlaceholder')}
               value={keyword}
               onChange={(e) => setKeyword(e.target.value)}
             />
@@ -391,7 +391,7 @@ export default function SearchPage() {
           <div className="space-y-2">
             <Label className="flex items-center gap-2">
               <Star className="w-4 h-4 text-muted-foreground" />
-              Min. Puan: {minRating[0].toFixed(1)}
+              {t('searchPage.minRating')}: {minRating[0].toFixed(1)}
             </Label>
             <Slider
               id="min-rating-slider"
@@ -408,13 +408,13 @@ export default function SearchPage() {
           <div className="space-y-2">
             <Label className="flex items-center gap-2">
               <MessageSquare className="w-4 h-4 text-muted-foreground" />
-              Min. Yorum
+              {t('searchPage.minReviews')}
             </Label>
             <Input
               id="min-reviews-input"
               type="number"
               min="0"
-              placeholder="En az yorum sayısı"
+              placeholder={t('searchPage.minReviewsPlaceholder')}
               value={minReviews}
               onChange={(e) => {
                 const value = Number(e.target.value);
@@ -434,12 +434,12 @@ export default function SearchPage() {
               {isSearching ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  Aranıyor...
+                  {t('searchPage.searching')}
                 </>
               ) : (
                 <>
                   <Search className="w-4 h-4" />
-                  Ara
+                  {t('searchPage.search')}
                 </>
               )}
             </Button>
@@ -470,14 +470,14 @@ export default function SearchPage() {
             <div className="flex items-center gap-4">
               <DataSourceIndicator className="hidden sm:flex" />
               <span className="text-sm text-muted-foreground">
-                {totalResults} sonuç bulundu
+                {totalResults} {t('searchPage.resultsFound')}
               </span>
               <span className="text-sm text-muted-foreground">
-                Sayfa {currentPage} / {totalPages}
+                {t('searchPage.page')} {currentPage} / {totalPages}
               </span>
               {selectedIds.length > 0 && (
                 <span className="text-sm font-medium text-primary">
-                  {selectedIds.length} seçili
+                  {selectedIds.length} {t('searchPage.selected')}
                 </span>
               )}
             </div>
@@ -486,11 +486,11 @@ export default function SearchPage() {
                 <TooltipTrigger asChild>
                   <span className="text-sm text-muted-foreground flex items-center gap-1">
                     <AlertCircle className="w-4 h-4" />
-                    Kalan: 1.250 kredi
+                    {t('searchPage.creditsRemaining', { credits: '1.250' })}
                   </span>
                 </TooltipTrigger>
                 <TooltipContent>
-                  Her lead ekleme 1 kredi harcar
+                  {t('searchPage.creditCostTooltip')}
                 </TooltipContent>
               </Tooltip>
               <Button
@@ -511,7 +511,7 @@ export default function SearchPage() {
                 }}
               >
                 <Plus className="w-4 h-4" />
-                Seçilenleri Ekle ({selectedIds.length})
+                {t('searchPage.addSelected', { count: selectedIds.length })}
               </Button>
               <Button
                 data-onboarding="export-csv"
@@ -522,7 +522,7 @@ export default function SearchPage() {
                 }}
               >
                 <FileDown className="w-4 h-4" />
-                CSV İndir ({selectedIds.length})
+                {t('searchPage.downloadCSV', { count: selectedIds.length })}
               </Button>
             </div>
           </div>
@@ -539,22 +539,16 @@ export default function SearchPage() {
                     />
                   </th>
                   <th className="text-left p-4 text-sm font-medium text-muted-foreground">
-                    İşletme Adı
+                    {t('searchPage.businessName')}
                   </th>
                   <th className="text-left p-4 text-sm font-medium text-muted-foreground">
-                    Kategori
+                    {t('searchPage.category')}
                   </th>
                   <th className="text-left p-4 text-sm font-medium text-muted-foreground">
-                    İlçe
+                    {t('searchPage.district')}
                   </th>
                   <th className="text-left p-4 text-sm font-medium text-muted-foreground">
-                    Puan
-                  </th>
-                  <th className="text-left p-4 text-sm font-medium text-muted-foreground">
-                    Yorum
-                  </th>
-                  <th className="text-left p-4 text-sm font-medium text-muted-foreground">
-                    Skor
+                    {t('searchPage.rating')}
                   </th>
                   <th className="text-left p-4 text-sm font-medium text-muted-foreground">
                     Durum

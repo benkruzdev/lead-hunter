@@ -13,8 +13,10 @@ import {
 } from "@/components/ui/dialog";
 import { Plus, List, Calendar, ArrowRight, Loader2 } from "lucide-react";
 import { getLeadLists, createLeadList, LeadList } from "@/lib/api";
+import { useTranslation } from "react-i18next";
 
 export default function LeadLists() {
+  const { t } = useTranslation();
   const [lists, setLists] = useState<LeadList[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
@@ -65,12 +67,12 @@ export default function LeadLists() {
         <div>
           <h2 className="text-lg font-semibold">Lead Listelerim</h2>
           <p className="text-sm text-muted-foreground">
-            Oluşturduğunuz lead listelerini yönetin
+            {t('leadListsPage.description')}
           </p>
         </div>
         <Button onClick={() => setShowCreateDialog(true)}>
           <Plus className="w-4 h-4" />
-          Yeni Liste Oluştur
+          {t('leadListsPage.createButton')}
         </Button>
       </div>
 
@@ -110,7 +112,7 @@ export default function LeadLists() {
 
                   <Link to={`/app/lists/${list.id}`}>
                     <Button variant="outline" className="w-full group-hover:bg-primary group-hover:text-primary-foreground group-hover:border-primary transition-colors">
-                      Aç
+                      {t('leadListsPage.openButton')}
                       <ArrowRight className="w-4 h-4" />
                     </Button>
                   </Link>
