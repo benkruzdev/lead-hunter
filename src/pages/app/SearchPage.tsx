@@ -54,6 +54,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import turkeyData from "@/data/turkey.json";
+import { DataSourceIndicator } from "@/components/common/DataSourceIndicator";
 
 // Mock data generator (temporary for PR3 testing - will be replaced with real API)
 // Generates 200 results to test pagination modal, confirm/cancel, and same-page-free logic
