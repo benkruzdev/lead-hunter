@@ -31,6 +31,7 @@ import AdminSearchLogsPage from "./pages/admin/AdminSearchLogsPage";
 import AdminExportsPage from "./pages/admin/AdminExportsPage";
 import AdminPaymentsPage from "./pages/admin/AdminPaymentsPage";
 import AdminSystemLogsPage from "./pages/admin/AdminSystemLogsPage";
+import AdminSystemSettingsPage from "./pages/admin/AdminSystemSettingsPage";
 import AdminConfigPage from "./pages/admin/AdminConfigPage";
 import NotFound from "./pages/NotFound";
 
@@ -88,6 +89,7 @@ const AppContent = () => {
                     <Route path="exports" element={<AdminExportsPage />} />
                     <Route path="payments" element={<AdminPaymentsPage />} />
                     <Route path="system-logs" element={<AdminSystemLogsPage />} />
+                    <Route path="system-settings" element={<AdminSystemSettingsPage />} />
                     <Route path="config" element={<AdminConfigPage />} />
                   </Route>
                 </Route>
