@@ -30,6 +30,7 @@ import AdminCreditsPage from "./pages/admin/AdminCreditsPage";
 import AdminSearchLogsPage from "./pages/admin/AdminSearchLogsPage";
 import AdminExportsPage from "./pages/admin/AdminExportsPage";
 import AdminPaymentsPage from "./pages/admin/AdminPaymentsPage";
+import AdminCostPanelPage from "./pages/admin/AdminCostPanelPage";
 import AdminSystemLogsPage from "./pages/admin/AdminSystemLogsPage";
 import AdminSmtpSettingsPage from "./pages/admin/AdminSmtpSettingsPage";
 import AdminSystemSettingsPage from "./pages/admin/AdminSystemSettingsPage";
@@ -89,6 +90,7 @@ const AppContent = () => {
                     <Route path="search-logs" element={<AdminSearchLogsPage />} />
                     <Route path="exports" element={<AdminExportsPage />} />
                     <Route path="payments" element={<AdminPaymentsPage />} />
+                    <Route path="costs" element={<AdminCostPanelPage />} />
                     <Route path="system-logs" element={<AdminSystemLogsPage />} />
                     <Route path="smtp-settings" element={<AdminSmtpSettingsPage />} />
                     <Route path="system-settings" element={<AdminSystemSettingsPage />} />

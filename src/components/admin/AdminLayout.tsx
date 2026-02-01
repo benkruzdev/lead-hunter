@@ -1,5 +1,5 @@
 import { NavLink, Outlet, useLocation } from "react-router-dom";
-import { LayoutDashboard, Users, Settings, CreditCard, Search, FileDown, Wallet, FileText, Mail, Wrench } from "lucide-react";
+import { LayoutDashboard, Users, Settings, CreditCard, Search, FileDown, Wallet, LineChart, FileText, Mail, Wrench } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 export default function AdminLayout() {
@@ -13,6 +13,7 @@ export default function AdminLayout() {
         { icon: Search, label: t('admin.navigation.searchLogs'), path: '/app/admin/search-logs' },
         { icon: FileDown, label: t('admin.navigation.exports'), path: '/app/admin/exports' },
         { icon: Wallet, label: t('admin.navigation.payments'), path: '/app/admin/payments' },
+        { icon: LineChart, label: t('admin.navigation.costs'), path: '/app/admin/costs' },
         { icon: FileText, label: t('admin.navigation.systemLogs'), path: '/app/admin/system-logs' },
         { icon: Mail, label: t('admin.navigation.smtpSettings'), path: '/app/admin/smtp-settings' },
         { icon: Wrench, label: t('admin.navigation.systemSettings'), path: '/app/admin/system-settings' },

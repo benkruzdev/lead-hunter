@@ -258,6 +258,7 @@ const resources = {
                     searchLogs: 'Arama Logları',
                     exports: 'Exportlar',
                     payments: 'Ödemeler',
+                    costs: 'Maliyet',
                     systemLogs: 'Sistem Logları',
                     smtpSettings: 'SMTP Ayarları',
                     systemSettings: 'Sistem Ayarları',
@@ -397,6 +398,28 @@ const resources = {
                         action: 'Aksiyon',
                         target: 'Hedef',
                         createdAt: 'Oluşturulma',
+                    },
+                },
+                costs: {
+                    title: 'Maliyet Paneli',
+                    description: 'API kullanımı ve tahmini maliyetleri görüntüle',
+                    apiCalls: {
+                        title: 'API Çağrı Sayıları',
+                        description: 'API kullanım istatistiklerini görüntüle',
+                        noEndpoint: 'Backend endpoint mevcut değil',
+                        noEndpointDesc: 'API çağrı sayılarını görüntülemek için backend\'de yönetici endpoint\'i oluşturulmalıdır.',
+                    },
+                    estimatedCost: {
+                        title: 'Tahmini Maliyet',
+                        description: 'API kullanımına dayalı tahmini maliyetleri görüntüle',
+                        noEndpoint: 'Backend endpoint mevcut değil',
+                        noEndpointDesc: 'Tahmini maliyetleri görüntülemek için backend\'de yönetici endpoint\'i oluşturulmalıdır.',
+                    },
+                    dailyCharts: {
+                        title: 'Günlük Grafikler',
+                        description: 'Günlük API kullanım ve maliyet grafiklerini görüntüle',
+                        noEndpoint: 'Backend endpoint mevcut değil',
+                        noEndpointDesc: 'Günlük grafikleri görüntülemek için backend\'de yönetici endpoint\'i oluşturulmalıdır.',
                     },
                 },
                 smtpSettings: {
@@ -696,6 +719,7 @@ const resources = {
                     searchLogs: 'Search Logs',
                     exports: 'Exports',
                     payments: 'Payments',
+                    costs: 'Costs',
                     systemLogs: 'System Logs',
                     smtpSettings: 'SMTP Settings',
                     systemSettings: 'System Settings',
@@ -835,6 +859,28 @@ const resources = {
                         action: 'Action',
                         target: 'Target',
                         createdAt: 'Created',
+                    },
+                },
+                costs: {
+                    title: 'Cost Panel',
+                    description: 'View API usage and estimated costs',
+                    apiCalls: {
+                        title: 'API Call Count',
+                        description: 'View API usage statistics',
+                        noEndpoint: 'Backend endpoint not available',
+                        noEndpointDesc: 'An admin endpoint must be created on the backend to view API call counts.',
+                    },
+                    estimatedCost: {
+                        title: 'Estimated Cost',
+                        description: 'View estimated costs based on API usage',
+                        noEndpoint: 'Backend endpoint not available',
+                        noEndpointDesc: 'An admin endpoint must be created on the backend to view estimated costs.',
+                    },
+                    dailyCharts: {
+                        title: 'Daily Charts',
+                        description: 'View daily API usage and cost charts',
+                        noEndpoint: 'Backend endpoint not available',
+                        noEndpointDesc: 'An admin endpoint must be created on the backend to view daily charts.',
                     },
                 },
                 smtpSettings: {
