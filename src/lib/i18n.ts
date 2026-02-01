@@ -254,6 +254,7 @@ const resources = {
                 navigation: {
                     dashboard: 'Dashboard',
                     users: 'Kullanıcılar',
+                    credits: 'Kredi',
                     config: 'Ayarlar',
                 },
                 dashboard: {
@@ -307,6 +308,20 @@ const resources = {
                     status: 'Durum',
                     role: 'Rol',
                     createdAt: 'Kayıt Tarihi',
+                },
+                credits: {
+                    title: 'Kredi Yönetimi',
+                    description: 'Kredi işlemlerini görüntüle ve yönet',
+                    ledger: {
+                        title: 'Kredi Defteri',
+                        noEndpoint: 'Backend endpoint mevcut değil',
+                        noEndpointDesc: 'Kredi işlemlerini görüntülemek için backend\'de yönetici endpoint\'i oluşturulmalıdır.',
+                    },
+                    manual: {
+                        title: 'Manuel Kredi Yükleme',
+                        noEndpoint: 'Backend endpoint mevcut değil',
+                        noEndpointDesc: 'Manuel kredi yüklemek için backend\'de yönetici endpoint\'i oluşturulmalıdır.',
+                    },
                 },
             },
         },
@@ -562,6 +577,7 @@ const resources = {
                 navigation: {
                     dashboard: 'Dashboard',
                     users: 'Users',
+                    credits: 'Credits',
                     config: 'Settings',
                 },
                 dashboard: {
@@ -615,6 +631,20 @@ const resources = {
                     status: 'Status',
                     role: 'Role',
                     createdAt: 'Created At',
+                },
+                credits: {
+                    title: 'Credit Management',
+                    description: 'View and manage credit transactions',
+                    ledger: {
+                        title: 'Credit Ledger',
+                        noEndpoint: 'Backend endpoint not available',
+                        noEndpointDesc: 'An admin endpoint must be created on the backend to view credit transactions.',
+                    },
+                    manual: {
+                        title: 'Manual Credit Load',
+                        noEndpoint: 'Backend endpoint not available',
+                        noEndpointDesc: 'An admin endpoint must be created on the backend to manually load credits.',
+                    },
                 },
             },
         },

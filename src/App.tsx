@@ -26,6 +26,7 @@ import AdminLayout from "./components/admin/AdminLayout";
 import AdminDashboardPage from "./pages/admin/AdminDashboardPage";
 import AdminUsersPage from "./pages/admin/AdminUsersPage";
 import AdminUserDetailPage from "./pages/admin/AdminUserDetailPage";
+import AdminCreditsPage from "./pages/admin/AdminCreditsPage";
 import AdminConfigPage from "./pages/admin/AdminConfigPage";
 import NotFound from "./pages/NotFound";
 
@@ -78,6 +79,7 @@ const AppContent = () => {
                     <Route index element={<AdminDashboardPage />} />
                     <Route path="users" element={<AdminUsersPage />} />
                     <Route path="users/:id" element={<AdminUserDetailPage />} />
+                    <Route path="credits" element={<AdminCreditsPage />} />
                     <Route path="config" element={<AdminConfigPage />} />
                   </Route>
                 </Route>
