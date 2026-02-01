@@ -259,7 +259,8 @@ const resources = {
                     exports: 'Exportlar',
                     payments: 'Ödemeler',
                     systemLogs: 'Sistem Logları',
-                    systemSettings: 'SMTP & Sistem Ayarları',
+                    smtpSettings: 'SMTP Ayarları',
+                    systemSettings: 'Sistem Ayarları',
                     config: 'Ayarlar',
                 },
                 dashboard: {
@@ -398,9 +399,9 @@ const resources = {
                         createdAt: 'Oluşturulma',
                     },
                 },
-                systemSettings: {
-                    title: 'SMTP & Sistem Ayarları',
-                    description: 'SMTP, mail testi, kredi kuralları ve plan ayarlarını yönet',
+                smtpSettings: {
+                    title: 'SMTP Ayarları',
+                    description: 'E-posta gönderimi ve SMTP yapılandırmasını yönet',
                     smtp: {
                         title: 'SMTP Ayarları',
                         description: 'E-posta gönderimi için SMTP yapılandırması',
@@ -420,6 +421,10 @@ const resources = {
                         sent: 'Test mail gönderildi',
                         sendFailed: 'Test mail gönderilemedi',
                     },
+                },
+                systemSettings: {
+                    title: 'Sistem Ayarları',
+                    description: 'Kredi kuralları ve plan ayarlarını yönet',
                     creditRules: {
                         title: 'Kredi Kuralları',
                         description: 'Kredi kullanım kurallarını görüntüle ve yönet',
@@ -692,7 +697,8 @@ const resources = {
                     exports: 'Exports',
                     payments: 'Payments',
                     systemLogs: 'System Logs',
-                    systemSettings: 'SMTP & System Settings',
+                    smtpSettings: 'SMTP Settings',
+                    systemSettings: 'System Settings',
                     config: 'Settings',
                 },
                 dashboard: {
@@ -831,9 +837,9 @@ const resources = {
                         createdAt: 'Created',
                     },
                 },
-                systemSettings: {
-                    title: 'SMTP & System Settings',
-                    description: 'Manage SMTP, mail testing, credit rules, and plan settings',
+                smtpSettings: {
+                    title: 'SMTP Settings',
+                    description: 'Manage email delivery and SMTP configuration',
                     smtp: {
                         title: 'SMTP Settings',
                         description: 'Configure SMTP for email delivery',
@@ -853,6 +859,10 @@ const resources = {
                         sent: 'Test mail sent',
                         sendFailed: 'Failed to send test mail',
                     },
+                },
+                systemSettings: {
+                    title: 'System Settings',
+                    description: 'Manage credit rules and plan settings',
                     creditRules: {
                         title: 'Credit Rules',
                         description: 'View and manage credit usage rules',
