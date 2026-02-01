@@ -1,5 +1,5 @@
 import { NavLink, Outlet, useLocation } from "react-router-dom";
-import { LayoutDashboard, Users, Settings, CreditCard } from "lucide-react";
+import { LayoutDashboard, Users, Settings, CreditCard, Search } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 export default function AdminLayout() {
@@ -10,6 +10,7 @@ export default function AdminLayout() {
         { icon: LayoutDashboard, label: t('admin.navigation.dashboard'), path: '/app/admin' },
         { icon: Users, label: t('admin.navigation.users'), path: '/app/admin/users' },
         { icon: CreditCard, label: t('admin.navigation.credits'), path: '/app/admin/credits' },
+        { icon: Search, label: t('admin.navigation.searchLogs'), path: '/app/admin/search-logs' },
         { icon: Settings, label: t('admin.navigation.config'), path: '/app/admin/config' },
     ];
 
@@ -19,7 +20,9 @@ export default function AdminLayout() {
             <div className="border-b">
                 <nav className="flex gap-6">
                     {tabs.map((tab) => {
-                        const isActive = location.pathname === tab.path;
+                        const isActive = tab.path === '/app/admin'
+                            ? location.pathname === tab.path
+                            : location.pathname.startsWith(tab.path);
                         return (
                             <NavLink
                                 key={tab.path}
