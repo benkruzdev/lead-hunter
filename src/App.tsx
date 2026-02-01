@@ -22,6 +22,9 @@ import ListDetail from "./pages/app/ListDetail";
 import ExportsPage from "./pages/app/ExportsPage";
 import BillingPage from "./pages/app/BillingPage";
 import SettingsPage from "./pages/app/SettingsPage";
+import AdminLayout from "./components/admin/AdminLayout";
+import AdminDashboardPage from "./pages/admin/AdminDashboardPage";
+import AdminUsersPage from "./pages/admin/AdminUsersPage";
 import AdminConfigPage from "./pages/admin/AdminConfigPage";
 import NotFound from "./pages/NotFound";
 
@@ -70,7 +73,11 @@ const AppContent = () => {
                   <Route path="exports" element={<ExportsPage />} />
                   <Route path="billing" element={<BillingPage />} />
                   <Route path="settings" element={<SettingsPage />} />
-                  <Route path="admin" element={<AdminConfigPage />} />
+                  <Route path="admin" element={<AdminLayout />}>
+                    <Route index element={<AdminDashboardPage />} />
+                    <Route path="users" element={<AdminUsersPage />} />
+                    <Route path="config" element={<AdminConfigPage />} />
+                  </Route>
                 </Route>
               </Route>
 

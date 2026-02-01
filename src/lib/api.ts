@@ -260,6 +260,95 @@ export async function updateAdminConfig(data: {
 }
 
 /**
+ * Get admin dashboard metrics (admin only)
+ * GET /api/${ADMIN_SECRET}/admin/dashboard
+ */
+export async function getAdminDashboard() {
+    if (!ADMIN_SECRET) {
+        throw new Error('VITE_ADMIN_ROUTE_SECRET is not configured. Admin panel cannot function.');
+    }
+    return apiRequest<{
+        total_users: number;
+        daily_search_count: number;
+        daily_credits_spent: number;
+        daily_exports_count: number;
+    }>(`/api/${ADMIN_SECRET}/admin/dashboard`);
+}
+
+/**
+ * Get admin users list (admin only)
+ * GET /api/${ADMIN_SECRET}/admin/users
+ */
+export async function getAdminUsers(params?: { query?: string; limit?: number; offset?: number }) {
+    if (!ADMIN_SECRET) {
+        throw new Error('VITE_ADMIN_ROUTE_SECRET is not configured. Admin panel cannot function.');
+    }
+    const searchParams = new URLSearchParams();
+    if (params?.query) searchParams.set('query', params.query);
+    if (params?.limit) searchParams.set('limit', params.limit.toString());
+    if (params?.offset) searchParams.set('offset', params.offset.toString());
+
+    const queryString = searchParams.toString();
+    const url = `/api/${ADMIN_SECRET}/admin/users${queryString ? `?${queryString}` : ''}`;
+
+    return apiRequest<{
+        users: Array<{
+            id: string;
+            email?: string;
+            full_name: string;
+            phone?: string;
+            plan: string;
+            credits: number;
+            status: boolean;
+            role: string;
+            created_at: string;
+            last_login_ip?: string;
+        }>;
+        total: number;
+    }>(url);
+}
+
+/**
+ * Get single admin user (admin only)
+ * GET /api/${ADMIN_SECRET}/admin/users/:id
+ */
+export async function getAdminUser(id: string) {
+    if (!ADMIN_SECRET) {
+        throw new Error('VITE_ADMIN_ROUTE_SECRET is not configured. Admin panel cannot function.');
+    }
+    return apiRequest<{
+        id: string;
+        email?: string;
+        full_name: string;
+        phone?: string;
+        plan: string;
+        credits: number;
+        status: boolean;
+        role: string;
+        created_at: string;
+    }>(`/api/${ADMIN_SECRET}/admin/users/${id}`);
+}
+
+/**
+ * Update admin user (admin only)
+ * PATCH /api/${ADMIN_SECRET}/admin/users/:id
+ */
+export async function updateAdminUser(id: string, data: {
+    plan?: string;
+    credits?: number;
+    status?: boolean;
+    role?: string;
+}) {
+    if (!ADMIN_SECRET) {
+        throw new Error('VITE_ADMIN_ROUTE_SECRET is not configured. Admin panel cannot function.');
+    }
+    return apiRequest<any>(`/api/${ADMIN_SECRET}/admin/users/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+    });
+}
+
+/**
  * Register new user with reCAPTCHA verification
  * POST /api/auth/register
  */
