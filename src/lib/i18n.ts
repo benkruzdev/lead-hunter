@@ -462,6 +462,35 @@ const resources = {
                     },
                 },
             },
+
+            // Compliance & Legal
+            compliance: {
+                pageTitle: 'Veri Kaynakları & Yasal Yaklaşım',
+                pageDescription: 'LeadHunter\'ın resmi API kullanımı ve gizlilik odaklı yaklaşımı hakkında bilgi edinin',
+                indicators: {
+                    safeData: 'Güvenli Veri',
+                    officialDataTooltip: 'Google resmi API kullanır, scraping yapmaz, gizlilik odaklı',
+                    googleApis: 'Google Resmi API',
+                    noScraping: 'Scraping Yok',
+                    gdprCompliant: 'Gizlilik Odaklı',
+                },
+                whatWeDo: {
+                    title: 'Ne Yapıyoruz',
+                    description: 'LeadHunter, yalnızca Google\'ın resmi ve halka açık API\'lerini kullanarak işletme bilgilerini sağlar. Tüm veriler yasal ve şeffaf yöntemlerle elde edilir.',
+                },
+                whatWeDoNot: {
+                    title: 'Gri Alana Girmiyoruz',
+                    description: 'Web scraping, otomatik bot kullanımı veya Google Haritalar\'ın kullanım koşullarını ihlal eden hiçbir yöntem kullanmıyoruz. Yasal riskli veya belirsiz yöntemlerden uzak duruyoruz.',
+                },
+                dataPrinciples: {
+                    title: 'Veri Prensipleri',
+                    description: 'Sadece halka açık işletme bilgileri sağlanır. Kullanıcı gizliliği ve veri güvenliği önceliğimizdir. Gizlilik odaklı ve uyumluluk bilinciyle çalışırız.',
+                },
+                disclaimer: {
+                    title: 'Sorumluluk Reddi',
+                    description: 'Bu sayfa bilgilendirme amaçlıdır ve yasal garanti veya tavsiye niteliği taşımaz. Platform yaklaşımımızı açıklamak için hazırlanmıştır.',
+                },
+            },
         },
     },
     en: {
@@ -921,6 +950,35 @@ const resources = {
                         noEndpoint: 'Backend endpoint not available',
                         noEndpointDesc: 'An admin endpoint must be created on the backend to view plan settings.',
                     },
+                },
+            },
+
+            // Compliance & Legal
+            compliance: {
+                pageTitle: 'Data Sources & Legal Approach',
+                pageDescription: 'Learn about LeadHunter\'s official API usage and privacy-first approach',
+                indicators: {
+                    safeData: 'Safe Data',
+                    officialDataTooltip: 'Uses Google official APIs, no scraping, privacy-first',
+                    googleApis: 'Google Official API',
+                    noScraping: 'No Scraping',
+                    gdprCompliant: 'Privacy-First',
+                },
+                whatWeDo: {
+                    title: 'What We Do',
+                    description: 'LeadHunter provides business information using only Google\'s official and public APIs. All data is obtained through legal and transparent methods.',
+                },
+                whatWeDoNot: {
+                    title: 'We Avoid Grey Areas',
+                    description: 'We do not use web scraping, automated bots, or any methods that violate Google Maps\' terms of service. We stay away from legally risky or unclear methods.',
+                },
+                dataPrinciples: {
+                    title: 'Data Principles',
+                    description: 'Only publicly available business information is provided. User privacy and data security are our priorities. We operate with a privacy-first and compliance-focused approach.',
+                },
+                disclaimer: {
+                    title: 'Disclaimer',
+                    description: 'This page is for informational purposes only and does not constitute legal guarantees or advice. It is prepared to explain our platform approach.',
                 },
             },
         },

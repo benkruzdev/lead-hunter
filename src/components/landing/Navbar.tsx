@@ -13,7 +13,7 @@ export function Navbar() {
           <span className="text-primary">Lead</span>
           <span className="text-foreground">Hunter</span>
         </Link>
-        
+
         {/* Desktop nav */}
         <div className="hidden md:flex items-center gap-8">
           <Link to="/pricing" className="text-muted-foreground hover:text-foreground transition-colors">
@@ -26,7 +26,7 @@ export function Navbar() {
             İletişim
           </a>
         </div>
-        
+
         <div className="hidden md:flex items-center gap-3">
           <Link to="/login">
             <Button variant="ghost">Giriş Yap</Button>
@@ -35,7 +35,7 @@ export function Navbar() {
             <Button>Ücretsiz Dene</Button>
           </Link>
         </div>
-        
+
         {/* Mobile menu button */}
         <button
           className="md:hidden p-2"
@@ -44,13 +44,13 @@ export function Navbar() {
           {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
         </button>
       </div>
-      
+
       {/* Mobile menu */}
       {mobileMenuOpen && (
         <div className="md:hidden absolute top-16 left-0 right-0 bg-background border-b shadow-lg animate-fade-in">
           <div className="container py-4 space-y-4">
-            <Link 
-              to="/pricing" 
+            <Link
+              to="/pricing"
               className="block text-muted-foreground hover:text-foreground transition-colors"
               onClick={() => setMobileMenuOpen(false)}
             >

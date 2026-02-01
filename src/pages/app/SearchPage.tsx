@@ -467,6 +467,7 @@ export default function SearchPage() {
           {/* Results header */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 border-b bg-muted/30">
             <div className="flex items-center gap-4">
+              <DataSourceIndicator className="hidden sm:flex" />
               <span className="text-sm text-muted-foreground">
                 {totalResults} sonuç bulundu
               </span>
