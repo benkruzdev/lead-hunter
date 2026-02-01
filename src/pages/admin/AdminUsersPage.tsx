@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -150,10 +151,12 @@ export default function AdminUsersPage() {
                                         <tr key={user.id} className="border-b hover:bg-muted/30 transition-colors">
                                             <td className="p-3">
                                                 <div className="flex items-center justify-between gap-4">
-                                                    <div className="space-y-1">
-                                                        <p className="text-sm font-medium">{user.full_name}</p>
-                                                        <p className="text-xs text-muted-foreground">{user.email || '-'}</p>
-                                                    </div>
+                                                    <Link to={`/app/admin/users/${user.id}`} className="flex-1">
+                                                        <div className="space-y-1">
+                                                            <p className="text-sm font-medium hover:underline">{user.full_name}</p>
+                                                            <p className="text-xs text-muted-foreground">{user.email || '-'}</p>
+                                                        </div>
+                                                    </Link>
                                                     <Button
                                                         variant="outline"
                                                         size="sm"

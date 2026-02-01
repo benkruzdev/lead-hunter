@@ -25,6 +25,7 @@ import SettingsPage from "./pages/app/SettingsPage";
 import AdminLayout from "./components/admin/AdminLayout";
 import AdminDashboardPage from "./pages/admin/AdminDashboardPage";
 import AdminUsersPage from "./pages/admin/AdminUsersPage";
+import AdminUserDetailPage from "./pages/admin/AdminUserDetailPage";
 import AdminConfigPage from "./pages/admin/AdminConfigPage";
 import NotFound from "./pages/NotFound";
 
@@ -76,6 +77,7 @@ const AppContent = () => {
                   <Route path="admin" element={<AdminLayout />}>
                     <Route index element={<AdminDashboardPage />} />
                     <Route path="users" element={<AdminUsersPage />} />
+                    <Route path="users/:id" element={<AdminUserDetailPage />} />
                     <Route path="config" element={<AdminConfigPage />} />
                   </Route>
                 </Route>
