@@ -55,6 +55,10 @@ import {
 } from "@/components/ui/dialog";
 import turkeyData from "@/data/turkey.json";
 import { DataSourceIndicator } from "@/components/common/DataSourceIndicator";
+import { listPresets, savePreset, renamePreset, deletePreset, getPreset, type SearchFilters, type SearchPreset } from "@/lib/searchPresets";
+import { Bookmark } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+
 
 // Mock data generator (temporary for PR3 testing - will be replaced with real API)
 // Generates 200 results to test pagination modal, confirm/cancel, and same-page-free logic
@@ -117,6 +121,19 @@ export default function SearchPage() {
   const [dryRunCost, setDryRunCost] = useState<number | null>(null);
   const [listDialogError, setListDialogError] = useState<string | null>(null);
 
+  // Preset state
+  const { toast } = useToast();
+  const [presets, setPresets] = useState<SearchPreset[]>([]);
+  const [selectedPresetId, setSelectedPresetId] = useState("");
+  const [showSavePresetDialog, setShowSavePresetDialog] = useState(false);
+  const [showManagePresetsDialog, setShowManagePresetsDialog] = useState(false);
+  const [presetName, setPresetName] = useState("");
+  const [editingPresetId, setEditingPresetId] = useState<string | null>(null);
+  const [editingPresetName, setEditingPresetName] = useState("");
+  const [pendingDistrict, setPendingDistrict] = useState<string | null>(null);
+
+
+
   const resultsPerPage = 20;
   const totalPages = Math.max(1, Math.ceil(totalResults / resultsPerPage));
   // PR4.1: Backend returns 20 results per page, no frontend slicing needed
@@ -125,13 +142,26 @@ export default function SearchPage() {
   useEffect(() => {
     if (city) {
       const selectedProvince = turkeyData.provinces.find((p) => p.name === city);
-      setAvailableDistricts(selectedProvince?.districts || []);
-      setDistrict(""); // Reset district when city changes
+      const districts = selectedProvince?.districts || [];
+      setAvailableDistricts(districts);
+
+      // Apply pending district from preset if available
+      if (pendingDistrict && districts.includes(pendingDistrict)) {
+        setDistrict(pendingDistrict);
+        setPendingDistrict(null);
+      } else if (!pendingDistrict) {
+        setDistrict(""); // Reset district when city changes manually
+      } else {
+        // Pending district not in list, clear both
+        setPendingDistrict(null);
+        setDistrict("");
+      }
     } else {
       setAvailableDistricts([]);
       setDistrict("");
+      setPendingDistrict(null);
     }
-  }, [city]);
+  }, [city, pendingDistrict]);
 
   // Show onboarding tour for first-time users
   useEffect(() => {
@@ -139,6 +169,12 @@ export default function SearchPage() {
       setShowOnboarding(true);
     }
   }, [profile]);
+
+  // Load presets on mount
+  useEffect(() => {
+    setPresets(listPresets());
+  }, []);
+
 
   // PRODUCT_SPEC 5.4 - Load session from URL param (Continue search)
   useEffect(() => {
@@ -219,6 +255,84 @@ export default function SearchPage() {
       setIsSearching(false);
     }
   };
+
+  // Preset handlers
+  const handleSavePreset = () => {
+    const defaultName = city && category ? `${city} - ${category}` : "";
+    setPresetName(defaultName);
+    setShowSavePresetDialog(true);
+  };
+
+  const handleConfirmSavePreset = () => {
+    if (!presetName.trim()) return;
+
+    const filters: SearchFilters = {
+      city,
+      district,
+      category,
+      keyword,
+      minRating: minRating[0],
+      minReviews,
+    };
+
+    const result = savePreset(presetName.trim(), filters);
+    if (result.success) {
+      setPresets(listPresets());
+      setShowSavePresetDialog(false);
+      setPresetName("");
+      toast({ description: t('searchPage.presetSaved') });
+    } else if (result.error === 'limit_reached') {
+      toast({ variant: "destructive", description: t('searchPage.presetLimitReached') });
+    } else if (result.error === 'already_exists') {
+      toast({ variant: "destructive", description: t('searchPage.presetAlreadyExists') });
+    }
+  };
+
+  const handleApplyPreset = (presetId: string) => {
+    const preset = getPreset(presetId);
+    if (!preset) return;
+
+    const { filters } = preset;
+    setCity(filters.city);
+    setPendingDistrict(filters.district);
+    setCategory(filters.category);
+    setKeyword(filters.keyword);
+    setMinRating([filters.minRating]);
+    setMinReviews(filters.minReviews);
+    setSelectedPresetId(presetId);
+  };
+
+  const handleRenamePreset = (id: string) => {
+    const preset = getPreset(id);
+    if (!preset) return;
+    setEditingPresetId(id);
+    setEditingPresetName(preset.name);
+  };
+
+  const handleConfirmRename = () => {
+    if (!editingPresetId || !editingPresetName.trim()) return;
+
+    const result = renamePreset(editingPresetId, editingPresetName.trim());
+    if (result.success) {
+      setPresets(listPresets());
+      setEditingPresetId(null);
+      setEditingPresetName("");
+      toast({ description: t('searchPage.presetRenamed') });
+    } else if (result.error === 'already_exists') {
+      toast({ variant: "destructive", description: t('searchPage.presetAlreadyExists') });
+    }
+  };
+
+  const handleDeletePreset = (id: string) => {
+    if (deletePreset(id)) {
+      setPresets(listPresets());
+      if (selectedPresetId === id) {
+        setSelectedPresetId("");
+      }
+      toast({ description: t('searchPage.presetDeleted') });
+    }
+  };
+
 
   const handlePageChange = (newPage: number) => {
     if (newPage === currentPage) return;
@@ -442,6 +556,34 @@ export default function SearchPage() {
                   {t('searchPage.search')}
                 </>
               )}
+            </Button>
+          </div>
+
+          {/* Presets Row */}
+          <div className="flex items-end gap-2 pt-4 border-t">
+            <div className="flex-1 space-y-2">
+              <Label className="flex items-center gap-2">
+                <Bookmark className="w-4 h-4 text-muted-foreground" />
+                {t('searchPage.presetsLabel')}
+              </Label>
+              <Select value={selectedPresetId} onValueChange={handleApplyPreset}>
+                <SelectTrigger>
+                  <SelectValue placeholder={t('searchPage.presetsPlaceholder')} />
+                </SelectTrigger>
+                <SelectContent>
+                  {presets.map((preset) => (
+                    <SelectItem key={preset.id} value={preset.id}>
+                      {preset.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button onClick={handleSavePreset} variant="outline" size="default">
+              {t('searchPage.savePreset')}
+            </Button>
+            <Button onClick={() => setShowManagePresetsDialog(true)} variant="outline" size="default">
+              {t('searchPage.managePresets')}
             </Button>
           </div>
         </div>
@@ -886,6 +1028,121 @@ export default function SearchPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Save Preset Dialog */}
+      <Dialog open={showSavePresetDialog} onOpenChange={setShowSavePresetDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t('searchPage.savePreset')}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>{t('searchPage.presetNameLabel')}</Label>
+              <Input
+                value={presetName}
+                onChange={(e) => setPresetName(e.target.value)}
+                placeholder={t('searchPage.presetNamePlaceholder')}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    handleConfirmSavePreset();
+                  }
+                }}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowSavePresetDialog(false)}>
+              {t('searchPage.cancel')}
+            </Button>
+            <Button onClick={handleConfirmSavePreset} disabled={!presetName.trim()}>
+              {t('searchPage.save')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Manage Presets Dialog */}
+      <Dialog open={showManagePresetsDialog} onOpenChange={setShowManagePresetsDialog}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>{t('searchPage.managePresets')}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2 py-4 max-h-96 overflow-y-auto">
+            {presets.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-8">
+                {t('searchPage.presetsPlaceholder')}
+              </p>
+            ) : (
+              presets.map((preset) => (
+                <div
+                  key={preset.id}
+                  className="flex items-center gap-2 p-3 border rounded-lg hover:bg-muted/50"
+                >
+                  {editingPresetId === preset.id ? (
+                    <>
+                      <Input
+                        value={editingPresetName}
+                        onChange={(e) => setEditingPresetName(e.target.value)}
+                        className="flex-1"
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            handleConfirmRename();
+                          } else if (e.key === 'Escape') {
+                            setEditingPresetId(null);
+                            setEditingPresetName("");
+                          }
+                        }}
+                        autoFocus
+                      />
+                      <Button
+                        size="sm"
+                        onClick={handleConfirmRename}
+                        disabled={!editingPresetName.trim()}
+                      >
+                        {t('searchPage.save')}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          setEditingPresetId(null);
+                          setEditingPresetName("");
+                        }}
+                      >
+                        {t('searchPage.cancel')}
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <div className="flex-1">
+                        <p className="font-medium">{preset.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {new Date(preset.createdAt).toLocaleDateString()}
+                        </p>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleRenamePreset(preset.id)}
+                      >
+                        {t('searchPage.rename')}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        onClick={() => handleDeletePreset(preset.id)}
+                      >
+                        {t('searchPage.delete')}
+                      </Button>
+                    </>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
 
       {/* Onboarding Tour */}
       {showOnboarding && profile && !profile.onboarding_completed && (
