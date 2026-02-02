@@ -59,6 +59,8 @@ import { listPresets, savePreset, renamePreset, deletePreset, getPreset, type Se
 import { Bookmark } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { SearchIntelligenceBar } from "@/components/app/SearchIntelligenceBar";
+import { LeadQualityBadge } from "@/components/app/LeadQualityBadge";
+
 
 
 
@@ -723,7 +725,18 @@ export default function SearchPage() {
                         onCheckedChange={() => toggleSelect(item.id)}
                       />
                     </td>
-                    <td className="p-4 font-medium">{item.name}</td>
+                    <td className="p-4">
+                      <div className="space-y-1">
+                        <div className="font-medium">{item.name}</div>
+                        <LeadQualityBadge
+                          variant={
+                            item.reviews >= 1000 ? "engaged"
+                              : item.rating >= 4.5 ? "active"
+                                : "new"
+                          }
+                        />
+                      </div>
+                    </td>
                     <td className="p-4 text-muted-foreground">{item.category}</td>
                     <td className="p-4 text-muted-foreground">{item.district}</td>
                     <td className="p-4">

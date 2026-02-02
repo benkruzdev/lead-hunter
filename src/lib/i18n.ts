@@ -560,6 +560,20 @@ const resources = {
                     freshnessTooltip: 'Veri tazeliği backend ile ölçülecek.',
                 },
             },
+            leadQuality: {
+                new: {
+                    label: 'Yeni',
+                    tooltip: 'Placeholder: İşletme yeni açılmış gibi görünüyor (backend sinyali gelince gerçek olacak).',
+                },
+                active: {
+                    label: 'Aktif',
+                    tooltip: 'Placeholder: Yakın zamanda aktiflik sinyali var (backend ile ölçülecek).',
+                },
+                engaged: {
+                    label: 'Yüksek Etkileşim',
+                    tooltip: 'Placeholder: Etkileşim yüksek görünüyor (backend ile hesaplanacak).',
+                },
+            },
         },
     },
     en: {
@@ -1117,6 +1131,20 @@ const resources = {
                     freshnessLabel: 'Freshness',
                     freshnessUnknown: 'Unknown',
                     freshnessTooltip: 'Data freshness will be measured with backend.',
+                },
+            },
+            leadQuality: {
+                new: {
+                    label: 'New',
+                    tooltip: 'Placeholder: Business appears to be newly opened (will be real once backend signal arrives).',
+                },
+                active: {
+                    label: 'Active',
+                    tooltip: 'Placeholder: Recent activity signal detected (will be measured with backend).',
+                },
+                engaged: {
+                    label: 'High Engagement',
+                    tooltip: 'Placeholder: Engagement appears high (will be calculated with backend).',
                 },
             },
         },
