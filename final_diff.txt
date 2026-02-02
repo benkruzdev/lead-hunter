@@ -1,0 +1,149 @@
+﻿diff --git a/src/lib/i18n.ts b/src/lib/i18n.ts
+index e57398b..756be7b 100644
+--- a/src/lib/i18n.ts
++++ b/src/lib/i18n.ts
+@@ -512,10 +512,12 @@ const resources = {
+                 minReviewsPlaceholder: '├Âr: 10',
+                 search: 'Ara',
+                 searching: 'Aran─▒yor...',
+-                resultsFound: 'sonu├ğ bulundu',
+-                page: 'Sayfa',
+-                selected: 'se├ğili',
++                resultsFound: '{{count}} sonu├ğ bulundu',
++                pageOf: 'Sayfa {{page}} / {{total}}',
++                selectedCount: '{{count}} se├ğili',
+                 businessName: '─░┼şletme Ad─▒',
++                tableCategory: 'Kategori',
++                tableDistrict: '─░l├ğe',
+                 rating: 'Puan',
+                 reviews: 'Yorumlar',
+                 score: 'Skor',
+@@ -526,6 +528,10 @@ const resources = {
+                 closed: 'Kapal─▒',
+                 previous: '├ûnceki',
+                 next: 'Sonraki',
++                creditsRemaining: 'Kalan: {{credits}} kredi',
++                creditCostTooltip: 'Her lead ekleme 1 kredi harcar',
++                addSelected: 'Se├ğilenleri Ekle ({{count}})',
++                downloadCSV: 'CSV ─░ndir ({{count}})',
+             },
+         },
+     },
+@@ -1038,10 +1044,12 @@ const resources = {
+                 minReviewsPlaceholder: 'e.g: 10',
+                 search: 'Search',
+                 searching: 'Searching...',
+-                resultsFound: 'results found',
+-                page: 'Page',
+-                selected: 'selected',
++                resultsFound: '{{count}} results found',
++                pageOf: 'Page {{page}} / {{total}}',
++                selectedCount: '{{count}} selected',
+                 businessName: 'Business Name',
++                tableCategory: 'Category',
++                tableDistrict: 'District',
+                 rating: 'Rating',
+                 reviews: 'Reviews',
+                 score: 'Score',
+@@ -1052,6 +1060,10 @@ const resources = {
+                 closed: 'Closed',
+                 previous: 'Previous',
+                 next: 'Next',
++                creditsRemaining: 'Remaining: {{credits}} credits',
++                creditCostTooltip: 'Adding each lead costs 1 credit',
++                addSelected: 'Add Selected ({{count}})',
++                downloadCSV: 'Download CSV ({{count}})',
+             },
+         },
+     },
+diff --git a/src/pages/app/SearchPage.tsx b/src/pages/app/SearchPage.tsx
+index 65108e1..d474532 100644
+--- a/src/pages/app/SearchPage.tsx
++++ b/src/pages/app/SearchPage.tsx
+@@ -320,7 +320,7 @@ export default function SearchPage() {
+           <div className="space-y-2">
+             <Label className="flex items-center gap-2">
+               <MapPin className="w-4 h-4 text-muted-foreground" />
+-              ┼Şehir
++              {t('searchPage.city')}
+             </Label>
+             <Select value={city} onValueChange={setCity}>
+               <SelectTrigger data-onboarding="city-select" id="city-select">
+@@ -470,14 +470,14 @@ export default function SearchPage() {
+             <div className="flex items-center gap-4">
+               <DataSourceIndicator className="hidden sm:flex" />
+               <span className="text-sm text-muted-foreground">
+-                {totalResults} {t('searchPage.resultsFound')}
++                {t('searchPage.resultsFound', { count: totalResults })}
+               </span>
+               <span className="text-sm text-muted-foreground">
+-                {t('searchPage.page')} {currentPage} / {totalPages}
++                {t('searchPage.pageOf', { page: currentPage, total: totalPages })}
+               </span>
+               {selectedIds.length > 0 && (
+                 <span className="text-sm font-medium text-primary">
+-                  {selectedIds.length} {t('searchPage.selected')}
++                  {t('searchPage.selectedCount', { count: selectedIds.length })}
+                 </span>
+               )}
+             </div>
+@@ -542,19 +542,19 @@ export default function SearchPage() {
+                     {t('searchPage.businessName')}
+                   </th>
+                   <th className="text-left p-4 text-sm font-medium text-muted-foreground">
+-                    {t('searchPage.category')}
++                    {t('searchPage.tableCategory')}
+                   </th>
+                   <th className="text-left p-4 text-sm font-medium text-muted-foreground">
+-                    {t('searchPage.district')}
++                    {t('searchPage.tableDistrict')}
+                   </th>
+                   <th className="text-left p-4 text-sm font-medium text-muted-foreground">
+                     {t('searchPage.rating')}
+                   </th>
+                   <th className="text-left p-4 text-sm font-medium text-muted-foreground">
+-                    Durum
++                    {t('searchPage.status')}
+                   </th>
+                   <th className="text-left p-4 text-sm font-medium text-muted-foreground">
+-                    ─░┼şlem
++                    {t('searchPage.actions')}
+                   </th>
+                 </tr>
+               </thead>
+@@ -592,7 +592,7 @@ export default function SearchPage() {
+                         variant={item.isOpen ? "default" : "secondary"}
+                         className={item.isOpen ? "bg-green-500" : ""}
+                       >
+-                        {item.isOpen ? "A├ğ─▒k" : "Kapal─▒"}
++                        {item.isOpen ? t('searchPage.open') : t('searchPage.closed')}
+                       </Badge>
+                     </td>
+                     <td className="p-4">
+@@ -602,7 +602,7 @@ export default function SearchPage() {
+                         onClick={() => setDetailItem(item)}
+                       >
+                         <Eye className="w-4 h-4" />
+-                        Detay
++                        {t('searchPage.detail')}
+                       </Button>
+                     </td>
+                   </tr>
+@@ -620,7 +620,7 @@ export default function SearchPage() {
+                 disabled={currentPage === 1}
+                 onClick={() => handlePageChange(currentPage - 1)}
+               >
+-                ├ûnceki
++                {t('searchPage.previous')}
+               </Button>
+ 
+               {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+@@ -643,7 +643,7 @@ export default function SearchPage() {
+                 disabled={currentPage === totalPages}
+                 onClick={() => handlePageChange(currentPage + 1)}
+               >
+-                Sonraki
++                {t('searchPage.next')}
+               </Button>
+             </div>
+           )}

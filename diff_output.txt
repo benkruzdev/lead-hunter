@@ -1,0 +1,52 @@
+﻿diff --git a/src/lib/i18n.ts b/src/lib/i18n.ts
+index e57398b..e17ae28 100644
+--- a/src/lib/i18n.ts
++++ b/src/lib/i18n.ts
+@@ -526,6 +526,10 @@ const resources = {
+                 closed: 'Kapal─▒',
+                 previous: '├ûnceki',
+                 next: 'Sonraki',
++                creditsRemaining: 'Kalan: {{credits}} kredi',
++                creditCostTooltip: 'Her lead ekleme 1 kredi harcar',
++                addSelected: 'Se├ğilenleri Ekle ({{count}})',
++                downloadCSV: 'CSV ─░ndir ({{count}})',
+             },
+         },
+     },
+@@ -1052,6 +1056,10 @@ const resources = {
+                 closed: 'Closed',
+                 previous: 'Previous',
+                 next: 'Next',
++                creditsRemaining: 'Remaining: {{credits}} credits',
++                creditCostTooltip: 'Adding each lead costs 1 credit',
++                addSelected: 'Add Selected ({{count}})',
++                downloadCSV: 'Download CSV ({{count}})',
+             },
+         },
+     },
+diff --git a/src/pages/app/SearchPage.tsx b/src/pages/app/SearchPage.tsx
+index 65108e1..6b62f83 100644
+--- a/src/pages/app/SearchPage.tsx
++++ b/src/pages/app/SearchPage.tsx
+@@ -320,7 +320,7 @@ export default function SearchPage() {
+           <div className="space-y-2">
+             <Label className="flex items-center gap-2">
+               <MapPin className="w-4 h-4 text-muted-foreground" />
+-              ┼Şehir
++              {t('searchPage.city')}
+             </Label>
+             <Select value={city} onValueChange={setCity}>
+               <SelectTrigger data-onboarding="city-select" id="city-select">
+@@ -551,10 +551,10 @@ export default function SearchPage() {
+                     {t('searchPage.rating')}
+                   </th>
+                   <th className="text-left p-4 text-sm font-medium text-muted-foreground">
+-                    Durum
++                    {t('searchPage.status')}
+                   </th>
+                   <th className="text-left p-4 text-sm font-medium text-muted-foreground">
+-                    ─░┼şlem
++                    {t('searchPage.actions')}
+                   </th>
+                 </tr>
+               </thead>

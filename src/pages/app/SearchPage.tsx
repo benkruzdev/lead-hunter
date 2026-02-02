@@ -320,7 +320,7 @@ export default function SearchPage() {
           <div className="space-y-2">
             <Label className="flex items-center gap-2">
               <MapPin className="w-4 h-4 text-muted-foreground" />
-              Şehir
+              {t('searchPage.city')}
             </Label>
             <Select value={city} onValueChange={setCity}>
               <SelectTrigger data-onboarding="city-select" id="city-select">
@@ -470,14 +470,14 @@ export default function SearchPage() {
             <div className="flex items-center gap-4">
               <DataSourceIndicator className="hidden sm:flex" />
               <span className="text-sm text-muted-foreground">
-                {totalResults} {t('searchPage.resultsFound')}
+                {t('searchPage.resultsFound', { count: totalResults })}
               </span>
               <span className="text-sm text-muted-foreground">
-                {t('searchPage.page')} {currentPage} / {totalPages}
+                {t('searchPage.pageOf', { page: currentPage, total: totalPages })}
               </span>
               {selectedIds.length > 0 && (
                 <span className="text-sm font-medium text-primary">
-                  {selectedIds.length} {t('searchPage.selected')}
+                  {t('searchPage.selectedCount', { count: selectedIds.length })}
                 </span>
               )}
             </div>
@@ -542,19 +542,19 @@ export default function SearchPage() {
                     {t('searchPage.businessName')}
                   </th>
                   <th className="text-left p-4 text-sm font-medium text-muted-foreground">
-                    {t('searchPage.category')}
+                    {t('searchPage.tableCategory')}
                   </th>
                   <th className="text-left p-4 text-sm font-medium text-muted-foreground">
-                    {t('searchPage.district')}
+                    {t('searchPage.tableDistrict')}
                   </th>
                   <th className="text-left p-4 text-sm font-medium text-muted-foreground">
                     {t('searchPage.rating')}
                   </th>
                   <th className="text-left p-4 text-sm font-medium text-muted-foreground">
-                    Durum
+                    {t('searchPage.status')}
                   </th>
                   <th className="text-left p-4 text-sm font-medium text-muted-foreground">
-                    İşlem
+                    {t('searchPage.actions')}
                   </th>
                 </tr>
               </thead>
@@ -592,7 +592,7 @@ export default function SearchPage() {
                         variant={item.isOpen ? "default" : "secondary"}
                         className={item.isOpen ? "bg-green-500" : ""}
                       >
-                        {item.isOpen ? "Açık" : "Kapalı"}
+                        {item.isOpen ? t('searchPage.open') : t('searchPage.closed')}
                       </Badge>
                     </td>
                     <td className="p-4">
@@ -602,7 +602,7 @@ export default function SearchPage() {
                         onClick={() => setDetailItem(item)}
                       >
                         <Eye className="w-4 h-4" />
-                        Detay
+                        {t('searchPage.detail')}
                       </Button>
                     </td>
                   </tr>
@@ -620,7 +620,7 @@ export default function SearchPage() {
                 disabled={currentPage === 1}
                 onClick={() => handlePageChange(currentPage - 1)}
               >
-                Önceki
+                {t('searchPage.previous')}
               </Button>
 
               {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
@@ -643,7 +643,7 @@ export default function SearchPage() {
                 disabled={currentPage === totalPages}
                 onClick={() => handlePageChange(currentPage + 1)}
               >
-                Sonraki
+                {t('searchPage.next')}
               </Button>
             </div>
           )}
