@@ -55,11 +55,13 @@ const AppContent = () => {
     );
   }
 
+
+
   // Conditionally wrap with reCAPTCHA provider based on backend config
   const appContent = (
-    <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <TooltipProvider>
+    <TooltipProvider>
+      <QueryClientProvider client={queryClient}>
+        <AuthProvider>
           <Toaster />
           <Sonner />
           <BrowserRouter>
@@ -104,9 +106,9 @@ const AppContent = () => {
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>
-        </TooltipProvider>
-      </AuthProvider>
-    </QueryClientProvider>
+        </AuthProvider>
+      </QueryClientProvider>
+    </TooltipProvider>
   );
 
   // Wrap with reCAPTCHA provider only if enabled and site key exists
