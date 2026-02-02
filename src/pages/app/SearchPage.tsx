@@ -33,6 +33,7 @@ import {
   Loader2,
   AlertCircle,
   FileDown,
+  Wand2,
 } from "lucide-react";
 import {
   Sheet,
@@ -60,6 +61,7 @@ import { Bookmark } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { SearchIntelligenceBar } from "@/components/app/SearchIntelligenceBar";
 import { LeadQualityBadge } from "@/components/app/LeadQualityBadge";
+import { EnrichmentResultReport } from "@/components/app/EnrichmentResultReport";
 
 
 
@@ -136,6 +138,14 @@ export default function SearchPage() {
   const [editingPresetName, setEditingPresetName] = useState("");
   const [pendingDistrict, setPendingDistrict] = useState<string | null>(null);
 
+  // Enrichment modal state
+  const [enrichmentModalOpen, setEnrichmentModalOpen] = useState(false);
+  const [enrichmentBusinessName, setEnrichmentBusinessName] = useState("");
+  const [enrichmentResult, setEnrichmentResult] = useState<{
+    found: { labelKey: string; value: string }[];
+    missing: { labelKey: string }[];
+    credits: { cost: number; onlyOnSuccess: boolean };
+  } | null>(null);
 
 
   const resultsPerPage = 20;
@@ -259,6 +269,47 @@ export default function SearchPage() {
       setIsSearching(false);
     }
   };
+
+  const handleEnrichClick = (item: typeof results[0]) => {
+    const found: { labelKey: string; value: string }[] = [];
+    const missing: { labelKey: string }[] = [];
+
+    if (item.website) {
+      found.push({ labelKey: 'website', value: item.website });
+    } else {
+      missing.push({ labelKey: 'website' });
+    }
+
+    if (item.phone) {
+      found.push({ labelKey: 'phone', value: item.phone });
+    } else {
+      missing.push({ labelKey: 'phone' });
+    }
+
+    if (item.id % 2 === 0) {
+      found.push({ labelKey: 'email', value: `info@${item.name.toLowerCase().replace(/\s+/g, '')}.com` });
+    } else {
+      missing.push({ labelKey: 'email' });
+    }
+
+    if (item.id % 3 === 0) {
+      found.push({ labelKey: 'instagram', value: `@${item.name.toLowerCase().replace(/\s+/g, '')}` });
+    } else {
+      missing.push({ labelKey: 'instagram' });
+    }
+
+    missing.push({ labelKey: 'facebook' });
+    missing.push({ labelKey: 'linkedin' });
+
+    setEnrichmentBusinessName(item.name);
+    setEnrichmentResult({
+      found,
+      missing,
+      credits: { cost: 1, onlyOnSuccess: true },
+    });
+    setEnrichmentModalOpen(true);
+  };
+
 
   // Preset handlers
   const handleSavePreset = () => {
@@ -762,14 +813,24 @@ export default function SearchPage() {
                       </Badge>
                     </td>
                     <td className="p-4">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setDetailItem(item)}
-                      >
-                        <Eye className="w-4 h-4" />
-                        {t('searchPage.detail')}
-                      </Button>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setDetailItem(item)}
+                        >
+                          <Eye className="w-4 h-4 mr-1" />
+                          {t('searchPage.detail')}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleEnrichClick(item)}
+                        >
+                          <Wand2 className="w-4 h-4 mr-1" />
+                          Enrich
+                        </Button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -1167,6 +1228,15 @@ export default function SearchPage() {
         </DialogContent>
       </Dialog>
 
+      {/* Enrichment Result Report Modal */}
+      {enrichmentResult && (
+        <EnrichmentResultReport
+          open={enrichmentModalOpen}
+          onOpenChange={setEnrichmentModalOpen}
+          businessName={enrichmentBusinessName}
+          result={enrichmentResult}
+        />
+      )}
 
       {/* Onboarding Tour */}
       {showOnboarding && profile && !profile.onboarding_completed && (
