@@ -58,6 +58,8 @@ import { DataSourceIndicator } from "@/components/common/DataSourceIndicator";
 import { listPresets, savePreset, renamePreset, deletePreset, getPreset, type SearchFilters, type SearchPreset } from "@/lib/searchPresets";
 import { Bookmark } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { SearchIntelligenceBar } from "@/components/app/SearchIntelligenceBar";
+
 
 
 // Mock data generator (temporary for PR3 testing - will be replaced with real API)
@@ -281,6 +283,8 @@ export default function SearchPage() {
       setShowSavePresetDialog(false);
       setPresetName("");
       toast({ description: t('searchPage.presetSaved') });
+    } else if (result.error === 'empty_name') {
+      toast({ variant: "destructive", description: t('searchPage.presetEmptyName') });
     } else if (result.error === 'limit_reached') {
       toast({ variant: "destructive", description: t('searchPage.presetLimitReached') });
     } else if (result.error === 'already_exists') {
@@ -318,6 +322,8 @@ export default function SearchPage() {
       setEditingPresetId(null);
       setEditingPresetName("");
       toast({ description: t('searchPage.presetRenamed') });
+    } else if (result.error === 'empty_name') {
+      toast({ variant: "destructive", description: t('searchPage.presetEmptyName') });
     } else if (result.error === 'already_exists') {
       toast({ variant: "destructive", description: t('searchPage.presetAlreadyExists') });
     }
@@ -667,6 +673,11 @@ export default function SearchPage() {
                 {t('searchPage.downloadCSV', { count: selectedIds.length })}
               </Button>
             </div>
+          </div>
+
+          {/* Search Intelligence Bar */}
+          <div className="px-4 pb-3">
+            <SearchIntelligenceBar cost={0} />
           </div>
 
           {/* Table */}

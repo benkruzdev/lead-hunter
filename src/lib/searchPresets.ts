@@ -28,19 +28,24 @@ export function listPresets(): SearchPreset[] {
 }
 
 export function savePreset(name: string, filters: SearchFilters): { success: boolean; error?: string } {
+    const clean = name.trim();
+    if (!clean) {
+        return { success: false, error: 'empty_name' };
+    }
+
     const presets = listPresets();
 
     if (presets.length >= MAX_PRESETS) {
         return { success: false, error: 'limit_reached' };
     }
 
-    if (presets.some(p => p.name === name)) {
+    if (presets.some(p => p.name === clean)) {
         return { success: false, error: 'already_exists' };
     }
 
     const newPreset: SearchPreset = {
         id: `preset_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        name,
+        name: clean,
         createdAt: new Date().toISOString(),
         filters,
     };
@@ -51,6 +56,11 @@ export function savePreset(name: string, filters: SearchFilters): { success: boo
 }
 
 export function renamePreset(id: string, newName: string): { success: boolean; error?: string } {
+    const clean = newName.trim();
+    if (!clean) {
+        return { success: false, error: 'empty_name' };
+    }
+
     const presets = listPresets();
     const index = presets.findIndex(p => p.id === id);
 
@@ -58,11 +68,11 @@ export function renamePreset(id: string, newName: string): { success: boolean; e
         return { success: false, error: 'not_found' };
     }
 
-    if (presets.some(p => p.name === newName && p.id !== id)) {
+    if (presets.some(p => p.name === clean && p.id !== id)) {
         return { success: false, error: 'already_exists' };
     }
 
-    presets[index].name = newName;
+    presets[index].name = clean;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(presets));
     return { success: true };
 }
