@@ -33,12 +33,14 @@ export function DataSourceIndicator({ variant = "compact", className = "" }: Dat
     return (
         <Tooltip>
             <TooltipTrigger asChild>
-                <Badge variant="outline" className={`gap-1 ${className}`}>
-                    <Shield className="w-3 h-3" />
-                    {t('compliance.indicators.safeData')}
-                </Badge>
+                <span className={`inline-flex cursor-help ${className}`} tabIndex={0}>
+                    <Badge variant="outline" className="gap-1">
+                        <Shield className="w-3 h-3" />
+                        {t('compliance.indicators.safeData')}
+                    </Badge>
+                </span>
             </TooltipTrigger>
-            <TooltipContent>{t('compliance.indicators.officialDataTooltip')}</TooltipContent>
+            <TooltipContent className="z-50">{t('compliance.indicators.officialDataTooltip')}</TooltipContent>
         </Tooltip>
     );
 }

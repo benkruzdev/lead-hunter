@@ -40,12 +40,14 @@ export function LeadQualityBadge({ variant }: LeadQualityBadgeProps) {
     return (
         <Tooltip>
             <TooltipTrigger asChild>
-                <Badge variant="outline" className={`text-xs ${className}`}>
-                    <Icon className="w-3 h-3 mr-1" />
-                    {label}
-                </Badge>
+                <span className="inline-flex cursor-help" tabIndex={0}>
+                    <Badge variant="outline" className={`text-xs ${className}`}>
+                        <Icon className="w-3 h-3 mr-1" />
+                        {label}
+                    </Badge>
+                </span>
             </TooltipTrigger>
-            <TooltipContent>
+            <TooltipContent className="z-50">
                 {tooltip}
             </TooltipContent>
         </Tooltip>
