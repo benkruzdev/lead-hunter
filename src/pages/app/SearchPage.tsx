@@ -62,6 +62,8 @@ import { useToast } from "@/hooks/use-toast";
 import { SearchIntelligenceBar } from "@/components/app/SearchIntelligenceBar";
 import { LeadQualityBadge } from "@/components/app/LeadQualityBadge";
 import { EnrichmentResultReport } from "@/components/app/EnrichmentResultReport";
+import { ExportTemplateDialog } from "@/components/app/ExportTemplateDialog";
+import { templates, mapItemToRecord, generateCSV, downloadCSV } from "@/lib/exportTemplates";
 
 
 
@@ -146,6 +148,9 @@ export default function SearchPage() {
     missing: { labelKey: string }[];
     credits: { cost: number; onlyOnSuccess: boolean };
   } | null>(null);
+
+  // Export template dialog state
+  const [showExportTemplateDialog, setShowExportTemplateDialog] = useState(false);
 
 
   const resultsPerPage = 20;
@@ -308,6 +313,24 @@ export default function SearchPage() {
       credits: { cost: 1, onlyOnSuccess: true },
     });
     setEnrichmentModalOpen(true);
+  };
+
+  const handleExportConfirm = (templateId: 'basic' | 'salesCrm' | 'outreach') => {
+    const template = templates[templateId];
+    const selectedItems = results.filter(item => selectedIds.includes(item.id));
+
+    // Map items to records based on template
+    const records = selectedItems.map(item => mapItemToRecord(item, template, city));
+
+    // Generate CSV
+    const csvContent = generateCSV(records, template.columns);
+
+    // Generate filename with timestamp
+    const timestamp = new Date().toISOString().split('T')[0];
+    const filename = `leads_${templateId}_${timestamp}.csv`;
+
+    // Trigger download
+    downloadCSV(csvContent, filename);
   };
 
 
@@ -718,9 +741,7 @@ export default function SearchPage() {
                 data-onboarding="export-csv"
                 variant="outline"
                 disabled={selectedIds.length === 0}
-                onClick={() => {
-                  alert(`${selectedIds.length} lead CSV olarak indiriliyor...`);
-                }}
+                onClick={() => setShowExportTemplateDialog(true)}
               >
                 <FileDown className="w-4 h-4" />
                 {t('searchPage.downloadCSV', { count: selectedIds.length })}
@@ -1237,6 +1258,14 @@ export default function SearchPage() {
           result={enrichmentResult}
         />
       )}
+
+      {/* Export Template Dialog */}
+      <ExportTemplateDialog
+        open={showExportTemplateDialog}
+        onOpenChange={setShowExportTemplateDialog}
+        selectedCount={selectedIds.length}
+        onConfirm={handleExportConfirm}
+      />
 
       {/* Onboarding Tour */}
       {showOnboarding && profile && !profile.onboarding_completed && (

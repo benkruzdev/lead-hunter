@@ -592,6 +592,24 @@ const resources = {
                 },
                 missingValue: 'Bulunamadı',
             },
+            exportTemplates: {
+                title: 'Dışa Aktarma Şablonu Seç',
+                description: '{{count}} lead için CSV şablonu seçin',
+                basic: {
+                    title: 'Temel Bilgiler',
+                    desc: 'Ad, kategori, ilçe, telefon, website',
+                },
+                salesCrm: {
+                    title: 'Satış CRM',
+                    desc: 'Ad, telefon, e-posta, puan, yorum sayısı, açık/kapalı',
+                },
+                outreach: {
+                    title: 'İletişim',
+                    desc: 'Ad, website, Instagram, kategori, şehir',
+                },
+                download: 'İndir',
+                cancel: 'İptal',
+            },
         },
     },
     en: {
@@ -1182,6 +1200,24 @@ const resources = {
                     phone: 'Phone',
                 },
                 missingValue: 'Not found',
+            },
+            exportTemplates: {
+                title: 'Select Export Template',
+                description: 'Choose a CSV template for {{count}} leads',
+                basic: {
+                    title: 'Basic Information',
+                    desc: 'Name, category, district, phone, website',
+                },
+                salesCrm: {
+                    title: 'Sales CRM',
+                    desc: 'Name, phone, email, rating, reviews, open/closed',
+                },
+                outreach: {
+                    title: 'Outreach',
+                    desc: 'Name, website, Instagram, category, city',
+                },
+                download: 'Download',
+                cancel: 'Cancel',
             },
         },
     },
