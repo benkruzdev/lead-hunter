@@ -40,6 +40,17 @@ export function EnrichmentResultReport({
                     <DialogDescription>
                         {t('enrichment.description')}
                     </DialogDescription>
+                    {/* Outreach Hint - only if socialCount >= 2 */}
+                    {(() => {
+                        const socialCount = result.found.filter(item =>
+                            ['instagram', 'facebook', 'linkedin', 'twitter', 'tiktok', 'youtube'].includes(item.labelKey)
+                        ).length;
+                        return socialCount >= 2 ? (
+                            <p className="text-sm text-muted-foreground mt-2">
+                                {t('enrichment.outreachHint')}
+                            </p>
+                        ) : null;
+                    })()}
                 </DialogHeader>
 
                 <div className="space-y-6 py-4">

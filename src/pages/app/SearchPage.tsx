@@ -34,6 +34,13 @@ import {
   AlertCircle,
   FileDown,
   Wand2,
+  Instagram,
+  Facebook,
+  Linkedin,
+  Twitter,
+  Music,
+  Youtube,
+  Camera,
 } from "lucide-react";
 import {
   Sheet,
@@ -64,6 +71,7 @@ import { LeadQualityBadge } from "@/components/app/LeadQualityBadge";
 import { EnrichmentResultReport } from "@/components/app/EnrichmentResultReport";
 import { ExportTemplateDialog } from "@/components/app/ExportTemplateDialog";
 import { templates, mapItemToRecord, generateCSV, downloadCSV } from "@/lib/exportTemplates";
+import { getMockSocials } from "@/lib/socials";
 
 
 
@@ -297,14 +305,28 @@ export default function SearchPage() {
       missing.push({ labelKey: 'email' });
     }
 
-    if (item.id % 3 === 0) {
-      found.push({ labelKey: 'instagram', value: `@${item.name.toLowerCase().replace(/\s+/g, '')}` });
-    } else {
-      missing.push({ labelKey: 'instagram' });
-    }
+    // Get social media links using deterministic mock
+    const socials = getMockSocials(item);
 
-    missing.push({ labelKey: 'facebook' });
-    missing.push({ labelKey: 'linkedin' });
+    // Only add socials that exist (no "not found" for social media)
+    if (socials.instagram) {
+      found.push({ labelKey: 'instagram', value: socials.instagram });
+    }
+    if (socials.facebook) {
+      found.push({ labelKey: 'facebook', value: socials.facebook });
+    }
+    if (socials.linkedin) {
+      found.push({ labelKey: 'linkedin', value: socials.linkedin });
+    }
+    if (socials.twitter) {
+      found.push({ labelKey: 'twitter', value: socials.twitter });
+    }
+    if (socials.tiktok) {
+      found.push({ labelKey: 'tiktok', value: socials.tiktok });
+    }
+    if (socials.youtube) {
+      found.push({ labelKey: 'youtube', value: socials.youtube });
+    }
 
     setEnrichmentBusinessName(item.name);
     setEnrichmentResult({
@@ -781,6 +803,9 @@ export default function SearchPage() {
                     {t('searchPage.status')}
                   </th>
                   <th className="text-left p-4 text-sm font-medium text-muted-foreground">
+                    {t('searchPage.tableSocials')}
+                  </th>
+                  <th className="text-left p-4 text-sm font-medium text-muted-foreground">
                     {t('searchPage.actions')}
                   </th>
                 </tr>
@@ -800,6 +825,14 @@ export default function SearchPage() {
                     <td className="p-4">
                       <div className="space-y-1">
                         <div className="font-medium">{item.name}</div>
+                        {(() => {
+                          const socialCount = Object.keys(getMockSocials(item)).length;
+                          return socialCount > 0 ? (
+                            <div className="text-xs text-muted-foreground">
+                              {t('searchPage.socialCount', { count: socialCount })}
+                            </div>
+                          ) : null;
+                        })()}
                         <LeadQualityBadge
                           variant={
                             item.reviews >= 1000 ? "engaged"
@@ -832,6 +865,80 @@ export default function SearchPage() {
                       >
                         {item.isOpen ? t('searchPage.open') : t('searchPage.closed')}
                       </Badge>
+                    </td>
+                    <td className="p-4">
+                      {/* Social Media Icons */}
+                      {(() => {
+                        const socials = getMockSocials(item);
+                        const hasSocials = Object.keys(socials).length > 0;
+
+                        if (!hasSocials) return null;
+
+                        return (
+                          <div className="flex items-center gap-2">
+                            {socials.instagram && (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <a href={socials.instagram} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-foreground transition-colors">
+                                    <Instagram className="w-4 h-4" />
+                                  </a>
+                                </TooltipTrigger>
+                                <TooltipContent>Instagram</TooltipContent>
+                              </Tooltip>
+                            )}
+                            {socials.facebook && (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <a href={socials.facebook} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-foreground transition-colors">
+                                    <Facebook className="w-4 h-4" />
+                                  </a>
+                                </TooltipTrigger>
+                                <TooltipContent>Facebook</TooltipContent>
+                              </Tooltip>
+                            )}
+                            {socials.linkedin && (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <a href={socials.linkedin} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-foreground transition-colors">
+                                    <Linkedin className="w-4 h-4" />
+                                  </a>
+                                </TooltipTrigger>
+                                <TooltipContent>LinkedIn</TooltipContent>
+                              </Tooltip>
+                            )}
+                            {socials.twitter && (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <a href={socials.twitter} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-foreground transition-colors">
+                                    <Twitter className="w-4 h-4" />
+                                  </a>
+                                </TooltipTrigger>
+                                <TooltipContent>X</TooltipContent>
+                              </Tooltip>
+                            )}
+                            {socials.tiktok && (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <a href={socials.tiktok} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-foreground transition-colors">
+                                    <Music className="w-4 h-4" />
+                                  </a>
+                                </TooltipTrigger>
+                                <TooltipContent>TikTok</TooltipContent>
+                              </Tooltip>
+                            )}
+                            {socials.youtube && (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <a href={socials.youtube} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-foreground transition-colors">
+                                    <Youtube className="w-4 h-4" />
+                                  </a>
+                                </TooltipTrigger>
+                                <TooltipContent>YouTube</TooltipContent>
+                              </Tooltip>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </td>
                     <td className="p-4">
                       <div className="flex items-center gap-2">

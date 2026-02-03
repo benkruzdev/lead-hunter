@@ -1,4 +1,5 @@
 // Export template definitions and CSV generation utilities
+import { getMockSocials } from './socials';
 
 export interface ExportTemplate {
     id: 'basic' | 'salesCrm' | 'outreach';
@@ -16,7 +17,7 @@ export const templates: Record<string, ExportTemplate> = {
     },
     outreach: {
         id: 'outreach',
-        columns: ['name', 'website', 'instagram', 'category', 'city'],
+        columns: ['name', 'website', 'instagram', 'facebook', 'linkedin', 'twitter', 'tiktok', 'youtube', 'outreach_ready', 'category', 'city'],
     },
 };
 
@@ -47,15 +48,6 @@ function generateMockEmail(item: any): string {
     if (item.id % 2 === 0) {
         const slug = slugify(item.name);
         return `info@${slug}.com`;
-    }
-    return '';
-}
-
-// Generate mock Instagram based on item ID
-function generateMockInstagram(item: any): string {
-    if (item.id % 3 === 0) {
-        const slug = slugify(item.name);
-        return `@${slug}`;
     }
     return '';
 }
@@ -94,8 +86,21 @@ export function mapItemToRecord(item: any, template: ExportTemplate, city?: stri
                 record[col] = item.isOpen ? 'Yes' : 'No';
                 break;
             case 'instagram':
-                record[col] = generateMockInstagram(item);
+            case 'facebook':
+            case 'linkedin':
+            case 'twitter':
+            case 'tiktok':
+            case 'youtube': {
+                const socials = getMockSocials(item);
+                record[col] = socials[col as keyof typeof socials] || '';
                 break;
+            }
+            case 'outreach_ready': {
+                const socials = getMockSocials(item);
+                const socialCount = Object.keys(socials).length;
+                record[col] = socialCount >= 2 ? 'yes' : 'no';
+                break;
+            }
             case 'city':
                 record[col] = city || '';
                 break;
