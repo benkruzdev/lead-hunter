@@ -30,6 +30,8 @@ import {
   StickyNote,
 } from "lucide-react";
 import { getLeadListItems, bulkUpdateListItems, bulkDeleteListItems, enrichLeadListItem, createExport, LeadListItem } from "@/lib/api";
+import { getListMeta, setListNotes, setListTag, ListTag } from "@/lib/listMeta";
+import { useToast } from "@/hooks/use-toast";
 
 export default function ListDetail() {
   const { t } = useTranslation();
@@ -60,6 +62,11 @@ export default function ListDetail() {
   const [exportNote, setExportNote] = useState('');
   const [isExporting, setIsExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
+
+  // List metadata state
+  const [notes, setNotes] = useState('');
+  const [selectedTag, setSelectedTag] = useState<ListTag>(null);
+  const { toast } = useToast();
 
   useEffect(() => {
     if (listId) {
@@ -93,6 +100,44 @@ export default function ListDetail() {
       setError(err?.message || t('leadLists.loadItemsFailed'));
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  // Load list metadata on mount
+  useEffect(() => {
+    if (listId) {
+      const meta = getListMeta(listId);
+      setNotes(meta.notes);
+      setSelectedTag(meta.tag);
+    }
+  }, [listId]);
+
+  // Autosave notes with debouncing
+  useEffect(() => {
+    if (!listId) return;
+
+    const timer = setTimeout(() => {
+      const meta = getListMeta(listId);
+      if (meta.notes !== notes) {
+        setListNotes(listId, notes);
+        toast({ description: t('listMeta.saved') });
+      }
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [notes, listId, t, toast]);
+
+  const handleTagChange = (value: string) => {
+    if (!listId) return;
+
+    const newTag: ListTag = value === 'none' ? null : (value as ListTag);
+    setSelectedTag(newTag);
+    setListTag(listId, newTag);
+
+    if (newTag === null) {
+      toast({ description: t('listMeta.tagCleared') });
+    } else {
+      toast({ description: t('listMeta.tagSaved') });
     }
   };
 
@@ -240,6 +285,40 @@ export default function ListDetail() {
           <FileDown className="w-4 h-4 mr-2" />
           {t('exports.create')}
         </Button>
+      </div>
+
+      {/* List Metadata: Notes & Tags */}
+      <div className="grid md:grid-cols-2 gap-6">
+        {/* Notes Section */}
+        <div className="bg-card rounded-xl border shadow-soft p-6">
+          <h3 className="text-sm font-semibold mb-3">{t('listMeta.notesTitle')}</h3>
+          <Textarea
+            placeholder={t('listMeta.notesPlaceholder')}
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            rows={4}
+            className="resize-none"
+          />
+          <p className="text-xs text-muted-foreground mt-2">
+            {t('listMeta.saved')}
+          </p>
+        </div>
+
+        {/* Tag Selector */}
+        <div className="bg-card rounded-xl border shadow-soft p-6">
+          <h3 className="text-sm font-semibold mb-3">{t('listMeta.tagTitle')}</h3>
+          <Select value={selectedTag || 'none'} onValueChange={handleTagChange}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">{t('listMeta.tagNone')}</SelectItem>
+              <SelectItem value="hot">{t('listMeta.tagHot')}</SelectItem>
+              <SelectItem value="cold">{t('listMeta.tagCold')}</SelectItem>
+              <SelectItem value="followup">{t('listMeta.tagFollowup')}</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {/* Bulk Action Bar */}

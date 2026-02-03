@@ -14,6 +14,8 @@ import {
 import { Plus, List, Calendar, ArrowRight, Loader2 } from "lucide-react";
 import { getLeadLists, createLeadList, LeadList } from "@/lib/api";
 import { useTranslation } from "react-i18next";
+import { getListMeta, ListMeta } from "@/lib/listMeta";
+import { Badge } from "@/components/ui/badge";
 
 export default function LeadLists() {
   const { t } = useTranslation();
@@ -22,6 +24,7 @@ export default function LeadLists() {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [newListName, setNewListName] = useState("");
   const [isCreating, setIsCreating] = useState(false);
+  const [listMetadata, setListMetadata] = useState<Map<string, ListMeta>>(new Map());
 
   useEffect(() => {
     loadLists();
@@ -32,6 +35,13 @@ export default function LeadLists() {
       setIsLoading(true);
       const { lists } = await getLeadLists();
       setLists(lists);
+
+      // Load metadata for all lists
+      const metadata = new Map<string, ListMeta>();
+      lists.forEach(list => {
+        metadata.set(list.id, getListMeta(list.id));
+      });
+      setListMetadata(metadata);
     } catch (error) {
       console.error('[LeadLists] Failed to load lists:', error);
     } finally {
@@ -98,6 +108,23 @@ export default function LeadLists() {
                   </div>
 
                   <h3 className="text-lg font-semibold mb-2">{list.name}</h3>
+
+                  {/* Tag Badge */}
+                  {listMetadata.get(list.id)?.tag && (
+                    <div className="mb-3">
+                      <Badge
+                        variant={
+                          listMetadata.get(list.id)?.tag === 'hot' ? 'destructive' :
+                            listMetadata.get(list.id)?.tag === 'followup' ? 'default' :
+                              'secondary'
+                        }
+                      >
+                        {listMetadata.get(list.id)?.tag === 'hot' && t('listMeta.tagHot')}
+                        {listMetadata.get(list.id)?.tag === 'cold' && t('listMeta.tagCold')}
+                        {listMetadata.get(list.id)?.tag === 'followup' && t('listMeta.tagFollowup')}
+                      </Badge>
+                    </div>
+                  )}
 
                   <div className="flex items-center gap-4 text-sm text-muted-foreground mb-4">
                     <span className="flex items-center gap-1">

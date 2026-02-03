@@ -610,6 +610,20 @@ const resources = {
                 download: 'İndir',
                 cancel: 'İptal',
             },
+
+            // List Metadata (Notes & Tags)
+            listMeta: {
+                notesTitle: 'Notlar',
+                notesPlaceholder: 'Bu liste için notlarınızı yazın...',
+                saved: 'Kaydedildi',
+                tagTitle: 'Etiket',
+                tagNone: 'Etiket Yok',
+                tagHot: 'Sıcak',
+                tagCold: 'Soğuk',
+                tagFollowup: 'Takipte',
+                tagSaved: 'Etiket kaydedildi',
+                tagCleared: 'Etiket kaldırıldı',
+            },
         },
     },
     en: {
@@ -1218,6 +1232,20 @@ const resources = {
                 },
                 download: 'Download',
                 cancel: 'Cancel',
+            },
+
+            // List Metadata (Notes & Tags)
+            listMeta: {
+                notesTitle: 'Notes',
+                notesPlaceholder: 'Write your notes for this list...',
+                saved: 'Saved',
+                tagTitle: 'Tag',
+                tagNone: 'No Tag',
+                tagHot: 'Hot',
+                tagCold: 'Cold',
+                tagFollowup: 'Follow-up',
+                tagSaved: 'Tag saved',
+                tagCleared: 'Tag cleared',
             },
         },
     },
