@@ -14,7 +14,7 @@ import {
   Shield,
   Clock
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQuery } from "@tanstack/react-query";
@@ -35,7 +35,7 @@ export default function AppLayout() {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, signOut, profile: authProfile, refreshProfile } = useAuth();
+  const { user, signOut, profile: authProfile, refreshProfile, credits: contextCredits, setCredits } = useAuth();
   const { t, i18n } = useTranslation();
 
   // Fetch profile and credits from backend
@@ -53,7 +53,14 @@ export default function AppLayout() {
   });
 
   const profile = profileData?.profile;
-  const credits = creditsData?.credits ?? 0;
+  const credits = contextCredits ?? creditsData?.credits ?? 0;
+
+  // Sync credits from backend to context
+  useEffect(() => {
+    if (creditsData?.credits !== undefined && creditsData.credits !== contextCredits) {
+      setCredits(creditsData.credits);
+    }
+  }, [creditsData?.credits, contextCredits, setCredits]);
 
   // Get display name (full_name or email)
   const displayName = profile?.full_name || profile?.email || "User";
@@ -128,26 +135,6 @@ export default function AppLayout() {
               </NavLink>
             )}
           </nav>
-
-          {/* Credits badge */}
-          <div className="p-4 border-t">
-            <div className="bg-sidebar-accent rounded-lg p-4">
-              <p className="text-xs text-sidebar-foreground/70 mb-1">
-                {t("common.creditsRemaining")}
-              </p>
-              <p className="text-2xl font-bold text-sidebar-primary">
-                {credits.toLocaleString()}
-              </p>
-              <Button
-                size="sm"
-                variant="outline"
-                className="w-full mt-3 text-xs"
-                onClick={() => navigate("/app/billing")}
-              >
-                {t("layout.buyCredits")}
-              </Button>
-            </div>
-          </div>
         </div>
       </aside>
 
@@ -173,6 +160,19 @@ export default function AppLayout() {
           <h1 className="text-xl font-semibold">{t(pageTitle)}</h1>
 
           <div className="ml-auto flex items-center gap-4">
+            {/* Credit display */}
+            <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-muted rounded-lg">
+              <span className="text-sm font-medium">{t("common.creditsRemaining")}:</span>
+              <span className="text-sm font-bold text-primary">{credits.toLocaleString()}</span>
+              <Button
+                size="sm"
+                variant="outline"
+                className="ml-2 h-7 text-xs"
+                onClick={() => navigate("/app/billing")}
+              >
+                {t("layout.buyCredits")}
+              </Button>
+            </div>
             {/* User menu */}
             <div className="relative">
               <button

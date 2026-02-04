@@ -102,7 +102,7 @@ const mockResults = generateMockResults(200);
 
 export default function SearchPage() {
   const { t } = useTranslation();
-  const { profile, refreshProfile } = useAuth();
+  const { profile, refreshProfile, decrementCredits, rollbackCredits, credits: contextCredits } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [showOnboarding, setShowOnboarding] = useState(false);
@@ -259,8 +259,17 @@ export default function SearchPage() {
     setCurrentPage(1);
     setViewedPages(new Set([1]));
 
+    // Optimistic credit update: Search costs 0 credits but we prepare for future cost
+    const SEARCH_COST = 0; // Current search cost is 0 per API docs
+    const previousCredits = contextCredits ?? 0;
+
+    // Only decrement if cost > 0
+    if (SEARCH_COST > 0) {
+      decrementCredits(SEARCH_COST);
+    }
+
     try {
-      // Call backend API (0 credits)
+      // Call backend API
       const response = await performSearch({
         province: city,
         district: district || undefined,
@@ -280,6 +289,11 @@ export default function SearchPage() {
       console.error('[SearchPage] Search failed:', error);
       setErrorMessage('Arama başarısız oldu. Lütfen tekrar deneyin.');
       setIsSearching(false);
+
+      // Rollback credits on error
+      if (SEARCH_COST > 0) {
+        rollbackCredits(previousCredits);
+      }
     }
   };
 
@@ -728,17 +742,6 @@ export default function SearchPage() {
               )}
             </div>
             <div className="flex items-center gap-3">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span className="text-sm text-muted-foreground flex items-center gap-1">
-                    <AlertCircle className="w-4 h-4" />
-                    {t('searchPage.creditsRemaining', { credits: '1.250' })}
-                  </span>
-                </TooltipTrigger>
-                <TooltipContent>
-                  {t('searchPage.creditCostTooltip')}
-                </TooltipContent>
-              </Tooltip>
               <Button
                 data-onboarding="add-to-list"
                 disabled={selectedIds.length === 0}

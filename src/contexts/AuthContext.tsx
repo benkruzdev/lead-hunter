@@ -7,6 +7,10 @@ type AuthContextType = {
     profile: Profile | null;
     session: Session | null;
     loading: boolean;
+    credits: number | null;
+    setCredits: (n: number) => void;
+    decrementCredits: (by: number) => void;
+    rollbackCredits: (prev: number) => void;
     signIn: (email: string, password: string, rememberMe?: boolean) => Promise<void>;
     signUp: (data: SignUpData, recaptchaToken: string) => Promise<void>;
     signInWithGoogle: () => Promise<void>;
@@ -30,6 +34,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const [profile, setProfile] = useState<Profile | null>(null);
     const [session, setSession] = useState<Session | null>(null);
     const [loading, setLoading] = useState(true);
+    const [credits, setCreditsState] = useState<number | null>(null);
 
     // Load profile from database
     const loadProfile = async (userId: string) => {
@@ -46,6 +51,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             }
 
             setProfile(data);
+            setCreditsState(data.credits ?? 0);
         } catch (error) {
             console.error('Failed to load profile:', error);
             setProfile(null);
@@ -176,11 +182,28 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
     };
 
+    // Credit management functions
+    const setCredits = (n: number) => {
+        setCreditsState(n);
+    };
+
+    const decrementCredits = (by: number) => {
+        setCreditsState(prev => (prev !== null ? Math.max(0, prev - by) : null));
+    };
+
+    const rollbackCredits = (prev: number) => {
+        setCreditsState(prev);
+    };
+
     const value: AuthContextType = {
         user,
         profile,
         session,
         loading,
+        credits,
+        setCredits,
+        decrementCredits,
+        rollbackCredits,
         signIn,
         signUp,
         signInWithGoogle,
