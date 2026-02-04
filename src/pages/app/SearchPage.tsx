@@ -822,7 +822,7 @@ export default function SearchPage() {
                   <div className="flex items-start gap-3">
                     <Mail className="w-5 h-5 text-muted-foreground mt-0.5" />
                     <div>
-                      <p className="font-medium">E-posta</p>
+                      <p className="font-medium">{t('searchPage.email')}</p>
                       <p className="text-muted-foreground">
                         {detailItem.id % 2 === 0 ? "Var" : "Yok"}
                       </p>
@@ -832,7 +832,7 @@ export default function SearchPage() {
                   <div className="flex items-start gap-3">
                     <Share2 className="w-5 h-5 text-muted-foreground mt-0.5" />
                     <div>
-                      <p className="font-medium">Sosyal Profiller</p>
+                      <p className="font-medium">{t('searchPage.socialProfiles')}</p>
                       <p className="text-muted-foreground">
                         {Object.keys(getMockSocials(detailItem)).length > 0 ? "Var" : "Yok"}
                       </p>
@@ -1019,6 +1019,7 @@ export default function SearchPage() {
     </div >
   );
 }
+
 
 
 
