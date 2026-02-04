@@ -580,8 +580,7 @@ export default function SearchPage() {
     </div>
 
       {/* Results */ }
-  {
-    isSearching ? (
+      {isSearching ? (
       <div className="bg-card rounded-xl border shadow-soft p-6">
         <div className="space-y-4">
           {[1, 2, 3, 4].map((i) => (
