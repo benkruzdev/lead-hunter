@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+﻿import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { performSearch, getSearchPage, getSearchSession, SearchResult, getLeadLists, addLeadsToList, LeadList } from "@/lib/api";
@@ -78,8 +78,8 @@ import { getMockSocials } from "@/lib/socials";
 // Mock data generator (temporary for PR3 testing - will be replaced with real API)
 // Generates 200 results to test pagination modal, confirm/cancel, and same-page-free logic
 const generateMockResults = (count: number = 200) => {
-  const categories = ["Restoran", "Kafe", "Berber", "Kuaför", "Market", "Eczane", "Veteriner", "Emlak"];
-  const districts = ["Kadıköy", "Beşiktaş", "Şişli", "Fatih", "Üsküdar", "Beyoğlu", "Çankaya", "Keçiören"];
+  const categories = ["Restoran", "Kafe", "Berber", "KuafÃ¶r", "Market", "Eczane", "Veteriner", "Emlak"];
+  const districts = ["KadÄ±kÃ¶y", "BeÅŸiktaÅŸ", "ÅiÅŸli", "Fatih", "ÃœskÃ¼dar", "BeyoÄŸlu", "Ã‡ankaya", "KeÃ§iÃ¶ren"];
   const adjectives = ["Modern", "Lezzet", "Tarihi", "Yeni", "Anadolu", "Karadeniz", "Ege", "Akdeniz"];
 
   return Array.from({ length: count }, (_, i) => ({
@@ -92,7 +92,7 @@ const generateMockResults = (count: number = 200) => {
     isOpen: i % 3 !== 0,
     phone: `+90 ${210 + (i % 6)}${(i % 10).toString().padStart(2, '0')} 555 ${String(1000 + i).slice(-4)}`,
     website: `www.business${i + 1}.com`,
-    address: `${districts[i % districts.length]} Mah. No:${i + 1}, İstanbul`,
+    address: `${districts[i % districts.length]} Mah. No:${i + 1}, Ä°stanbul`,
     hours: i % 3 === 0 ? "09:00 - 23:00" : "08:00 - 22:00",
   }));
 };
@@ -222,7 +222,7 @@ export default function SearchPage() {
       if (error.status === 410) {
         navigate('/app/history', { replace: true });
       } else {
-        setErrorMessage('Arama oturumu yüklenemedi.');
+        setErrorMessage('Arama oturumu yÃ¼klenemedi.');
       }
     }
   };
@@ -262,7 +262,7 @@ export default function SearchPage() {
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.credits });
     } catch (error) {
       console.error('[SearchPage] Search failed:', error);
-      setErrorMessage('Arama başarısız oldu. Lütfen tekrar deneyin.');
+      setErrorMessage('Arama baÅŸarÄ±sÄ±z oldu. LÃ¼tfen tekrar deneyin.');
       setIsSearching(false);
     }
   };
@@ -337,9 +337,9 @@ export default function SearchPage() {
 
       // Handle 402 Insufficient Credits
       if (error.message?.includes('Yeterli krediniz yok') || error.message?.includes('Insufficient')) {
-        setErrorMessage('Yeterli krediniz yok. Lütfen kredi satın alın.');
+        setErrorMessage('Yeterli krediniz yok. LÃ¼tfen kredi satÄ±n alÄ±n.');
       } else {
-        setErrorMessage('Sayfa yüklenemedi. Lütfen tekrar deneyin.');
+        setErrorMessage('Sayfa yÃ¼klenemedi. LÃ¼tfen tekrar deneyin.');
       }
 
       if (!skipModal) {
@@ -385,7 +385,7 @@ export default function SearchPage() {
       {/* Filter Panel */}
       <div className="bg-card rounded-xl border shadow-soft p-6">
         <div className="grid sm:grid-cols-2 lg:grid-cols-6 gap-4">
-          {/* Şehir */}
+          {/* Åehir */}
           <div className="space-y-2">
             <Label className="flex items-center gap-2">
               <MapPin className="w-4 h-4 text-muted-foreground" />
@@ -405,7 +405,7 @@ export default function SearchPage() {
             </Select>
           </div>
 
-          {/* İlçe */}
+          {/* Ä°lÃ§e */}
           <div className="space-y-2">
             <Label className="flex items-center gap-2">
               <MapPin className="w-4 h-4 text-muted-foreground" />
@@ -600,19 +600,19 @@ export default function SearchPage() {
                     {t('searchPage.tableDistrict')}
                   </th>
                   <th className="text-left p-4 text-sm font-medium text-muted-foreground">
-                    Puan
+                    {t('searchPage.rating')}
                   </th>
                   <th className="text-left p-4 text-sm font-medium text-muted-foreground">
-                    Yorum
+                    {t('searchPage.reviews')}
                   </th>
                   <th className="text-left p-4 text-sm font-medium text-muted-foreground">
-                    Durum
+                    {t('searchPage.status')}
                   </th>
                   <th className="text-left p-4 text-sm font-medium text-muted-foreground">
-                    E-posta
+                    {t('searchPage.email')}
                   </th>
                   <th className="text-left p-4 text-sm font-medium text-muted-foreground">
-                    Sosyal Profiller
+                    {t('searchPage.socialProfiles')}
                   </th>
                   <th className="text-left p-4 text-sm font-medium text-muted-foreground">
                     {t('searchPage.actions')}
@@ -665,7 +665,7 @@ export default function SearchPage() {
                         variant={item.isOpen ? "default" : "secondary"}
                         className={item.isOpen ? "bg-green-500" : ""}
                       >
-                        {item.isOpen ? 'Açık' : 'Kapalı'}
+                        {item.isOpen ? t('searchPage.open') : t('searchPage.closed')}
                       </Badge>
                     </td>
                     <td className="p-4">
@@ -746,10 +746,10 @@ export default function SearchPage() {
           <div className="w-16 h-16 mx-auto mb-4 bg-muted rounded-full flex items-center justify-center">
             <Search className="w-8 h-8 text-muted-foreground" />
           </div>
-          <h3 className="text-lg font-semibold mb-2">İşletme Aramaya Başlayın</h3>
+          <h3 className="text-lg font-semibold mb-2">Ä°ÅŸletme Aramaya BaÅŸlayÄ±n</h3>
           <p className="text-muted-foreground max-w-md mx-auto">
-            Şehir ve kategori seçerek Türkiye genelindeki işletmeleri arayın.
-            Sonuçlardan lead listenizi oluşturun.
+            Åehir ve kategori seÃ§erek TÃ¼rkiye genelindeki iÅŸletmeleri arayÄ±n.
+            SonuÃ§lardan lead listenizi oluÅŸturun.
           </p>
         </div>
       )
@@ -770,7 +770,7 @@ export default function SearchPage() {
                     className={`px-2.5 py-0.5 rounded-full text-xs font-medium border ${detailItem.isOpen ? "chip-open" : "chip-closed"
                       }`}
                   >
-                    {detailItem.isOpen ? "Açık" : "Kapalı"}
+                    {detailItem.isOpen ? t('searchPage.open') : t('searchPage.closed')}
                   </span>
                 </div>
               </SheetHeader>
@@ -782,7 +782,7 @@ export default function SearchPage() {
                     <span className="text-lg font-semibold">{detailItem.rating}</span>
                   </div>
                   <span className="text-muted-foreground">
-                    ({detailItem.reviews.toLocaleString()} yorum)
+                    ({detailItem.reviews.toLocaleString()} {t('searchPage.reviews')})
                   </span>
                 </div>
 
@@ -814,7 +814,7 @@ export default function SearchPage() {
                   <div className="flex items-start gap-3">
                     <Clock className="w-5 h-5 text-muted-foreground mt-0.5" />
                     <div>
-                      <p className="font-medium">Çalışma Saatleri</p>
+                      <p className="font-medium">Ã‡alÄ±ÅŸma Saatleri</p>
                       <p className="text-muted-foreground">{detailItem.hours}</p>
                     </div>
                   </div>
@@ -824,7 +824,7 @@ export default function SearchPage() {
                     <div>
                       <p className="font-medium">{t('searchPage.email')}</p>
                       <p className="text-muted-foreground">
-                        {detailItem.id % 2 === 0 ? "Var" : "Yok"}
+                        {detailItem.id % 2 === 0 ? t('common.yes') : t('common.no')}
                       </p>
                     </div>
                   </div>
@@ -834,7 +834,7 @@ export default function SearchPage() {
                     <div>
                       <p className="font-medium">{t('searchPage.socialProfiles')}</p>
                       <p className="text-muted-foreground">
-                        {Object.keys(getMockSocials(detailItem)).length > 0 ? "Var" : "Yok"}
+                        {Object.keys(getMockSocials(detailItem)).length > 0 ? t('common.yes') : t('common.no')}
                       </p>
                     </div>
                   </div>
@@ -850,7 +850,7 @@ export default function SearchPage() {
                   </Button>
                   <Button variant="outline" className="w-full">
                     <ExternalLink className="w-4 h-4" />
-                    Google Haritalar'da Aç
+                    Google Haritalar'da AÃ§
                   </Button>
                 </div>
               </div>
@@ -863,9 +863,9 @@ export default function SearchPage() {
       <Dialog open={showPaginationModal} onOpenChange={setShowPaginationModal}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Sayfa Değiştir</DialogTitle>
+            <DialogTitle>Sayfa DeÄŸiÅŸtir</DialogTitle>
             <DialogDescription>
-              Sayfa {pendingPage} görüntülemek için 10 kredi harcanacak.
+              Sayfa {pendingPage} gÃ¶rÃ¼ntÃ¼lemek iÃ§in 10 kredi harcanacak.
               <br />
               Kalan krediniz: {profile?.credits || 0}
             </DialogDescription>
@@ -878,7 +878,7 @@ export default function SearchPage() {
                 setPendingPage(null);
               }}
             >
-              İptal
+              Ä°ptal
             </Button>
             <Button onClick={() => confirmPageChange()}>
               Onayla (10 kredi)
@@ -1019,6 +1019,9 @@ export default function SearchPage() {
     </div >
   );
 }
+
+
+
 
 
 
