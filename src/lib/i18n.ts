@@ -521,7 +521,9 @@ const resources = {
                 tableSocials: 'Sosyal',
                 socialCount: '{{count}} sosyal',
                 rating: 'Puan',
-                reviews: 'Yorumlar',
+                reviews: 'Yorum',
+                email: 'E-posta',
+                socialProfiles: 'Sosyal Profiller',
                 score: 'Skor',
                 status: 'Durum',
                 actions: 'İşlemler',
@@ -615,6 +617,8 @@ const resources = {
                 },
                 download: 'İndir',
                 cancel: 'İptal',
+                yes: 'Var',
+                no: 'Yok',
             },
 
             // List Metadata (Notes & Tags)
@@ -1147,11 +1151,13 @@ const resources = {
                 businessName: 'Business Name',
                 tableCategory: 'Category',
                 tableDistrict: 'District',
-                tableSocials: 'Social',
+                tableSocials: 'Social Media',
                 socialCount: '{{count}} socials',
                 rating: 'Rating',
                 reviews: 'Reviews',
                 score: 'Score',
+                email: 'Email',
+                socialProfiles: 'Social Profiles',
                 status: 'Status',
                 actions: 'Actions',
                 detail: 'Detail',
@@ -1244,6 +1250,8 @@ const resources = {
                 },
                 download: 'Download',
                 cancel: 'Cancel',
+                yes: 'Available',
+                no: 'Not Available',
             },
 
             // List Metadata (Notes & Tags)
