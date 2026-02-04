@@ -577,9 +577,8 @@ export default function SearchPage() {
 
         </div>
       </div>
-    </div>
 
-      {/* Results */ }
+      {/* Results */}
       {isSearching ? (
       <div className="bg-card rounded-xl border shadow-soft p-6">
         <div className="space-y-4">
@@ -1138,3 +1137,4 @@ export default function SearchPage() {
     </div >
   );
 }
+
