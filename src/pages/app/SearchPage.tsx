@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { performSearch, getSearchPage, getSearchSession, SearchResult, getLeadLists, addLeadsToList, LeadList } from "@/lib/api";
+import { useQueryClient } from "@tanstack/react-query";
+import { QUERY_KEYS } from "@/lib/queryKeys";
 import OnboardingTour from "@/components/onboarding/OnboardingTour";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
@@ -62,9 +64,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import turkeyData from "@/data/turkey.json";
-import { DataSourceIndicator } from "@/components/common/DataSourceIndicator";
-import { listPresets, savePreset, renamePreset, deletePreset, getPreset, type SearchFilters, type SearchPreset } from "@/lib/searchPresets";
-import { Bookmark } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { SearchIntelligenceBar } from "@/components/app/SearchIntelligenceBar";
 import { LeadQualityBadge } from "@/components/app/LeadQualityBadge";
@@ -102,7 +101,8 @@ const mockResults = generateMockResults(200);
 
 export default function SearchPage() {
   const { t } = useTranslation();
-  const { profile, refreshProfile, decrementCredits, rollbackCredits, credits: contextCredits } = useAuth();
+  const { profile, refreshProfile } = useAuth();
+  const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [showOnboarding, setShowOnboarding] = useState(false);
@@ -137,15 +137,7 @@ export default function SearchPage() {
   const [dryRunCost, setDryRunCost] = useState<number | null>(null);
   const [listDialogError, setListDialogError] = useState<string | null>(null);
 
-  // Preset state
   const { toast } = useToast();
-  const [presets, setPresets] = useState<SearchPreset[]>([]);
-  const [selectedPresetId, setSelectedPresetId] = useState("");
-  const [showSavePresetDialog, setShowSavePresetDialog] = useState(false);
-  const [showManagePresetsDialog, setShowManagePresetsDialog] = useState(false);
-  const [presetName, setPresetName] = useState("");
-  const [editingPresetId, setEditingPresetId] = useState<string | null>(null);
-  const [editingPresetName, setEditingPresetName] = useState("");
   const [pendingDistrict, setPendingDistrict] = useState<string | null>(null);
 
   // Enrichment modal state
@@ -197,10 +189,6 @@ export default function SearchPage() {
     }
   }, [profile]);
 
-  // Load presets on mount
-  useEffect(() => {
-    setPresets(listPresets());
-  }, []);
 
 
   // PRODUCT_SPEC 5.4 - Load session from URL param (Continue search)
@@ -259,15 +247,6 @@ export default function SearchPage() {
     setCurrentPage(1);
     setViewedPages(new Set([1]));
 
-    // Optimistic credit update: Search costs 0 credits but we prepare for future cost
-    const SEARCH_COST = 0; // Current search cost is 0 per API docs
-    const previousCredits = contextCredits ?? 0;
-
-    // Only decrement if cost > 0
-    if (SEARCH_COST > 0) {
-      decrementCredits(SEARCH_COST);
-    }
-
     try {
       // Call backend API
       const response = await performSearch({
@@ -285,15 +264,15 @@ export default function SearchPage() {
       setCurrentPage(1);
       setIsSearching(false);
       setHasSearched(true);
+
+      // Refresh profile to get updated credits instantly (don't wait for 30s polling)
+      refreshProfile();
+      // Invalidate credits query to trigger immediate refetch
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.credits });
     } catch (error) {
       console.error('[SearchPage] Search failed:', error);
       setErrorMessage('Arama başarısız oldu. Lütfen tekrar deneyin.');
       setIsSearching(false);
-
-      // Rollback credits on error
-      if (SEARCH_COST > 0) {
-        rollbackCredits(previousCredits);
-      }
     }
   };
 
@@ -369,87 +348,6 @@ export default function SearchPage() {
     downloadCSV(csvContent, filename);
   };
 
-
-  // Preset handlers
-  const handleSavePreset = () => {
-    const defaultName = city && category ? `${city} - ${category}` : "";
-    setPresetName(defaultName);
-    setShowSavePresetDialog(true);
-  };
-
-  const handleConfirmSavePreset = () => {
-    if (!presetName.trim()) return;
-
-    const filters: SearchFilters = {
-      city,
-      district,
-      category,
-      keyword,
-      minRating: minRating[0],
-      minReviews,
-    };
-
-    const result = savePreset(presetName.trim(), filters);
-    if (result.success) {
-      setPresets(listPresets());
-      setShowSavePresetDialog(false);
-      setPresetName("");
-      toast({ description: t('searchPage.presetSaved') });
-    } else if (result.error === 'empty_name') {
-      toast({ variant: "destructive", description: t('searchPage.presetEmptyName') });
-    } else if (result.error === 'limit_reached') {
-      toast({ variant: "destructive", description: t('searchPage.presetLimitReached') });
-    } else if (result.error === 'already_exists') {
-      toast({ variant: "destructive", description: t('searchPage.presetAlreadyExists') });
-    }
-  };
-
-  const handleApplyPreset = (presetId: string) => {
-    const preset = getPreset(presetId);
-    if (!preset) return;
-
-    const { filters } = preset;
-    setCity(filters.city);
-    setPendingDistrict(filters.district);
-    setCategory(filters.category);
-    setKeyword(filters.keyword);
-    setMinRating([filters.minRating]);
-    setMinReviews(filters.minReviews);
-    setSelectedPresetId(presetId);
-  };
-
-  const handleRenamePreset = (id: string) => {
-    const preset = getPreset(id);
-    if (!preset) return;
-    setEditingPresetId(id);
-    setEditingPresetName(preset.name);
-  };
-
-  const handleConfirmRename = () => {
-    if (!editingPresetId || !editingPresetName.trim()) return;
-
-    const result = renamePreset(editingPresetId, editingPresetName.trim());
-    if (result.success) {
-      setPresets(listPresets());
-      setEditingPresetId(null);
-      setEditingPresetName("");
-      toast({ description: t('searchPage.presetRenamed') });
-    } else if (result.error === 'empty_name') {
-      toast({ variant: "destructive", description: t('searchPage.presetEmptyName') });
-    } else if (result.error === 'already_exists') {
-      toast({ variant: "destructive", description: t('searchPage.presetAlreadyExists') });
-    }
-  };
-
-  const handleDeletePreset = (id: string) => {
-    if (deletePreset(id)) {
-      setPresets(listPresets());
-      if (selectedPresetId === id) {
-        setSelectedPresetId("");
-      }
-      toast({ description: t('searchPage.presetDeleted') });
-    }
-  };
 
 
   const handlePageChange = (newPage: number) => {
@@ -677,710 +575,567 @@ export default function SearchPage() {
             </Button>
           </div>
 
-          {/* Presets Row */}
-          <div className="flex items-end gap-2 pt-4 border-t">
-            <div className="flex-1 space-y-2">
-              <Label className="flex items-center gap-2">
-                <Bookmark className="w-4 h-4 text-muted-foreground" />
-                {t('searchPage.presetsLabel')}
-              </Label>
-              <Select value={selectedPresetId} onValueChange={handleApplyPreset}>
-                <SelectTrigger>
-                  <SelectValue placeholder={t('searchPage.presetsPlaceholder')} />
-                </SelectTrigger>
-                <SelectContent>
-                  {presets.map((preset) => (
-                    <SelectItem key={preset.id} value={preset.id}>
-                      {preset.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <Button onClick={handleSavePreset} variant="outline" size="default">
-              {t('searchPage.savePreset')}
-            </Button>
-            <Button onClick={() => setShowManagePresetsDialog(true)} variant="outline" size="default">
-              {t('searchPage.managePresets')}
-            </Button>
-          </div>
         </div>
       </div>
+    </div>
 
-      {/* Results */}
-      {isSearching ? (
-        <div className="bg-card rounded-xl border shadow-soft p-6">
-          <div className="space-y-4">
-            {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="flex items-center gap-4 p-4 bg-muted/50 rounded-lg skeleton-loading">
-                <div className="w-5 h-5 bg-muted rounded" />
-                <div className="flex-1 space-y-2">
-                  <div className="h-4 bg-muted rounded w-1/3" />
-                  <div className="h-3 bg-muted rounded w-1/2" />
-                </div>
-                <div className="h-6 bg-muted rounded w-16" />
+      {/* Results */ }
+  {
+    isSearching ? (
+      <div className="bg-card rounded-xl border shadow-soft p-6">
+        <div className="space-y-4">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="flex items-center gap-4 p-4 bg-muted/50 rounded-lg skeleton-loading">
+              <div className="w-5 h-5 bg-muted rounded" />
+              <div className="flex-1 space-y-2">
+                <div className="h-4 bg-muted rounded w-1/3" />
+                <div className="h-3 bg-muted rounded w-1/2" />
               </div>
-            ))}
-          </div>
+              <div className="h-6 bg-muted rounded w-16" />
+            </div>
+          ))}
         </div>
-      ) : hasSearched ? (
-        <div className="bg-card rounded-xl border shadow-soft overflow-hidden">
-          {/* Results header */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 border-b bg-muted/30">
-            <div className="flex items-center gap-4">
-              <DataSourceIndicator className="hidden sm:flex" />
-              <span className="text-sm text-muted-foreground">
-                {t('searchPage.resultsFound', { count: totalResults })}
+      </div>
+    ) : hasSearched ? (
+      <div className="bg-card rounded-xl border shadow-soft overflow-hidden">
+        {/* Results header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 border-b bg-muted/30">
+          <div className="flex items-center gap-4">
+            <span className="text-sm text-muted-foreground">
+              {t('searchPage.resultsFound', { count: totalResults })}
+            </span>
+            <span className="text-sm text-muted-foreground">
+              {t('searchPage.pageOf', { page: currentPage, total: totalPages })}
+            </span>
+            {selectedIds.length > 0 && (
+              <span className="text-sm font-medium text-primary">
+                {t('searchPage.selectedCount', { count: selectedIds.length })}
               </span>
-              <span className="text-sm text-muted-foreground">
-                {t('searchPage.pageOf', { page: currentPage, total: totalPages })}
-              </span>
-              {selectedIds.length > 0 && (
-                <span className="text-sm font-medium text-primary">
-                  {t('searchPage.selectedCount', { count: selectedIds.length })}
-                </span>
-              )}
-            </div>
-            <div className="flex items-center gap-3">
-              <Button
-                data-onboarding="add-to-list"
-                disabled={selectedIds.length === 0}
-                onClick={async () => {
-                  setIsLoadingLists(true);
-                  setShowListDialog(true);
-                  try {
-                    const { lists } = await getLeadLists();
-                    setUserLists(lists);
-                  } catch (error) {
-                    console.error('[SearchPage] Failed to load lists:', error);
-                    setErrorMessage(t('leadLists.loadListsFailed'));
-                  } finally {
-                    setIsLoadingLists(false);
-                  }
-                }}
-              >
-                <Plus className="w-4 h-4" />
-                {t('searchPage.addSelected', { count: selectedIds.length })}
-              </Button>
-              <Button
-                data-onboarding="export-csv"
-                variant="outline"
-                disabled={selectedIds.length === 0}
-                onClick={() => setShowExportTemplateDialog(true)}
-              >
-                <FileDown className="w-4 h-4" />
-                {t('searchPage.downloadCSV', { count: selectedIds.length })}
-              </Button>
-            </div>
+            )}
           </div>
-
-          {/* Search Intelligence Bar */}
-          <div className="px-4 pb-3">
-            <SearchIntelligenceBar cost={0} />
-          </div>
-
-          {/* Table */}
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b bg-muted/20">
-                  <th className="text-left p-4 w-12">
-                    <Checkbox
-                      checked={selectedIds.length === results.length && results.length > 0}
-                      onCheckedChange={toggleSelectAll}
-                    />
-                  </th>
-                  <th className="text-left p-4 text-sm font-medium text-muted-foreground">
-                    {t('searchPage.businessName')}
-                  </th>
-                  <th className="text-left p-4 text-sm font-medium text-muted-foreground">
-                    {t('searchPage.tableCategory')}
-                  </th>
-                  <th className="text-left p-4 text-sm font-medium text-muted-foreground">
-                    {t('searchPage.tableDistrict')}
-                  </th>
-                  <th className="text-left p-4 text-sm font-medium text-muted-foreground">
-                    {t('searchPage.rating')}
-                  </th>
-                  <th className="text-left p-4 text-sm font-medium text-muted-foreground">
-                    {t('searchPage.status')}
-                  </th>
-                  <th className="text-left p-4 text-sm font-medium text-muted-foreground">
-                    {t('searchPage.tableSocials')}
-                  </th>
-                  <th className="text-left p-4 text-sm font-medium text-muted-foreground">
-                    {t('searchPage.actions')}
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {results.map((item) => (
-                  <tr
-                    key={item.id}
-                    className="border-b hover:bg-muted/30 transition-colors"
-                  >
-                    <td className="p-4">
-                      <Checkbox
-                        checked={selectedIds.includes(item.id)}
-                        onCheckedChange={() => toggleSelect(item.id)}
-                      />
-                    </td>
-                    <td className="p-4">
-                      <div className="space-y-1">
-                        <div className="font-medium">{item.name}</div>
-                        {(() => {
-                          const socialCount = Object.keys(getMockSocials(item)).length;
-                          return socialCount > 0 ? (
-                            <div className="text-xs text-muted-foreground">
-                              {t('searchPage.socialCount', { count: socialCount })}
-                            </div>
-                          ) : null;
-                        })()}
-                        <LeadQualityBadge
-                          variant={
-                            item.reviews >= 1000 ? "engaged"
-                              : item.rating >= 4.5 ? "active"
-                                : "new"
-                          }
-                        />
-                      </div>
-                    </td>
-                    <td className="p-4 text-muted-foreground">{item.category}</td>
-                    <td className="p-4 text-muted-foreground">{item.district}</td>
-                    <td className="p-4">
-                      <span className="flex items-center gap-1">
-                        <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
-                        {item.rating}
-                      </span>
-                    </td>
-                    <td className="p-4 text-muted-foreground">{item.reviews.toLocaleString()}</td>
-                    <td className="p-4">
-                      {item.score && (
-                        <Badge variant={item.score === 'hot' ? 'destructive' : item.score === 'warm' ? 'default' : 'secondary'}>
-                          {item.score === 'hot' ? t('leadScore.hot') : item.score === 'warm' ? t('leadScore.warm') : t('leadScore.cold')}
-                        </Badge>
-                      )}
-                    </td>
-                    <td className="p-4">
-                      <Badge
-                        variant={item.isOpen ? "default" : "secondary"}
-                        className={item.isOpen ? "bg-green-500" : ""}
-                      >
-                        {item.isOpen ? t('searchPage.open') : t('searchPage.closed')}
-                      </Badge>
-                    </td>
-                    <td className="p-4">
-                      {/* Social Media Icons */}
-                      {(() => {
-                        const socials = getMockSocials(item);
-                        const hasSocials = Object.keys(socials).length > 0;
-
-                        if (!hasSocials) return null;
-
-                        return (
-                          <div className="flex items-center gap-2">
-                            {socials.instagram && (
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <a href={socials.instagram} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-foreground transition-colors">
-                                    <Instagram className="w-4 h-4" />
-                                  </a>
-                                </TooltipTrigger>
-                                <TooltipContent>Instagram</TooltipContent>
-                              </Tooltip>
-                            )}
-                            {socials.facebook && (
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <a href={socials.facebook} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-foreground transition-colors">
-                                    <Facebook className="w-4 h-4" />
-                                  </a>
-                                </TooltipTrigger>
-                                <TooltipContent>Facebook</TooltipContent>
-                              </Tooltip>
-                            )}
-                            {socials.linkedin && (
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <a href={socials.linkedin} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-foreground transition-colors">
-                                    <Linkedin className="w-4 h-4" />
-                                  </a>
-                                </TooltipTrigger>
-                                <TooltipContent>LinkedIn</TooltipContent>
-                              </Tooltip>
-                            )}
-                            {socials.twitter && (
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <a href={socials.twitter} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-foreground transition-colors">
-                                    <Twitter className="w-4 h-4" />
-                                  </a>
-                                </TooltipTrigger>
-                                <TooltipContent>X</TooltipContent>
-                              </Tooltip>
-                            )}
-                            {socials.tiktok && (
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <a href={socials.tiktok} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-foreground transition-colors">
-                                    <Music className="w-4 h-4" />
-                                  </a>
-                                </TooltipTrigger>
-                                <TooltipContent>TikTok</TooltipContent>
-                              </Tooltip>
-                            )}
-                            {socials.youtube && (
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <a href={socials.youtube} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-foreground transition-colors">
-                                    <Youtube className="w-4 h-4" />
-                                  </a>
-                                </TooltipTrigger>
-                                <TooltipContent>YouTube</TooltipContent>
-                              </Tooltip>
-                            )}
-                          </div>
-                        );
-                      })()}
-                    </td>
-                    <td className="p-4">
-                      <div className="flex items-center gap-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setDetailItem(item)}
-                        >
-                          <Eye className="w-4 h-4 mr-1" />
-                          {t('searchPage.detail')}
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleEnrichClick(item)}
-                        >
-                          <Wand2 className="w-4 h-4 mr-1" />
-                          Enrich
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="flex justify-center items-center gap-2 p-4 border-t bg-muted/10">
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={currentPage === 1}
-                onClick={() => handlePageChange(currentPage - 1)}
-              >
-                {t('searchPage.previous')}
-              </Button>
-
-              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                const pageNum = i + 1;
-                return (
-                  <Button
-                    key={pageNum}
-                    variant={currentPage === pageNum ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => handlePageChange(pageNum)}
-                  >
-                    {pageNum}
-                  </Button>
-                );
-              })}
-
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={currentPage === totalPages}
-                onClick={() => handlePageChange(currentPage + 1)}
-              >
-                {t('searchPage.next')}
-              </Button>
-            </div>
-          )}
-        </div>
-      ) : (
-        <div className="bg-card rounded-xl border shadow-soft p-12 text-center">
-          <div className="w-16 h-16 mx-auto mb-4 bg-muted rounded-full flex items-center justify-center">
-            <Search className="w-8 h-8 text-muted-foreground" />
-          </div>
-          <h3 className="text-lg font-semibold mb-2">İşletme Aramaya Başlayın</h3>
-          <p className="text-muted-foreground max-w-md mx-auto">
-            Şehir ve kategori seçerek Türkiye genelindeki işletmeleri arayın.
-            Sonuçlardan lead listenizi oluşturun.
-          </p>
-        </div>
-      )}
-
-      {/* Detail Sheet */}
-      <Sheet open={!!detailItem} onOpenChange={() => setDetailItem(null)}>
-        <SheetContent className="sm:max-w-lg">
-          {detailItem && (
-            <div className="animate-slide-in-right">
-              <SheetHeader className="mb-6">
-                <SheetTitle className="text-2xl">{detailItem.name}</SheetTitle>
-                <div className="flex items-center gap-3 mt-2">
-                  <span className="px-2.5 py-0.5 bg-primary/10 text-primary rounded-full text-sm font-medium">
-                    {detailItem.category}
-                  </span>
-                  <span
-                    className={`px-2.5 py-0.5 rounded-full text-xs font-medium border ${detailItem.isOpen ? "chip-open" : "chip-closed"
-                      }`}
-                  >
-                    {detailItem.isOpen ? "Açık" : "Kapalı"}
-                  </span>
-                </div>
-              </SheetHeader>
-
-              <div className="space-y-6">
-                <div className="flex items-center gap-4">
-                  <div className="flex items-center gap-1">
-                    <Star className="w-5 h-5 text-yellow-500 fill-yellow-500" />
-                    <span className="text-lg font-semibold">{detailItem.rating}</span>
-                  </div>
-                  <span className="text-muted-foreground">
-                    ({detailItem.reviews.toLocaleString()} yorum)
-                  </span>
-                </div>
-
-                <div className="space-y-4">
-                  <div className="flex items-start gap-3">
-                    <MapPin className="w-5 h-5 text-muted-foreground mt-0.5" />
-                    <div>
-                      <p className="font-medium">Adres</p>
-                      <p className="text-muted-foreground">{detailItem.address}</p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-start gap-3">
-                    <Phone className="w-5 h-5 text-muted-foreground mt-0.5" />
-                    <div>
-                      <p className="font-medium">Telefon</p>
-                      <p className="text-muted-foreground">{detailItem.phone}</p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-start gap-3">
-                    <Globe className="w-5 h-5 text-muted-foreground mt-0.5" />
-                    <div>
-                      <p className="font-medium">Website</p>
-                      <p className="text-primary">{detailItem.website}</p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-start gap-3">
-                    <Clock className="w-5 h-5 text-muted-foreground mt-0.5" />
-                    <div>
-                      <p className="font-medium">Çalışma Saatleri</p>
-                      <p className="text-muted-foreground">{detailItem.hours}</p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="pt-4 space-y-3">
-                  <Button className="w-full" onClick={() => {
-                    alert("Lead listenize eklendi!");
-                    setDetailItem(null);
-                  }}>
-                    <Plus className="w-4 h-4" />
-                    Lead Listeme Ekle
-                  </Button>
-                  <Button variant="outline" className="w-full">
-                    <ExternalLink className="w-4 h-4" />
-                    Google Haritalar'da Aç
-                  </Button>
-                </div>
-              </div>
-            </div>
-          )}
-        </SheetContent>
-      </Sheet>
-
-      {/* Credit Confirmation Modal (PR3) */}
-      <Dialog open={showPaginationModal} onOpenChange={setShowPaginationModal}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Sayfa Değiştir</DialogTitle>
-            <DialogDescription>
-              Sayfa {pendingPage} görüntülemek için 10 kredi harcanacak.
-              <br />
-              Kalan krediniz: {profile?.credits || 0}
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="flex gap-2">
+          <div className="flex items-center gap-3">
             <Button
-              variant="outline"
-              onClick={() => {
-                setShowPaginationModal(false);
-                setPendingPage(null);
+              data-onboarding="add-to-list"
+              disabled={selectedIds.length === 0}
+              onClick={async () => {
+                setIsLoadingLists(true);
+                setShowListDialog(true);
+                try {
+                  const { lists } = await getLeadLists();
+                  setUserLists(lists);
+                } catch (error) {
+                  console.error('[SearchPage] Failed to load lists:', error);
+                  setErrorMessage(t('leadLists.loadListsFailed'));
+                } finally {
+                  setIsLoadingLists(false);
+                }
               }}
             >
-              İptal
+              <Plus className="w-4 h-4" />
+              {t('searchPage.addSelected', { count: selectedIds.length })}
             </Button>
-            <Button onClick={() => confirmPageChange()}>
-              Onayla (10 kredi)
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* List Selection Dialog */}
-      <Dialog open={showListDialog} onOpenChange={setShowListDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{t('leadLists.addToListTitle')}</DialogTitle>
-            <DialogDescription>
-              {t('leadLists.leadsSelected', { count: selectedIds.length })}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            {isLoadingLists ? (
-              <div className="text-center py-8">
-                <Loader2 className="w-6 h-6 animate-spin mx-auto text-muted-foreground" />
-              </div>
-            ) : userLists.length === 0 ? (
-              <div className="text-center py-8">
-                <p className="text-sm text-muted-foreground">{t('leadLists.noListsYet')}</p>
-              </div>
-            ) : (
-              <Select value={selectedListId} onValueChange={async (listId) => {
-                setSelectedListId(listId);
-                setDryRunCost(null);
-                try {
-                  const selectedLeads = results.filter(r => selectedIds.includes(r.id));
-                  const dryRunResult = await addLeadsToList(listId, selectedLeads, { dryRun: true });
-                  setDryRunCost(dryRunResult.creditCost || 0);
-                } catch (error) {
-                  console.error('[SearchPage] DryRun failed:', error);
-                }
-              }}>
-                <SelectTrigger>
-                  <SelectValue placeholder={t('leadLists.selectList')} />
-                </SelectTrigger>
-                <SelectContent>
-                  {userLists.map((list) => (
-                    <SelectItem key={list.id} value={list.id}>
-                      {list.name} ({list.lead_count} lead)
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-            {dryRunCost !== null && (
-              <div className="bg-muted/50 rounded-lg p-4">
-                <p className="text-sm font-medium">{t('leadLists.costLabel', { cost: dryRunCost })}</p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {dryRunCost === 0 ? t('leadLists.allDuplicates') : t('leadLists.willAddN', { count: dryRunCost })}
-                </p>
-              </div>
-            )}
-            {listDialogError && (
-              <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-3 text-sm text-destructive">
-                {listDialogError}
-              </div>
-            )}
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => {
+        </div>
+
+        {/* Search Intelligence Bar */}
+        <div className="px-4 pb-3">
+          <SearchIntelligenceBar cost={0} />
+        </div>
+
+        {/* Table */}
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b bg-muted/20">
+                <th className="text-left p-4 w-12">
+                  <Checkbox
+                    checked={selectedIds.length === results.length && results.length > 0}
+                    onCheckedChange={toggleSelectAll}
+                  />
+                </th>
+                <th className="text-left p-4 text-sm font-medium text-muted-foreground">
+                  {t('searchPage.businessName')}
+                </th>
+                <th className="text-left p-4 text-sm font-medium text-muted-foreground">
+                  {t('searchPage.tableCategory')}
+                </th>
+                <th className="text-left p-4 text-sm font-medium text-muted-foreground">
+                  {t('searchPage.tableDistrict')}
+                </th>
+                <th className="text-left p-4 text-sm font-medium text-muted-foreground">
+                  {t('searchPage.rating')}
+                </th>
+                <th className="text-left p-4 text-sm font-medium text-muted-foreground">
+                  {t('searchPage.status')}
+                </th>
+                <th className="text-left p-4 text-sm font-medium text-muted-foreground">
+                  {t('searchPage.tableSocials')}
+                </th>
+                <th className="text-left p-4 text-sm font-medium text-muted-foreground">
+                  {t('searchPage.actions')}
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {results.map((item) => (
+                <tr
+                  key={item.id}
+                  className="border-b hover:bg-muted/30 transition-colors"
+                >
+                  <td className="p-4">
+                    <Checkbox
+                      checked={selectedIds.includes(item.id)}
+                      onCheckedChange={() => toggleSelect(item.id)}
+                    />
+                  </td>
+                  <td className="p-4">
+                    <div className="space-y-1">
+                      <div className="font-medium">{item.name}</div>
+                      {(() => {
+                        const socialCount = Object.keys(getMockSocials(item)).length;
+                        return socialCount > 0 ? (
+                          <div className="text-xs text-muted-foreground">
+                            {t('searchPage.socialCount', { count: socialCount })}
+                          </div>
+                        ) : null;
+                      })()}
+                      <LeadQualityBadge
+                        variant={
+                          item.reviews >= 1000 ? "engaged"
+                            : item.rating >= 4.5 ? "active"
+                              : "new"
+                        }
+                      />
+                    </div>
+                  </td>
+                  <td className="p-4 text-muted-foreground">{item.category}</td>
+                  <td className="p-4 text-muted-foreground">{item.district}</td>
+                  <td className="p-4">
+                    <span className="flex items-center gap-1">
+                      <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
+                      {item.rating}
+                    </span>
+                  </td>
+                  <td className="p-4 text-muted-foreground">{item.reviews.toLocaleString()}</td>
+                  <td className="p-4">
+                    {item.score && (
+                      <Badge variant={item.score === 'hot' ? 'destructive' : item.score === 'warm' ? 'default' : 'secondary'}>
+                        {item.score === 'hot' ? t('leadScore.hot') : item.score === 'warm' ? t('leadScore.warm') : t('leadScore.cold')}
+                      </Badge>
+                    )}
+                  </td>
+                  <td className="p-4">
+                    <Badge
+                      variant={item.isOpen ? "default" : "secondary"}
+                      className={item.isOpen ? "bg-green-500" : ""}
+                    >
+                      {item.isOpen ? t('searchPage.open') : t('searchPage.closed')}
+                    </Badge>
+                  </td>
+                  <td className="p-4">
+                    {/* Social Media Icons */}
+                    {(() => {
+                      const socials = getMockSocials(item);
+                      const hasSocials = Object.keys(socials).length > 0;
+
+                      if (!hasSocials) return null;
+
+                      return (
+                        <div className="flex items-center gap-2">
+                          {socials.instagram && (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <a href={socials.instagram} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-foreground transition-colors">
+                                  <Instagram className="w-4 h-4" />
+                                </a>
+                              </TooltipTrigger>
+                              <TooltipContent>Instagram</TooltipContent>
+                            </Tooltip>
+                          )}
+                          {socials.facebook && (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <a href={socials.facebook} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-foreground transition-colors">
+                                  <Facebook className="w-4 h-4" />
+                                </a>
+                              </TooltipTrigger>
+                              <TooltipContent>Facebook</TooltipContent>
+                            </Tooltip>
+                          )}
+                          {socials.linkedin && (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <a href={socials.linkedin} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-foreground transition-colors">
+                                  <Linkedin className="w-4 h-4" />
+                                </a>
+                              </TooltipTrigger>
+                              <TooltipContent>LinkedIn</TooltipContent>
+                            </Tooltip>
+                          )}
+                          {socials.twitter && (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <a href={socials.twitter} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-foreground transition-colors">
+                                  <Twitter className="w-4 h-4" />
+                                </a>
+                              </TooltipTrigger>
+                              <TooltipContent>X</TooltipContent>
+                            </Tooltip>
+                          )}
+                          {socials.tiktok && (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <a href={socials.tiktok} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-foreground transition-colors">
+                                  <Music className="w-4 h-4" />
+                                </a>
+                              </TooltipTrigger>
+                              <TooltipContent>TikTok</TooltipContent>
+                            </Tooltip>
+                          )}
+                          {socials.youtube && (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <a href={socials.youtube} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-foreground transition-colors">
+                                  <Youtube className="w-4 h-4" />
+                                </a>
+                              </TooltipTrigger>
+                              <TooltipContent>YouTube</TooltipContent>
+                            </Tooltip>
+                          )}
+                        </div>
+                      );
+                    })()}
+                  </td>
+                  <td className="p-4">
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setDetailItem(item)}
+                      >
+                        <Eye className="w-4 h-4 mr-1" />
+                        {t('searchPage.detail')}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleEnrichClick(item)}
+                      >
+                        <Wand2 className="w-4 h-4 mr-1" />
+                        Enrich
+                      </Button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="flex justify-center items-center gap-2 p-4 border-t bg-muted/10">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={currentPage === 1}
+              onClick={() => handlePageChange(currentPage - 1)}
+            >
+              {t('searchPage.previous')}
+            </Button>
+
+            {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+              const pageNum = i + 1;
+              return (
+                <Button
+                  key={pageNum}
+                  variant={currentPage === pageNum ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => handlePageChange(pageNum)}
+                >
+                  {pageNum}
+                </Button>
+              );
+            })}
+
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={currentPage === totalPages}
+              onClick={() => handlePageChange(currentPage + 1)}
+            >
+              {t('searchPage.next')}
+            </Button>
+          </div>
+        )}
+      </div>
+    ) : (
+      <div className="bg-card rounded-xl border shadow-soft p-12 text-center">
+        <div className="w-16 h-16 mx-auto mb-4 bg-muted rounded-full flex items-center justify-center">
+          <Search className="w-8 h-8 text-muted-foreground" />
+        </div>
+        <h3 className="text-lg font-semibold mb-2">İşletme Aramaya Başlayın</h3>
+        <p className="text-muted-foreground max-w-md mx-auto">
+          Şehir ve kategori seçerek Türkiye genelindeki işletmeleri arayın.
+          Sonuçlardan lead listenizi oluşturun.
+        </p>
+      </div>
+    )
+  }
+
+  {/* Detail Sheet */ }
+  <Sheet open={!!detailItem} onOpenChange={() => setDetailItem(null)}>
+    <SheetContent className="sm:max-w-lg">
+      {detailItem && (
+        <div className="animate-slide-in-right">
+          <SheetHeader className="mb-6">
+            <SheetTitle className="text-2xl">{detailItem.name}</SheetTitle>
+            <div className="flex items-center gap-3 mt-2">
+              <span className="px-2.5 py-0.5 bg-primary/10 text-primary rounded-full text-sm font-medium">
+                {detailItem.category}
+              </span>
+              <span
+                className={`px-2.5 py-0.5 rounded-full text-xs font-medium border ${detailItem.isOpen ? "chip-open" : "chip-closed"
+                  }`}
+              >
+                {detailItem.isOpen ? "Açık" : "Kapalı"}
+              </span>
+            </div>
+          </SheetHeader>
+
+          <div className="space-y-6">
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-1">
+                <Star className="w-5 h-5 text-yellow-500 fill-yellow-500" />
+                <span className="text-lg font-semibold">{detailItem.rating}</span>
+              </div>
+              <span className="text-muted-foreground">
+                ({detailItem.reviews.toLocaleString()} yorum)
+              </span>
+            </div>
+
+            <div className="space-y-4">
+              <div className="flex items-start gap-3">
+                <MapPin className="w-5 h-5 text-muted-foreground mt-0.5" />
+                <div>
+                  <p className="font-medium">Adres</p>
+                  <p className="text-muted-foreground">{detailItem.address}</p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3">
+                <Phone className="w-5 h-5 text-muted-foreground mt-0.5" />
+                <div>
+                  <p className="font-medium">Telefon</p>
+                  <p className="text-muted-foreground">{detailItem.phone}</p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3">
+                <Globe className="w-5 h-5 text-muted-foreground mt-0.5" />
+                <div>
+                  <p className="font-medium">Website</p>
+                  <p className="text-primary">{detailItem.website}</p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3">
+                <Clock className="w-5 h-5 text-muted-foreground mt-0.5" />
+                <div>
+                  <p className="font-medium">Çalışma Saatleri</p>
+                  <p className="text-muted-foreground">{detailItem.hours}</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-4 space-y-3">
+              <Button className="w-full" onClick={() => {
+                alert("Lead listenize eklendi!");
+                setDetailItem(null);
+              }}>
+                <Plus className="w-4 h-4" />
+                Lead Listeme Ekle
+              </Button>
+              <Button variant="outline" className="w-full">
+                <ExternalLink className="w-4 h-4" />
+                Google Haritalar'da Aç
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+    </SheetContent>
+  </Sheet>
+
+  {/* Credit Confirmation Modal (PR3) */ }
+  <Dialog open={showPaginationModal} onOpenChange={setShowPaginationModal}>
+    <DialogContent>
+      <DialogHeader>
+        <DialogTitle>Sayfa Değiştir</DialogTitle>
+        <DialogDescription>
+          Sayfa {pendingPage} görüntülemek için 10 kredi harcanacak.
+          <br />
+          Kalan krediniz: {profile?.credits || 0}
+        </DialogDescription>
+      </DialogHeader>
+      <DialogFooter className="flex gap-2">
+        <Button
+          variant="outline"
+          onClick={() => {
+            setShowPaginationModal(false);
+            setPendingPage(null);
+          }}
+        >
+          İptal
+        </Button>
+        <Button onClick={() => confirmPageChange()}>
+          Onayla (10 kredi)
+        </Button>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>
+
+  {/* List Selection Dialog */ }
+  <Dialog open={showListDialog} onOpenChange={setShowListDialog}>
+    <DialogContent>
+      <DialogHeader>
+        <DialogTitle>{t('leadLists.addToListTitle')}</DialogTitle>
+        <DialogDescription>
+          {t('leadLists.leadsSelected', { count: selectedIds.length })}
+        </DialogDescription>
+      </DialogHeader>
+      <div className="space-y-4">
+        {isLoadingLists ? (
+          <div className="text-center py-8">
+            <Loader2 className="w-6 h-6 animate-spin mx-auto text-muted-foreground" />
+          </div>
+        ) : userLists.length === 0 ? (
+          <div className="text-center py-8">
+            <p className="text-sm text-muted-foreground">{t('leadLists.noListsYet')}</p>
+          </div>
+        ) : (
+          <Select value={selectedListId} onValueChange={async (listId) => {
+            setSelectedListId(listId);
+            setDryRunCost(null);
+            try {
+              const selectedLeads = results.filter(r => selectedIds.includes(r.id));
+              const dryRunResult = await addLeadsToList(listId, selectedLeads, { dryRun: true });
+              setDryRunCost(dryRunResult.creditCost || 0);
+            } catch (error) {
+              console.error('[SearchPage] DryRun failed:', error);
+            }
+          }}>
+            <SelectTrigger>
+              <SelectValue placeholder={t('leadLists.selectList')} />
+            </SelectTrigger>
+            <SelectContent>
+              {userLists.map((list) => (
+                <SelectItem key={list.id} value={list.id}>
+                  {list.name} ({list.lead_count} lead)
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+        {dryRunCost !== null && (
+          <div className="bg-muted/50 rounded-lg p-4">
+            <p className="text-sm font-medium">{t('leadLists.costLabel', { cost: dryRunCost })}</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              {dryRunCost === 0 ? t('leadLists.allDuplicates') : t('leadLists.willAddN', { count: dryRunCost })}
+            </p>
+          </div>
+        )}
+        {listDialogError && (
+          <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-3 text-sm text-destructive">
+            {listDialogError}
+          </div>
+        )}
+      </div>
+      <DialogFooter>
+        <Button variant="outline" onClick={() => {
+          setShowListDialog(false);
+          setSelectedListId("");
+          setDryRunCost(null);
+          setListDialogError(null);
+        }}>
+          {t('common.cancel')}
+        </Button>
+        <Button
+          disabled={!selectedListId || isAddingToList || dryRunCost === null}
+          onClick={async () => {
+            setIsAddingToList(true);
+            setListDialogError(null);
+            try {
+              const selectedLeads = results.filter(r => selectedIds.includes(r.id));
+              const result = await addLeadsToList(selectedListId, selectedLeads);
+
               setShowListDialog(false);
               setSelectedListId("");
               setDryRunCost(null);
               setListDialogError(null);
-            }}>
-              {t('common.cancel')}
-            </Button>
-            <Button
-              disabled={!selectedListId || isAddingToList || dryRunCost === null}
-              onClick={async () => {
-                setIsAddingToList(true);
-                setListDialogError(null);
-                try {
-                  const selectedLeads = results.filter(r => selectedIds.includes(r.id));
-                  const result = await addLeadsToList(selectedListId, selectedLeads);
+              setSelectedIds([]);
 
-                  setShowListDialog(false);
-                  setSelectedListId("");
-                  setDryRunCost(null);
-                  setListDialogError(null);
-                  setSelectedIds([]);
+              await refreshProfile();
 
-                  await refreshProfile();
+              setErrorMessage(`${result.addedCount} lead eklendi${result.skippedCount ? `, ${result.skippedCount} zaten listede` : ''}`);
+              setTimeout(() => setErrorMessage(null), 5000);
+            } catch (error: any) {
+              console.error('[SearchPage] Add to list failed:', error);
+              if (error.status === 402) {
+                const requiredText = error.required ? ` ${error.required} kredi gerekli,` : '';
+                const availableText = error.available !== undefined ? ` ${error.available} kredi mevcut.` : '';
+                setListDialogError(t('leadLists.insufficientCredits') + requiredText + availableText);
+              } else {
+                setListDialogError(t('leadLists.addFailed'));
+              }
+            } finally {
+              setIsAddingToList(false);
+            }
+          }}
+        >
+          {isAddingToList ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" />
+              {t('leadLists.adding')}
+            </>
+          ) : (
+            <>
+              <Plus className="w-4 h-4" />
+              {t('leadLists.addButtonWithCost', { cost: dryRunCost ?? '?' })}
+            </>
+          )}
+        </Button>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>
 
-                  setErrorMessage(`${result.addedCount} lead eklendi${result.skippedCount ? `, ${result.skippedCount} zaten listede` : ''}`);
-                  setTimeout(() => setErrorMessage(null), 5000);
-                } catch (error: any) {
-                  console.error('[SearchPage] Add to list failed:', error);
-                  if (error.status === 402) {
-                    const requiredText = error.required ? ` ${error.required} kredi gerekli,` : '';
-                    const availableText = error.available !== undefined ? ` ${error.available} kredi mevcut.` : '';
-                    setListDialogError(t('leadLists.insufficientCredits') + requiredText + availableText);
-                  } else {
-                    setListDialogError(t('leadLists.addFailed'));
-                  }
-                } finally {
-                  setIsAddingToList(false);
-                }
-              }}
-            >
-              {isAddingToList ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  {t('leadLists.adding')}
-                </>
-              ) : (
-                <>
-                  <Plus className="w-4 h-4" />
-                  {t('leadLists.addButtonWithCost', { cost: dryRunCost ?? '?' })}
-                </>
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
-      {/* Save Preset Dialog */}
-      <Dialog open={showSavePresetDialog} onOpenChange={setShowSavePresetDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{t('searchPage.savePreset')}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label>{t('searchPage.presetNameLabel')}</Label>
-              <Input
-                value={presetName}
-                onChange={(e) => setPresetName(e.target.value)}
-                placeholder={t('searchPage.presetNamePlaceholder')}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    handleConfirmSavePreset();
-                  }
-                }}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowSavePresetDialog(false)}>
-              {t('searchPage.cancel')}
-            </Button>
-            <Button onClick={handleConfirmSavePreset} disabled={!presetName.trim()}>
-              {t('searchPage.save')}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Manage Presets Dialog */}
-      <Dialog open={showManagePresetsDialog} onOpenChange={setShowManagePresetsDialog}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>{t('searchPage.managePresets')}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-2 py-4 max-h-96 overflow-y-auto">
-            {presets.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-8">
-                {t('searchPage.presetsPlaceholder')}
-              </p>
-            ) : (
-              presets.map((preset) => (
-                <div
-                  key={preset.id}
-                  className="flex items-center gap-2 p-3 border rounded-lg hover:bg-muted/50"
-                >
-                  {editingPresetId === preset.id ? (
-                    <>
-                      <Input
-                        value={editingPresetName}
-                        onChange={(e) => setEditingPresetName(e.target.value)}
-                        className="flex-1"
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            handleConfirmRename();
-                          } else if (e.key === 'Escape') {
-                            setEditingPresetId(null);
-                            setEditingPresetName("");
-                          }
-                        }}
-                        autoFocus
-                      />
-                      <Button
-                        size="sm"
-                        onClick={handleConfirmRename}
-                        disabled={!editingPresetName.trim()}
-                      >
-                        {t('searchPage.save')}
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => {
-                          setEditingPresetId(null);
-                          setEditingPresetName("");
-                        }}
-                      >
-                        {t('searchPage.cancel')}
-                      </Button>
-                    </>
-                  ) : (
-                    <>
-                      <div className="flex-1">
-                        <p className="font-medium">{preset.name}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {new Date(preset.createdAt).toLocaleDateString()}
-                        </p>
-                      </div>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleRenamePreset(preset.id)}
-                      >
-                        {t('searchPage.rename')}
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="destructive"
-                        onClick={() => handleDeletePreset(preset.id)}
-                      >
-                        {t('searchPage.delete')}
-                      </Button>
-                    </>
-                  )}
-                </div>
-              ))
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Enrichment Result Report Modal */}
-      {enrichmentResult && (
-        <EnrichmentResultReport
-          open={enrichmentModalOpen}
-          onOpenChange={setEnrichmentModalOpen}
-          businessName={enrichmentBusinessName}
-          result={enrichmentResult}
-        />
-      )}
-
-      {/* Export Template Dialog */}
-      <ExportTemplateDialog
-        open={showExportTemplateDialog}
-        onOpenChange={setShowExportTemplateDialog}
-        selectedCount={selectedIds.length}
-        onConfirm={handleExportConfirm}
+  {/* Enrichment Result Report Modal */ }
+  {
+    enrichmentResult && (
+      <EnrichmentResultReport
+        open={enrichmentModalOpen}
+        onOpenChange={setEnrichmentModalOpen}
+        businessName={enrichmentBusinessName}
+        result={enrichmentResult}
       />
+    )
+  }
 
-      {/* Onboarding Tour */}
-      {showOnboarding && profile && !profile.onboarding_completed && (
-        <OnboardingTour onComplete={handleOnboardingComplete} />
-      )}
-    </div>
+  {/* Export Template Dialog */ }
+  <ExportTemplateDialog
+    open={showExportTemplateDialog}
+    onOpenChange={setShowExportTemplateDialog}
+    selectedCount={selectedIds.length}
+    onConfirm={handleExportConfirm}
+  />
+
+  {/* Onboarding Tour */ }
+  {
+    showOnboarding && profile && !profile.onboarding_completed && (
+      <OnboardingTour onComplete={handleOnboardingComplete} />
+    )
+  }
+    </div >
   );
 }

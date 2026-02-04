@@ -16,9 +16,17 @@ import {
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQuery } from "@tanstack/react-query";
 import { getProfile, getCredits } from "@/lib/api";
+import { QUERY_KEYS } from "@/lib/queryKeys";
 import { useTranslation } from "react-i18next";
 
 const sidebarItems = [
@@ -46,7 +54,7 @@ export default function AppLayout() {
   });
 
   const { data: creditsData } = useQuery({
-    queryKey: ["credits"],
+    queryKey: QUERY_KEYS.credits,
     queryFn: getCredits,
     enabled: !!user,
     refetchInterval: 30000, // Auto-refresh every 30 seconds
@@ -161,7 +169,7 @@ export default function AppLayout() {
 
           <div className="ml-auto flex items-center gap-4">
             {/* Credit display */}
-            <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-muted rounded-lg">
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-muted rounded-lg">
               <span className="text-sm font-medium">{t("common.creditsRemaining")}:</span>
               <span className="text-sm font-bold text-primary">{credits.toLocaleString()}</span>
               <Button
@@ -173,6 +181,17 @@ export default function AppLayout() {
                 {t("layout.buyCredits")}
               </Button>
             </div>
+            {/* Language selector */}
+            <Select value={i18n.language} onValueChange={(value) => i18n.changeLanguage(value)}>
+              <SelectTrigger className="w-20 h-9 bg-muted">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="tr">TR</SelectItem>
+                <SelectItem value="en">EN</SelectItem>
+              </SelectContent>
+            </Select>
+
             {/* User menu */}
             <div className="relative">
               <button
@@ -201,16 +220,14 @@ export default function AppLayout() {
                       <User className="w-4 h-4" />
                       {t("layout.profile")}
                     </NavLink>
-                    <button
-                      onClick={() => {
-                        toggleLanguage();
-                        setUserMenuOpen(false);
-                      }}
-                      className="flex items-center gap-2 px-3 py-2 text-sm rounded-md hover:bg-muted w-full text-left"
+                    <NavLink
+                      to="/app/settings"
+                      onClick={() => setUserMenuOpen(false)}
+                      className="flex items-center gap-2 px-3 py-2 text-sm rounded-md hover:bg-muted"
                     >
-                      <Globe className="w-4 h-4" />
-                      {i18n.language === "tr" ? "English" : "Türkçe"}
-                    </button>
+                      <Settings className="w-4 h-4" />
+                      {t("layout.settings")}
+                    </NavLink>
                     <hr className="my-2" />
                     <button
                       onClick={async () => {
