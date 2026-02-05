@@ -670,9 +670,9 @@ export default function SearchPage() {
                     </td>
                     <td className="p-4">
                       {item.id % 2 === 0 ? (
-                        <span className="text-sm text-foreground">Var</span>
+                        <span className="text-sm text-foreground">{t('common.yes')}</span>
                       ) : (
-                        <span className="text-sm text-muted-foreground">Yok</span>
+                        <span className="text-sm text-muted-foreground">{t('common.no')}</span>
                       )}
                     </td>
                     <td className="p-4">
