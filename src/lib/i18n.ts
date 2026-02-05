@@ -623,6 +623,10 @@ const resources = {
             common: {
                 yes: 'Var',
                 no: 'Yok',
+                loading: 'Yükleniyor...',
+                creditsRemaining: 'Kalan Kredi',
+                confirm: 'Onayla',
+                cancel: 'İptal',
             },
 
             // List Metadata (Notes & Tags)
@@ -1260,6 +1264,10 @@ const resources = {
             common: {
                 yes: 'Available',
                 no: 'Not Available',
+                loading: 'Loading...',
+                creditsRemaining: 'Credits Remaining',
+                confirm: 'Confirm',
+                cancel: 'Cancel',
             },
 
             // List Metadata (Notes & Tags)
