@@ -617,6 +617,10 @@ const resources = {
                 },
                 download: 'İndir',
                 cancel: 'İptal',
+            },
+
+            // Common
+            common: {
                 yes: 'Var',
                 no: 'Yok',
             },
@@ -1250,6 +1254,10 @@ const resources = {
                 },
                 download: 'Download',
                 cancel: 'Cancel',
+            },
+
+            // Common
+            common: {
                 yes: 'Available',
                 no: 'Not Available',
             },
