@@ -680,9 +680,9 @@ export default function SearchPage() {
                         const socials = getMockSocials(item);
                         const hasSocials = Object.keys(socials).length > 0;
                         return hasSocials ? (
-                          <span className="text-sm text-foreground">Var</span>
+                          <span className="text-sm text-foreground">{t('common.yes')}</span>
                         ) : (
-                          <span className="text-sm text-muted-foreground">Yok</span>
+                          <span className="text-sm text-muted-foreground">{t('common.no')}</span>
                         );
                       })()}
                     </td>
