@@ -60,7 +60,7 @@ function mapPlace(place) {
     const isOpen = place.regularOpeningHours?.openNow ?? false;
 
     return {
-        id: place.id,               // stable place_id equivalent
+        id: place.id || '', // String type to match Google Places ID, frontend handles string/number
         name: place.displayName?.text || place.name || '',
         category: place.primaryTypeDisplayName?.text || place.types?.[0] || '',
         district,
@@ -92,6 +92,61 @@ async function collectPlaceIds(apiKey, query, maxResults = 60) {
             maxResultCount: PAGE_SIZE,
         };
         if (pageToken) body.pageToken = pageToken;
+
+        // Apply minRating directly in the Text Search request to reduce detailed fetches
+        // minRating parameter matches Google Places API 'minRating' field range [0.0, 5.0]
+        if (minRating && minRating > 0) {
+            body.minRating = parseFloat(minRating);
+        }
+
+        const resp = await fetch(`${PLACES_BASE}/places:searchText`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Goog-Api-Key': apiKey,
+                'X-Goog-FieldMask': 'places.id,nextPageToken',
+            },
+            body: JSON.stringify(body),
+        });
+
+        if (!resp.ok) {
+            const errText = await resp.text();
+            console.error('[Places] Text Search error:', resp.status, errText);
+            break;
+        }
+
+        const data = await resp.json();
+        const ids = (data.places || []).map(p => p.id).filter(Boolean);
+        placeIds.push(...ids);
+        pageToken = data.nextPageToken || null;
+
+        if (!pageToken || placeIds.length >= maxResults) break;
+    }
+
+    return { placeIds, total: placeIds.length };
+}
+
+/**
+ * Perform Places Text Search (New) with rating filter.
+ * Kept signature compatible. collectPlaceIds handles maxResults.
+ */
+async function collectPlaceIdsFiltered(apiKey, query, minRating, maxResults = 60) {
+    const placeIds = [];
+    let pageToken = undefined;
+    const maxPages = Math.ceil(Math.min(maxResults, 60) / PAGE_SIZE);
+
+    for (let i = 0; i < maxPages; i++) {
+        const body = {
+            textQuery: query,
+            languageCode: 'tr',
+            regionCode: 'TR',
+            maxResultCount: PAGE_SIZE,
+        };
+        if (pageToken) body.pageToken = pageToken;
+        // Text Search (New) supports minRating natively
+        if (minRating && minRating > 0) {
+            body.minRating = parseFloat(minRating);
+        }
 
         const resp = await fetch(`${PLACES_BASE}/places:searchText`, {
             method: 'POST',
@@ -228,9 +283,9 @@ router.post('/', requireAuth, async (req, res) => {
 
         console.log('[Search] New search request:', { province, district, category, keyword, userId });
 
-        // 2. Text Search → collect place_ids (up to 60)
+        // 2. Text Search → collect place_ids (up to 60), pass minRating to API
         const query = buildSearchQuery(province, district, category, keyword);
-        const { placeIds, total } = await collectPlaceIds(apiKey, query);
+        const { placeIds, total } = await collectPlaceIdsFiltered(apiKey, query, minRating);
 
         console.log('[Search] Places found:', total, 'query:', query);
 
@@ -238,13 +293,12 @@ router.post('/', requireAuth, async (req, res) => {
         const page1Ids = placeIds.slice(0, PAGE_SIZE);
         let page1Results = page1Ids.length > 0 ? await fetchPlaceDetails(apiKey, page1Ids) : [];
 
-        // 4. Apply filters
+        // 4. Apply filters (minReviews only, minRating already handled by collectPlaceIdsFiltered)
         let filteredIds = placeIds;
-        if (minRating || minReviews) {
-            // We need all details to filter globally; fetch all and rebuild id list
+        if (minReviews) {
+            // We need all details to filter globally by reviews; fetch all and rebuild id list
             const allDetails = await fetchPlaceDetails(apiKey, placeIds);
             const filtered = allDetails.filter(r => {
-                if (minRating && r.rating < minRating) return false;
                 if (minReviews && r.reviews < minReviews) return false;
                 return true;
             });
@@ -269,49 +323,22 @@ router.post('/', requireAuth, async (req, res) => {
                 min_reviews: minReviews || null,
                 total_results: totalResults,
                 viewed_pages: [1],
-                place_ids: filteredIds,   // stored for pagination
+                place_ids: filteredIds,
             })
             .select()
             .single());
 
-        // Fallback: place_ids column may not exist yet
-        if (sessionError && (sessionError.message?.includes('place_ids') || sessionError.message?.includes('schema cache'))) {
-            console.warn('[Search] place_ids column missing, retrying without it');
-            ({ data: session, error: sessionError } = await supabaseAdmin
-                .from('search_sessions')
-                .insert({
-                    user_id: userId,
-                    province,
-                    district,
-                    category,
-                    keyword: keyword || null,
-                    min_rating: minRating || null,
-                    min_reviews: minReviews || null,
-                    total_results: totalResults,
-                    viewed_pages: [1],
-                })
-                .select()
-                .single());
+        // Do not silently fallback and insert a broken session if place_ids column is missing.
+        // Pagination and credits depend entirely on place_ids. If it fails, report it loudly.
+        if (sessionError && sessionError.message?.includes('place_ids')) {
+            console.error('[Search] FATAL: search_sessions.place_ids column is missing. Run migration.');
+            return res.status(500).json({
+                error: 'Database schema incomplete',
+                message: 'Admin sayfasına gidip search_sessions tablosuna place_ids TEXT[] eklemelisiniz.',
+                details: sessionError.message
+            });
         }
 
-        // Fallback: keyword column may not exist
-        if (sessionError && (sessionError.message?.includes('keyword') || sessionError.message?.includes('schema cache'))) {
-            console.warn('[Search] keyword column missing, retrying without it');
-            ({ data: session, error: sessionError } = await supabaseAdmin
-                .from('search_sessions')
-                .insert({
-                    user_id: userId,
-                    province,
-                    district,
-                    category,
-                    min_rating: minRating || null,
-                    min_reviews: minReviews || null,
-                    total_results: totalResults,
-                    viewed_pages: [1],
-                })
-                .select()
-                .single());
-        }
 
         if (sessionError) {
             console.error('[Search] Failed to create session:', sessionError);
