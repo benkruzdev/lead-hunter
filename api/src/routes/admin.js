@@ -45,7 +45,8 @@ router.patch('/config', requireAuth, requireAdmin, async (req, res) => {
             recaptcha_secret_key,
             google_oauth_enabled,
             google_client_id,
-            google_client_secret
+            google_client_secret,
+            google_maps_api_key
         } = req.body;
 
         const updates = { updated_at: new Date().toISOString() };
@@ -56,6 +57,7 @@ router.patch('/config', requireAuth, requireAdmin, async (req, res) => {
         if (google_oauth_enabled !== undefined) updates.google_oauth_enabled = google_oauth_enabled;
         if (google_client_id !== undefined) updates.google_client_id = google_client_id;
         if (google_client_secret !== undefined) updates.google_client_secret = google_client_secret;
+        if (google_maps_api_key !== undefined) updates.google_maps_api_key = google_maps_api_key;
 
         const { data, error } = await supabaseAdmin
             .from('system_settings')

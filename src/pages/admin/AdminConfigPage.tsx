@@ -36,7 +36,8 @@ export default function AdminConfigPage() {
         recaptcha_secret_key: '',
         google_oauth_enabled: false,
         google_client_id: '',
-        google_client_secret: ''
+        google_client_secret: '',
+        google_maps_api_key: ''
     });
 
     useEffect(() => {
@@ -47,7 +48,8 @@ export default function AdminConfigPage() {
                 recaptcha_secret_key: data.config.recaptcha_secret_key || '',
                 google_oauth_enabled: data.config.google_oauth_enabled,
                 google_client_id: data.config.google_client_id || '',
-                google_client_secret: data.config.google_client_secret || ''
+                google_client_secret: data.config.google_client_secret || '',
+                google_maps_api_key: data.config.google_maps_api_key || ''
             });
         }
     }, [data]);
@@ -154,6 +156,26 @@ export default function AdminConfigPage() {
                                 value={formData.google_client_secret}
                                 onChange={(e) => setFormData(prev => ({ ...prev, google_client_secret: e.target.value }))}
                                 placeholder="GOCSPX-..."
+                            />
+                        </div>
+                    </CardContent>
+                </Card>
+
+                {/* Google Maps API Settings */}
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Google Maps API</CardTitle>
+                        <CardDescription>API key used for place search and data enrichment</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="google-maps-api-key">API Key</Label>
+                            <Input
+                                id="google-maps-api-key"
+                                type="password"
+                                value={formData.google_maps_api_key}
+                                onChange={(e) => setFormData(prev => ({ ...prev, google_maps_api_key: e.target.value }))}
+                                placeholder="AIza..."
                             />
                         </div>
                     </CardContent>

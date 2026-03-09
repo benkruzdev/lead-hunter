@@ -225,6 +225,7 @@ export async function getAdminConfig() {
             google_oauth_enabled: boolean;
             google_client_id: string | null;
             google_client_secret: string | null;
+            google_maps_api_key: string | null;
             updated_at: string;
         };
     }>(`/api/${ADMIN_SECRET}/admin/config`);
@@ -241,6 +242,7 @@ export async function updateAdminConfig(data: {
     google_oauth_enabled?: boolean;
     google_client_id?: string;
     google_client_secret?: string;
+    google_maps_api_key?: string;
 }) {
     if (!ADMIN_SECRET) {
         throw new Error('VITE_ADMIN_ROUTE_SECRET is not configured. Admin panel cannot function.');
