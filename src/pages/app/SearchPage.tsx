@@ -187,7 +187,7 @@ export default function SearchPage() {
       if (error.status === 410) {
         navigate('/app/history', { replace: true });
       } else {
-        setErrorMessage('Arama oturumu yÃ¼klenemedi.');
+        setErrorMessage('Arama oturumu yüklenemedi.');
       }
     }
   };
@@ -227,7 +227,7 @@ export default function SearchPage() {
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.credits });
     } catch (error) {
       console.error('[SearchPage] Search failed:', error);
-      setErrorMessage('Arama baÅŸarÄ±sÄ±z oldu. LÃ¼tfen tekrar deneyin.');
+      setErrorMessage('Arama baYarısız oldu. Lütfen tekrar deneyin.');
       setIsSearching(false);
     }
   };
@@ -302,9 +302,9 @@ export default function SearchPage() {
 
       // Handle 402 Insufficient Credits
       if (error.message?.includes('Yeterli krediniz yok') || error.message?.includes('Insufficient')) {
-        setErrorMessage('Yeterli krediniz yok. LÃ¼tfen kredi satÄ±n alÄ±n.');
+        setErrorMessage('Yeterli krediniz yok. Lütfen kredi satın alın.');
       } else {
-        setErrorMessage('Sayfa yÃ¼klenemedi. LÃ¼tfen tekrar deneyin.');
+        setErrorMessage('Sayfa yüklenemedi. Lütfen tekrar deneyin.');
       }
 
       if (!skipModal) {
@@ -350,7 +350,7 @@ export default function SearchPage() {
       {/* Filter Panel */}
       <div className="bg-card rounded-xl border shadow-soft p-6">
         <div className="grid sm:grid-cols-2 lg:grid-cols-6 gap-4">
-          {/* Åehir */}
+          {/* Şehir */}
           <div className="space-y-2">
             <Label className="flex items-center gap-2">
               <MapPin className="w-4 h-4 text-muted-foreground" />
@@ -370,7 +370,7 @@ export default function SearchPage() {
             </Select>
           </div>
 
-          {/* Ä°lÃ§e */}
+          {/* İlçe */}
           <div className="space-y-2">
             <Label className="flex items-center gap-2">
               <MapPin className="w-4 h-4 text-muted-foreground" />
@@ -626,10 +626,10 @@ export default function SearchPage() {
                       </Badge>
                     </td>
                     <td className="p-4">
-                      <span className="text-sm text-muted-foreground">—</span>
+                      <span className="text-sm text-muted-foreground">-</span>
                     </td>
                     <td className="p-4">
-                      <span className="text-sm text-muted-foreground">—</span>
+                      <span className="text-sm text-muted-foreground">-</span>
                     </td>
                     <td className="p-4">
                       <div className="flex items-center gap-2">
@@ -691,10 +691,9 @@ export default function SearchPage() {
           <div className="w-16 h-16 mx-auto mb-4 bg-muted rounded-full flex items-center justify-center">
             <Search className="w-8 h-8 text-muted-foreground" />
           </div>
-          <h3 className="text-lg font-semibold mb-2">Ä°ÅŸletme Aramaya BaÅŸlayÄ±n</h3>
+          <h3 className="text-lg font-semibold mb-2">{t('searchPage.emptyTitle')}</h3>
           <p className="text-muted-foreground max-w-md mx-auto">
-            Åehir ve kategori seÃ§erek TÃ¼rkiye genelindeki iÅŸletmeleri arayÄ±n.
-            SonuÃ§lardan lead listenizi oluÅŸturun.
+            {t('searchPage.emptyDescription')}
           </p>
         </div>
       )
@@ -735,7 +734,7 @@ export default function SearchPage() {
                   <div className="flex items-start gap-3">
                     <MapPin className="w-5 h-5 text-muted-foreground mt-0.5" />
                     <div>
-                      <p className="font-medium">Adres</p>
+                      <p className="font-medium">{t('searchPage.detailAddress')}</p>
                       <p className="text-muted-foreground">{detailItem.address}</p>
                     </div>
                   </div>
@@ -743,7 +742,7 @@ export default function SearchPage() {
                   <div className="flex items-start gap-3">
                     <Phone className="w-5 h-5 text-muted-foreground mt-0.5" />
                     <div>
-                      <p className="font-medium">Telefon</p>
+                      <p className="font-medium">{t('searchPage.detailPhone')}</p>
                       <p className="text-muted-foreground">{detailItem.phone}</p>
                     </div>
                   </div>
@@ -751,7 +750,7 @@ export default function SearchPage() {
                   <div className="flex items-start gap-3">
                     <Globe className="w-5 h-5 text-muted-foreground mt-0.5" />
                     <div>
-                      <p className="font-medium">Website</p>
+                      <p className="font-medium">{t('searchPage.detailWebsite')}</p>
                       <p className="text-primary">{detailItem.website}</p>
                     </div>
                   </div>
@@ -759,7 +758,7 @@ export default function SearchPage() {
                   <div className="flex items-start gap-3">
                     <Clock className="w-5 h-5 text-muted-foreground mt-0.5" />
                     <div>
-                      <p className="font-medium">Ã‡alÄ±ÅŸma Saatleri</p>
+                      <p className="font-medium">{t('searchPage.detailHours')}</p>
                       <p className="text-muted-foreground">{detailItem.hours}</p>
                     </div>
                   </div>
@@ -768,7 +767,7 @@ export default function SearchPage() {
                     <Mail className="w-5 h-5 text-muted-foreground mt-0.5" />
                     <div>
                       <p className="font-medium">{t('searchPage.email')}</p>
-                      <p className="text-muted-foreground">—</p>
+                      <p className="text-muted-foreground">-</p>
                     </div>
                   </div>
 
@@ -776,7 +775,7 @@ export default function SearchPage() {
                     <Share2 className="w-5 h-5 text-muted-foreground mt-0.5" />
                     <div>
                       <p className="font-medium">{t('searchPage.socialProfiles')}</p>
-                      <p className="text-muted-foreground">—</p>
+                      <p className="text-muted-foreground">-</p>
                     </div>
                   </div>
                 </div>
@@ -803,11 +802,11 @@ export default function SearchPage() {
       <Dialog open={showPaginationModal} onOpenChange={setShowPaginationModal}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Sayfa DeÄŸiÅŸtir</DialogTitle>
+            <DialogTitle>{t('searchPage.pageChangeTitle')}</DialogTitle>
             <DialogDescription>
-              Sayfa {pendingPage} gÃ¶rÃ¼ntÃ¼lemek iÃ§in 10 kredi harcanacak.
+              {t('searchPage.pageChangeDesc', { page: pendingPage })}
               <br />
-              Kalan krediniz: {profile?.credits || 0}
+              {t('searchPage.pageChangeCreditInfo', { credits: profile?.credits || 0 })}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="flex gap-2">
@@ -818,10 +817,10 @@ export default function SearchPage() {
                 setPendingPage(null);
               }}
             >
-              Ä°ptal
+              {t('common.cancel')}
             </Button>
             <Button onClick={() => confirmPageChange()}>
-              Onayla (10 kredi)
+              {t('searchPage.confirmPageBtn')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -909,7 +908,11 @@ export default function SearchPage() {
 
                   await refreshProfile();
 
-                  setErrorMessage(`${result.addedCount} lead eklendi${result.skippedCount ? `, ${result.skippedCount} zaten listede` : ''}`);
+                  setErrorMessage(
+                    result.skippedCount
+                      ? t('leadLists.addSuccessWithSkipped', { added: result.addedCount, skipped: result.skippedCount })
+                      : t('leadLists.addSuccess', { count: result.addedCount })
+                  );
                   setTimeout(() => setErrorMessage(null), 5000);
                 } catch (error: any) {
                   console.error('[SearchPage] Add to list failed:', error);

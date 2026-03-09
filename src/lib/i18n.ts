@@ -563,6 +563,16 @@ const resources = {
                     freshnessUnknown: 'Bilinmiyor',
                     freshnessTooltip: 'Veri tazeliği backend ile ölçülecek.',
                 },
+                emptyTitle: 'İşletme Aramaya Başlayın',
+                emptyDescription: 'Şehir ve kategori seçerek Türkiye genelindeki işletmeleri arayın. Sonuçlardan lead listenizi oluşturun.',
+                detailAddress: 'Adres',
+                detailPhone: 'Telefon',
+                detailWebsite: 'Website',
+                detailHours: 'Çalışma Saatleri',
+                pageChangeTitle: 'Sayfa Değiştir',
+                pageChangeDesc: 'Sayfa {{page}} görüntülemek için 10 kredi harcanacak.',
+                pageChangeCreditInfo: 'Kalan krediniz: {{credits}}',
+                confirmPageBtn: 'Onayla (10 kredi)',
             },
             leadQuality: {
                 new: {
@@ -1204,6 +1214,16 @@ const resources = {
                     freshnessUnknown: 'Unknown',
                     freshnessTooltip: 'Data freshness will be measured with backend.',
                 },
+                emptyTitle: 'Start Searching Businesses',
+                emptyDescription: 'Select a city and category to search businesses across Turkey. Build your lead list from the results.',
+                detailAddress: 'Address',
+                detailPhone: 'Phone',
+                detailWebsite: 'Website',
+                detailHours: 'Working Hours',
+                pageChangeTitle: 'Change Page',
+                pageChangeDesc: 'Viewing page {{page}} will cost 10 credits.',
+                pageChangeCreditInfo: 'Your credits: {{credits}}',
+                confirmPageBtn: 'Confirm (10 credits)',
             },
             leadQuality: {
                 new: {
