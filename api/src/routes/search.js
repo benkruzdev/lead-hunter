@@ -1,27 +1,172 @@
 import express from 'express';
 import { requireAuth } from '../middleware/auth.js';
 import { supabaseAdmin } from '../config/supabase.js';
-import { calculateLeadScore } from '../utils/leadScore.js';
 
 const router = express.Router();
+
+const PAGE_SIZE = 20;
+const PLACES_BASE = 'https://places.googleapis.com/v1';
+
+// ─── Helpers ────────────────────────────────────────────────────────────────
+
+/**
+ * Fetch google_maps_api_key from system_settings table.
+ * Returns null if not configured.
+ */
+async function getGoogleMapsApiKey() {
+    const { data, error } = await supabaseAdmin
+        .from('system_settings')
+        .select('google_maps_api_key')
+        .eq('id', 1)
+        .single();
+
+    if (error || !data?.google_maps_api_key) return null;
+    return data.google_maps_api_key;
+}
+
+/**
+ * Build a localized Turkish query string for Places Text Search.
+ * e.g. "İstanbul Kadıköy restoran pasta"
+ */
+function buildSearchQuery(province, district, category, keyword) {
+    const parts = [province];
+    if (district) parts.push(district);
+    parts.push(category);
+    if (keyword) parts.push(keyword);
+    return parts.join(' ');
+}
+
+/**
+ * Map a single Places API (New) place object to our frontend SearchResult shape.
+ */
+function mapPlace(place) {
+    // Extract district from addressComponents (sublocality > admin_level_3 > fallback)
+    let district = null;
+    if (Array.isArray(place.addressComponents)) {
+        const sub = place.addressComponents.find(c =>
+            c.types?.includes('sublocality_level_1') || c.types?.includes('sublocality')
+        );
+        const admin3 = place.addressComponents.find(c =>
+            c.types?.includes('administrative_area_level_3')
+        );
+        district = sub?.longText || admin3?.longText || null;
+    }
+
+    // Phone: internationalPhoneNumber preferred
+    const phone = place.internationalPhoneNumber || place.nationalPhoneNumber || null;
+
+    // Opening hours: first weekday description (Mon) or null
+    const hours = place.regularOpeningHours?.weekdayDescriptions?.[0] || null;
+    const isOpen = place.regularOpeningHours?.openNow ?? false;
+
+    return {
+        id: place.id,               // stable place_id equivalent
+        name: place.displayName?.text || place.name || '',
+        category: place.primaryTypeDisplayName?.text || place.types?.[0] || '',
+        district,
+        rating: place.rating || 0,
+        reviews: place.userRatingCount || 0,
+        isOpen,
+        phone,
+        website: place.websiteUri || null,
+        address: place.formattedAddress || null,
+        hours,
+    };
+}
+
+/**
+ * Perform Places Text Search (New) and collect up to maxResults place_ids.
+ * Returns { placeIds: string[], total: number }
+ * maxResults capped at 60 (Places API Text Search limit: 3 pages × 20).
+ */
+async function collectPlaceIds(apiKey, query, maxResults = 60) {
+    const placeIds = [];
+    let pageToken = undefined;
+    const maxPages = Math.ceil(Math.min(maxResults, 60) / PAGE_SIZE);
+
+    for (let i = 0; i < maxPages; i++) {
+        const body = {
+            textQuery: query,
+            languageCode: 'tr',
+            regionCode: 'TR',
+            maxResultCount: PAGE_SIZE,
+        };
+        if (pageToken) body.pageToken = pageToken;
+
+        const resp = await fetch(`${PLACES_BASE}/places:searchText`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Goog-Api-Key': apiKey,
+                'X-Goog-FieldMask': 'places.id,nextPageToken',
+            },
+            body: JSON.stringify(body),
+        });
+
+        if (!resp.ok) {
+            const errText = await resp.text();
+            console.error('[Places] Text Search error:', resp.status, errText);
+            break;
+        }
+
+        const data = await resp.json();
+        const ids = (data.places || []).map(p => p.id).filter(Boolean);
+        placeIds.push(...ids);
+        pageToken = data.nextPageToken || null;
+
+        if (!pageToken || placeIds.length >= maxResults) break;
+    }
+
+    return { placeIds, total: placeIds.length };
+}
+
+/**
+ * Fetch full details for an array of place_ids.
+ * Returns array of mapped SearchResult objects.
+ */
+async function fetchPlaceDetails(apiKey, placeIds) {
+    const fieldMask = [
+        'id',
+        'displayName',
+        'formattedAddress',
+        'addressComponents',
+        'internationalPhoneNumber',
+        'nationalPhoneNumber',
+        'websiteUri',
+        'rating',
+        'userRatingCount',
+        'regularOpeningHours',
+        'primaryTypeDisplayName',
+        'types',
+    ].join(',');
+
+    const results = await Promise.all(
+        placeIds.map(async (id) => {
+            try {
+                const resp = await fetch(`${PLACES_BASE}/places/${id}`, {
+                    headers: {
+                        'X-Goog-Api-Key': apiKey,
+                        'X-Goog-FieldMask': fieldMask,
+                    },
+                });
+                if (!resp.ok) return null;
+                const place = await resp.json();
+                return mapPlace(place);
+            } catch (e) {
+                console.error('[Places] Detail fetch error for', id, e.message);
+                return null;
+            }
+        })
+    );
+
+    return results.filter(Boolean);
+}
+
+// ─── POST /api/search ────────────────────────────────────────────────────────
 
 /**
  * POST /api/search
  * Perform search (0 credits - initial search is free per PRODUCT_SPEC)
- * 
- * Request body:
- * - province: string
- * - district: string (optional)
- * - category: string
- * - keyword: string (optional)
- * - minRating: number (optional)
- * - minReviews: number (optional)
- * 
- * Response:
- * - sessionId: UUID
- * - results: array (page 1, 20 items)
- * - totalResults: number
- * - currentPage: 1
  */
 router.post('/', requireAuth, async (req, res) => {
     try {
@@ -45,28 +190,73 @@ router.post('/', requireAuth, async (req, res) => {
                 return res.status(410).json({ error: 'Session expired' });
             }
 
-            // Return page 1 (always free for existing session)
-            // TODO: fetch real results from data source using session filters
+            // Return page 1 from stored place_ids (free)
+            const apiKey = await getGoogleMapsApiKey();
+            const allIds = Array.isArray(existingSession.place_ids) ? existingSession.place_ids : [];
+            const pageIds = allIds.slice(0, PAGE_SIZE);
+
+            let results = [];
+            if (apiKey && pageIds.length > 0) {
+                results = await fetchPlaceDetails(apiKey, pageIds);
+            }
+
+            // Apply client-side filters if needed
+            if (minRating) results = results.filter(r => r.rating >= minRating);
+            if (minReviews) results = results.filter(r => r.reviews >= minReviews);
+
             return res.json({
                 sessionId: existingSession.id,
-                results: [],
-                totalResults: 0,
-                currentPage: 1
+                results,
+                totalResults: existingSession.total_results,
+                currentPage: 1,
             });
         }
 
-        // PRODUCT_SPEC 5.3: Create new session
+        // PRODUCT_SPEC 5.3: New search
         if (!province || !category) {
             return res.status(400).json({ error: 'Province and category are required' });
         }
 
-        console.log('[Search] New search request:', { province, district, category, userId });
+        // 1. Get API key
+        const apiKey = await getGoogleMapsApiKey();
+        if (!apiKey) {
+            return res.status(503).json({
+                error: 'Google Maps API not configured',
+                message: 'Admin panelinden Google Maps API key ayarlayın.',
+            });
+        }
 
-        // TODO: Actual search logic with Google Maps API
-        // Create search session
+        console.log('[Search] New search request:', { province, district, category, keyword, userId });
+
+        // 2. Text Search → collect place_ids (up to 60)
+        const query = buildSearchQuery(province, district, category, keyword);
+        const { placeIds, total } = await collectPlaceIds(apiKey, query);
+
+        console.log('[Search] Places found:', total, 'query:', query);
+
+        // 3. Fetch details for page 1 (first PAGE_SIZE ids)
+        const page1Ids = placeIds.slice(0, PAGE_SIZE);
+        let page1Results = page1Ids.length > 0 ? await fetchPlaceDetails(apiKey, page1Ids) : [];
+
+        // 4. Apply filters
+        let filteredIds = placeIds;
+        if (minRating || minReviews) {
+            // We need all details to filter globally; fetch all and rebuild id list
+            const allDetails = await fetchPlaceDetails(apiKey, placeIds);
+            const filtered = allDetails.filter(r => {
+                if (minRating && r.rating < minRating) return false;
+                if (minReviews && r.reviews < minReviews) return false;
+                return true;
+            });
+            filteredIds = filtered.map(r => r.id);
+            page1Results = filtered.slice(0, PAGE_SIZE);
+        }
+
+        const totalResults = filteredIds.length;
+
+        // 5. Create session, store place_ids for pagination
         let session, sessionError;
 
-        // Try insert with keyword first (Section 5.4)
         ({ data: session, error: sessionError } = await supabaseAdmin
             .from('search_sessions')
             .insert({
@@ -77,15 +267,36 @@ router.post('/', requireAuth, async (req, res) => {
                 keyword: keyword || null,
                 min_rating: minRating || null,
                 min_reviews: minReviews || null,
-                total_results: 0,
-                viewed_pages: [1] // Page 1 is always free
+                total_results: totalResults,
+                viewed_pages: [1],
+                place_ids: filteredIds,   // stored for pagination
             })
             .select()
             .single());
 
-        // Fallback: if keyword column doesn't exist, retry without it
+        // Fallback: place_ids column may not exist yet
+        if (sessionError && (sessionError.message?.includes('place_ids') || sessionError.message?.includes('schema cache'))) {
+            console.warn('[Search] place_ids column missing, retrying without it');
+            ({ data: session, error: sessionError } = await supabaseAdmin
+                .from('search_sessions')
+                .insert({
+                    user_id: userId,
+                    province,
+                    district,
+                    category,
+                    keyword: keyword || null,
+                    min_rating: minRating || null,
+                    min_reviews: minReviews || null,
+                    total_results: totalResults,
+                    viewed_pages: [1],
+                })
+                .select()
+                .single());
+        }
+
+        // Fallback: keyword column may not exist
         if (sessionError && (sessionError.message?.includes('keyword') || sessionError.message?.includes('schema cache'))) {
-            console.log('[Search] Keyword column not found, retrying without keyword');
+            console.warn('[Search] keyword column missing, retrying without it');
             ({ data: session, error: sessionError } = await supabaseAdmin
                 .from('search_sessions')
                 .insert({
@@ -95,8 +306,8 @@ router.post('/', requireAuth, async (req, res) => {
                     category,
                     min_rating: minRating || null,
                     min_reviews: minReviews || null,
-                    total_results: 0,
-                    viewed_pages: [1]
+                    total_results: totalResults,
+                    viewed_pages: [1],
                 })
                 .select()
                 .single());
@@ -106,37 +317,30 @@ router.post('/', requireAuth, async (req, res) => {
             console.error('[Search] Failed to create session:', sessionError);
             return res.status(500).json({
                 error: 'Failed to create search session',
-                details: sessionError.message
+                details: sessionError.message,
             });
         }
 
-        console.log('[Search] Session created:', session.id);
+        console.log('[Search] Session created:', session.id, 'total:', totalResults);
 
-        // Return first page (no results until real API integration)
         res.json({
             sessionId: session.id,
-            results: [],
-            totalResults: 0,
-            currentPage: 1
+            results: page1Results,
+            totalResults,
+            currentPage: 1,
         });
+
     } catch (err) {
         console.error('[Search] Error:', err);
-        res.status(500).json({ error: 'Internal server error' });
+        res.status(500).json({ error: 'Internal server error', details: err.message });
     }
 });
 
+// ─── GET /api/search/:sessionId/page/:pageNumber ─────────────────────────────
+
 /**
  * GET /api/search/:sessionId/page/:pageNumber
- * Get specific page of search results
- * 
- * Cost: 
- * - 10 credits if page not viewed before
- * - 0 credits if page already viewed
- * 
- * Responses:
- * - 200: Success with results
- * - 402: Insufficient credits
- * - 404: Session not found
+ * Cost: 10 credits if page not viewed before, 0 if already viewed.
  */
 router.get('/:sessionId/page/:pageNumber', requireAuth, async (req, res) => {
     try {
@@ -144,12 +348,8 @@ router.get('/:sessionId/page/:pageNumber', requireAuth, async (req, res) => {
         const userId = req.user.id;
         const page = parseInt(pageNumber);
 
-        // PR4.1: Page number validation
         if (!Number.isInteger(page) || page < 1) {
-            return res.status(400).json({
-                error: 'Invalid page',
-                message: 'Invalid page number'
-            });
+            return res.status(400).json({ error: 'Invalid page', message: 'Invalid page number' });
         }
 
         console.log('[Search] Page request:', { sessionId, page, userId });
@@ -167,16 +367,12 @@ router.get('/:sessionId/page/:pageNumber', requireAuth, async (req, res) => {
             return res.status(404).json({ error: 'Search session not found' });
         }
 
-        // PR4.1: Upper bound validation
-        const totalPages = Math.max(1, Math.ceil(session.total_results / 20));
+        // Upper bound validation
+        const totalPages = Math.max(1, Math.ceil(session.total_results / PAGE_SIZE));
         if (page > totalPages) {
-            return res.status(404).json({
-                error: 'Page not found',
-                message: 'Requested page is out of range'
-            });
+            return res.status(404).json({ error: 'Page not found', message: 'Requested page is out of range' });
         }
 
-        // PR4.1: Null safety for viewed_pages
         const viewedPages = Array.isArray(session.viewed_pages) ? session.viewed_pages : [];
         const alreadyViewed = viewedPages.includes(page);
         const creditCost = alreadyViewed ? 0 : 10;
@@ -197,55 +393,60 @@ router.get('/:sessionId/page/:pageNumber', requireAuth, async (req, res) => {
                     error: 'Insufficient credits',
                     message: 'Yeterli krediniz yok',
                     required: creditCost,
-                    available: profile?.credits || 0
+                    available: profile?.credits || 0,
                 });
             }
 
-            // Deduct credits using RPC
-            const { data: newCredits, error: deductError } = await supabaseAdmin
-                .rpc('decrement_credits', {
-                    user_id: userId,
-                    amount: creditCost
-                });
+            // Deduct credits
+            const { error: deductError } = await supabaseAdmin
+                .rpc('decrement_credits', { user_id: userId, amount: creditCost });
 
             if (deductError) {
                 console.error('[Search] Credit deduction failed:', deductError);
                 return res.status(500).json({ error: 'Failed to deduct credits' });
             }
 
-            console.log('[Search] Credits deducted:', { amount: creditCost, newBalance: newCredits });
-
             // Mark page as viewed
             await supabaseAdmin
                 .from('search_sessions')
-                .update({
-                    viewed_pages: [...viewedPages, page]
-                })
+                .update({ viewed_pages: [...viewedPages, page] })
                 .eq('id', sessionId);
 
-            console.log('[Search] Page added to viewed:', page);
+            console.log('[Search] Credits deducted and page marked:', page);
         }
 
-        // TODO: Fetch from actual data source (Google Maps API)
+        // Fetch results for this page from stored place_ids
+        const apiKey = await getGoogleMapsApiKey();
+        const allIds = Array.isArray(session.place_ids) ? session.place_ids : [];
+        const start = (page - 1) * PAGE_SIZE;
+        const pageIds = allIds.slice(start, start + PAGE_SIZE);
+
+        let results = [];
+        if (apiKey && pageIds.length > 0) {
+            results = await fetchPlaceDetails(apiKey, pageIds);
+        } else if (!apiKey) {
+            console.warn('[Search] No API key for page fetch — returning empty results');
+        }
+
         res.json({
-            results: [],
+            results,
             currentPage: page,
-            totalResults: 0,
+            totalResults: session.total_results,
             creditCost,
-            alreadyViewed
+            alreadyViewed,
         });
+
     } catch (err) {
         console.error('[Search] Page fetch error:', err);
         res.status(500).json({ error: 'Internal server error' });
     }
 });
 
-
+// ─── GET /api/search/sessions ────────────────────────────────────────────────
 
 /**
  * GET /api/search/sessions
  * List user's search sessions (PRODUCT_SPEC 5.4 - Search History)
- * Only returns active sessions (expires_at > now())
  */
 router.get('/sessions', requireAuth, async (req, res) => {
     try {
@@ -259,40 +460,32 @@ router.get('/sessions', requireAuth, async (req, res) => {
             .order('created_at', { ascending: false });
 
         if (error) {
-            console.error('[Sessions] List error:', error);
-            console.error('[Sessions] Error details:', error.message, error.details);
-            return res.status(500).json({
-                error: 'Failed to fetch sessions',
-                details: error.message
-            });
+            console.error('[Sessions] List error:', error.message);
+            return res.status(500).json({ error: 'Failed to fetch sessions', details: error.message });
         }
 
-        // Normalize response for schema compatibility
         const normalizedSessions = sessions.map(row => ({
             id: row.id,
-            province: row.province ?? row.filters?.province ?? row.filters?.city ?? null,
-            district: row.district ?? row.filters?.district ?? row.filters?.town ?? null,
+            province: row.province ?? row.filters?.province ?? null,
+            district: row.district ?? row.filters?.district ?? null,
             category: row.category ?? row.filters?.category ?? null,
             keyword: row.keyword ?? row.filters?.keyword ?? null,
             min_rating: row.min_rating ?? row.filters?.minRating ?? null,
             min_reviews: row.min_reviews ?? row.filters?.minReviews ?? null,
-            total_results: row.total_results ?? row.filters?.totalResults ?? 0,
-            viewed_pages: Array.isArray(row.viewed_pages) ? row.viewed_pages :
-                (Array.isArray(row.filters?.viewed_pages) ? row.filters.viewed_pages : []),
+            total_results: row.total_results ?? 0,
+            viewed_pages: Array.isArray(row.viewed_pages) ? row.viewed_pages : [],
             created_at: row.created_at,
-            expires_at: row.expires_at
+            expires_at: row.expires_at,
         }));
 
         res.json({ sessions: normalizedSessions });
     } catch (err) {
-        console.error('[Sessions] Error:', err);
-        console.error('[Sessions] Error stack:', err.stack);
-        res.status(500).json({
-            error: 'Internal server error',
-            details: err.message
-        });
+        console.error('[Sessions] Error:', err.message);
+        res.status(500).json({ error: 'Internal server error', details: err.message });
     }
 });
+
+// ─── GET /api/search/sessions/:sessionId ─────────────────────────────────────
 
 /**
  * GET /api/search/sessions/:sessionId
@@ -314,7 +507,6 @@ router.get('/sessions/:sessionId', requireAuth, async (req, res) => {
             return res.status(404).json({ error: 'Session not found' });
         }
 
-        // Check if expired
         if (new Date(session.expires_at) < new Date()) {
             return res.status(410).json({ error: 'Session expired' });
         }
