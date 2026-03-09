@@ -75,58 +75,6 @@ function mapPlace(place) {
 }
 
 /**
- * Perform Places Text Search (New) and collect up to maxResults place_ids.
- * Returns { placeIds: string[], total: number }
- * maxResults capped at 60 (Places API Text Search limit: 3 pages × 20).
- */
-async function collectPlaceIds(apiKey, query, maxResults = 60) {
-    const placeIds = [];
-    let pageToken = undefined;
-    const maxPages = Math.ceil(Math.min(maxResults, 60) / PAGE_SIZE);
-
-    for (let i = 0; i < maxPages; i++) {
-        const body = {
-            textQuery: query,
-            languageCode: 'tr',
-            regionCode: 'TR',
-            maxResultCount: PAGE_SIZE,
-        };
-        if (pageToken) body.pageToken = pageToken;
-
-        // Apply minRating directly in the Text Search request to reduce detailed fetches
-        // minRating parameter matches Google Places API 'minRating' field range [0.0, 5.0]
-        if (minRating && minRating > 0) {
-            body.minRating = parseFloat(minRating);
-        }
-
-        const resp = await fetch(`${PLACES_BASE}/places:searchText`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-Goog-Api-Key': apiKey,
-                'X-Goog-FieldMask': 'places.id,nextPageToken',
-            },
-            body: JSON.stringify(body),
-        });
-
-        if (!resp.ok) {
-            const errText = await resp.text();
-            console.error('[Places] Text Search error:', resp.status, errText);
-            break;
-        }
-
-        const data = await resp.json();
-        const ids = (data.places || []).map(p => p.id).filter(Boolean);
-        placeIds.push(...ids);
-        pageToken = data.nextPageToken || null;
-
-        if (!pageToken || placeIds.length >= maxResults) break;
-    }
-
-    return { placeIds, total: placeIds.length };
-}
-
-/**
  * Perform Places Text Search (New) with rating filter.
  * Kept signature compatible. collectPlaceIds handles maxResults.
  */
@@ -255,9 +203,11 @@ router.post('/', requireAuth, async (req, res) => {
                 results = await fetchPlaceDetails(apiKey, pageIds);
             }
 
-            // Apply client-side filters if needed
-            if (minRating) results = results.filter(r => r.rating >= minRating);
-            if (minReviews) results = results.filter(r => r.reviews >= minReviews);
+            // Apply client-side filters using the values stored in the session
+            const sessionMinRating = existingSession.min_rating;
+            const sessionMinReviews = existingSession.min_reviews;
+            if (sessionMinRating) results = results.filter(r => r.rating >= sessionMinRating);
+            if (sessionMinReviews) results = results.filter(r => r.reviews >= sessionMinReviews);
 
             return res.json({
                 sessionId: existingSession.id,
