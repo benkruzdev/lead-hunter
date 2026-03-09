@@ -301,7 +301,7 @@ export default function SearchPage() {
       console.error('[SearchPage] Page change failed:', error);
 
       // Handle 402 Insufficient Credits
-      if (error.message?.includes('Yeterli krediniz yok') || error.message?.includes('Insufficient')) {
+      if (error.status === 402) {
         setErrorMessage(t('leadLists.insufficientCredits'));
       } else {
         setErrorMessage(t('searchPage.pageLoadFailed'));
