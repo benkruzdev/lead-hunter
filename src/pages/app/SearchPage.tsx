@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSearchParams, useNavigate } from "react-router-dom";
-import { performSearch, getSearchPage, getSearchSession, SearchResult, getLeadLists, addLeadsToList, createLeadList, LeadList } from "@/lib/api";
+import { performSearch, getSearchPage, getSearchSession, getSearchCreditCost, SearchResult, getLeadLists, addLeadsToList, createLeadList, LeadList } from "@/lib/api";
 import { useQueryClient } from "@tanstack/react-query";
 import { QUERY_KEYS } from "@/lib/queryKeys";
 import OnboardingTour from "@/components/onboarding/OnboardingTour";
@@ -106,6 +106,9 @@ export default function SearchPage() {
 
   const { toast } = useToast();
   const [pendingDistrict, setPendingDistrict] = useState<string | null>(null);
+  // Live credit costs from system_settings (fetched once on first search)
+  const [creditsPerPage, setCreditsPerPage] = useState(10);
+  const [creditsPerEnrichment, setCreditsPerEnrichment] = useState(1);
 
   // Export template dialog state
   const [showExportTemplateDialog, setShowExportTemplateDialog] = useState(false);
@@ -171,6 +174,12 @@ export default function SearchPage() {
       setTotalResults(session.total_results);
       setHasSearched(true);
 
+      // Fetch live credit costs for modal display (once per session load)
+      getSearchCreditCost().then(costs => {
+        setCreditsPerPage(costs.credits_per_page);
+        setCreditsPerEnrichment(costs.credits_per_enrichment);
+      }).catch(() => { /* keep defaults */ });
+
       // PRODUCT_SPEC 5.4: Auto-load page 1 results for resumed session
       const searchResponse = await performSearch({
         province: session.province || "",
@@ -217,15 +226,20 @@ export default function SearchPage() {
       });
 
       setSessionId(response.sessionId);
-      setResults(response.results as any[]); // Backend returns 20 results for page 1
+      setResults(response.results as any[]);
       setTotalResults(response.totalResults);
       setCurrentPage(1);
       setIsSearching(false);
       setHasSearched(true);
 
-      // Refresh profile to get updated credits instantly (don't wait for 30s polling)
+      // Fetch live credit costs for modal display
+      getSearchCreditCost().then(costs => {
+        setCreditsPerPage(costs.credits_per_page);
+        setCreditsPerEnrichment(costs.credits_per_enrichment);
+      }).catch(() => { /* keep defaults */ });
+
+      // Refresh profile to get updated credits
       refreshProfile();
-      // Invalidate credits query to trigger immediate refetch
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.credits });
     } catch (error) {
       console.error('[SearchPage] Search failed:', error);
@@ -811,7 +825,7 @@ export default function SearchPage() {
           <DialogHeader>
             <DialogTitle>{t('searchPage.pageChangeTitle')}</DialogTitle>
             <DialogDescription>
-              {t('searchPage.pageChangeDesc', { page: pendingPage })}
+              {t('searchPage.pageChangeDesc', { page: pendingPage, cost: creditsPerPage })}
               <br />
               {t('searchPage.pageChangeCreditInfo', { credits: profile?.credits || 0 })}
             </DialogDescription>
@@ -827,7 +841,7 @@ export default function SearchPage() {
               {t('common.cancel')}
             </Button>
             <Button onClick={() => confirmPageChange()}>
-              {t('searchPage.confirmPageBtn')}
+              {t('searchPage.confirmPageBtn', { cost: creditsPerPage })}
             </Button>
           </DialogFooter>
         </DialogContent>

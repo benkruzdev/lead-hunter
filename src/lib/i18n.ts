@@ -129,7 +129,7 @@ const resources = {
             // Lead Enrichment
             leadEnrichment: {
                 title: 'Detayları Tamamla',
-                costNote: '1 kredi (sadece başarılı olursa)',
+                costNote: '{{cost}} kredi (sadece başarılı olursa)',
                 running: 'İşleniyor...',
                 success: 'Detaylar güncellendi',
                 notFound: 'Bilgi bulunamadı',
@@ -577,9 +577,9 @@ const resources = {
                 detailWebsite: 'Website',
                 detailHours: 'Çalışma Saatleri',
                 pageChangeTitle: 'Sayfa Değiştir',
-                pageChangeDesc: 'Sayfa {{page}} görüntülemek için 10 kredi harcanacak.',
+                pageChangeDesc: 'Sayfa {{page}} görüntülemek için {{cost}} kredi harcanacak.',
                 pageChangeCreditInfo: 'Kalan krediniz: {{credits}}',
-                confirmPageBtn: 'Onayla (10 kredi)',
+                confirmPageBtn: 'Onayla ({{cost}} kredi)',
                 sessionLoadFailed: 'Arama oturumu yüklenemedi.',
                 searchFailed: 'Arama başarısız oldu. Lütfen tekrar deneyin.',
                 pageLoadFailed: 'Sayfa yüklenemedi. Lütfen tekrar deneyin.',
@@ -780,7 +780,7 @@ const resources = {
             // Lead Enrichment
             leadEnrichment: {
                 title: 'Complete Details',
-                costNote: '1 credit (only if successful)',
+                costNote: '{{cost}} credit (only if successful)',
                 running: 'Processing...',
                 success: 'Details updated',
                 notFound: 'No information found',

@@ -434,6 +434,35 @@ router.get('/:sessionId/page/:pageNumber', requireAuth, async (req, res) => {
     }
 });
 
+// ─── GET /api/search/credit-cost ─────────────────────────────────────────────
+
+/**
+ * GET /api/search/credit-cost
+ * Returns current credit costs from system_settings for UI display.
+ */
+router.get('/credit-cost', requireAuth, async (req, res) => {
+    try {
+        const { data, error } = await supabaseAdmin
+            .from('system_settings')
+            .select('credits_per_page, credits_per_enrichment, credits_per_lead')
+            .eq('id', 1)
+            .single();
+
+        if (error || !data) {
+            return res.json({ credits_per_page: 10, credits_per_enrichment: 1, credits_per_lead: 1 });
+        }
+
+        res.json({
+            credits_per_page: data.credits_per_page ?? 10,
+            credits_per_enrichment: data.credits_per_enrichment ?? 1,
+            credits_per_lead: data.credits_per_lead ?? 1,
+        });
+    } catch (err) {
+        console.error('[Search] Credit cost fetch error:', err);
+        res.json({ credits_per_page: 10, credits_per_enrichment: 1 });
+    }
+});
+
 // ─── GET /api/search/sessions ────────────────────────────────────────────────
 
 /**

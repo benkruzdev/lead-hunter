@@ -537,7 +537,7 @@ router.get('/system-settings', requireAuth, requireAdmin, async (req, res) => {
     try {
         const { data, error } = await supabaseAdmin
             .from('system_settings')
-            .select('credits_per_page, credits_per_enrichment, new_user_credits')
+            .select('credits_per_page, credits_per_enrichment, credits_per_lead, new_user_credits')
             .eq('id', 1)
             .single();
 
@@ -559,7 +559,7 @@ router.get('/system-settings', requireAuth, requireAdmin, async (req, res) => {
  */
 router.patch('/system-settings', requireAuth, requireAdmin, async (req, res) => {
     try {
-        const { credits_per_page, credits_per_enrichment, new_user_credits } = req.body;
+        const { credits_per_page, credits_per_enrichment, credits_per_lead, new_user_credits } = req.body;
 
         const updates = { updated_at: new Date().toISOString() };
 
@@ -573,6 +573,11 @@ router.patch('/system-settings', requireAuth, requireAdmin, async (req, res) => 
             if (isNaN(val) || val < 0) return res.status(400).json({ error: 'credits_per_enrichment must be a non-negative integer' });
             updates.credits_per_enrichment = val;
         }
+        if (credits_per_lead !== undefined) {
+            const val = parseInt(credits_per_lead);
+            if (isNaN(val) || val < 0) return res.status(400).json({ error: 'credits_per_lead must be a non-negative integer' });
+            updates.credits_per_lead = val;
+        }
         if (new_user_credits !== undefined) {
             const val = parseInt(new_user_credits);
             if (isNaN(val) || val < 0) return res.status(400).json({ error: 'new_user_credits must be a non-negative integer' });
@@ -583,7 +588,7 @@ router.patch('/system-settings', requireAuth, requireAdmin, async (req, res) => 
             .from('system_settings')
             .update(updates)
             .eq('id', 1)
-            .select('credits_per_page, credits_per_enrichment, new_user_credits')
+            .select('credits_per_page, credits_per_enrichment, credits_per_lead, new_user_credits')
             .single();
 
         if (error) {

@@ -22,6 +22,7 @@ export default function AdminSystemSettingsPage() {
     const [form, setForm] = useState({
         credits_per_page: '',
         credits_per_enrichment: '',
+        credits_per_lead: '',
         new_user_credits: '',
     });
 
@@ -31,6 +32,7 @@ export default function AdminSystemSettingsPage() {
             setForm({
                 credits_per_page: String(data.settings.credits_per_page ?? ''),
                 credits_per_enrichment: String(data.settings.credits_per_enrichment ?? ''),
+                credits_per_lead: String(data.settings.credits_per_lead ?? ''),
                 new_user_credits: String(data.settings.new_user_credits ?? ''),
             });
         }
@@ -52,6 +54,7 @@ export default function AdminSystemSettingsPage() {
         mutation.mutate({
             credits_per_page: parseInt(form.credits_per_page) || 0,
             credits_per_enrichment: parseInt(form.credits_per_enrichment) || 0,
+            credits_per_lead: parseInt(form.credits_per_lead) || 0,
             new_user_credits: parseInt(form.new_user_credits) || 0,
         });
     };
@@ -122,7 +125,22 @@ export default function AdminSystemSettingsPage() {
                                     placeholder="1"
                                 />
                                 <p className="text-xs text-muted-foreground">
-                                    Başarılı "Detayları Tamamla" işlemi başına kensilir
+                                    Başarılı "Detayları Tamamla" işlemi başına kesilir
+                                </p>
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label htmlFor="credits_per_lead">Listeye Lead Ekleme Kredisi</Label>
+                                <Input
+                                    id="credits_per_lead"
+                                    type="number"
+                                    min="0"
+                                    value={form.credits_per_lead}
+                                    onChange={(e) => setForm(prev => ({ ...prev, credits_per_lead: e.target.value }))}
+                                    placeholder="1"
+                                />
+                                <p className="text-xs text-muted-foreground">
+                                    Listeye eklenen her yeni lead başına kesilir — DB function güncellenmeli (aşağıya bakın)
                                 </p>
                             </div>
                         </div>

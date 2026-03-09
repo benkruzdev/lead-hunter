@@ -31,8 +31,9 @@ import {
   Pencil,
   Zap,
 } from "lucide-react";
-import { getLeadListItems, bulkUpdateListItems, bulkDeleteListItems, enrichLeadListItem, createExport, LeadListItem } from "@/lib/api";
+import { getLeadListItems, bulkUpdateListItems, bulkDeleteListItems, enrichLeadListItem, createExport, getSearchCreditCost, LeadListItem } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function ListDetail() {
   const { t } = useTranslation();
@@ -79,6 +80,8 @@ export default function ListDetail() {
   const [exportError, setExportError] = useState<string | null>(null);
 
   const { toast } = useToast();
+  const { refreshProfile } = useAuth();
+  const [creditsPerEnrichment, setCreditsPerEnrichment] = useState(1);
 
   useEffect(() => {
     if (listId) {
@@ -87,6 +90,8 @@ export default function ListDetail() {
       setError(t('leadLists.missingListId'));
       setIsLoading(false);
     }
+    // Fetch live credit cost for enrichment dialog
+    getSearchCreditCost().then(c => setCreditsPerEnrichment(c.credits_per_enrichment)).catch(() => {});
   }, [listId]);
 
   const loadItems = async () => {
@@ -218,6 +223,8 @@ export default function ListDetail() {
     setIsBulkEnriching(false);
     setBulkEnrichProgress(null);
     setSelectedItemIds([]);
+    // Refresh header credit balance
+    refreshProfile();
   };
 
   const handleEnrich = async () => {
@@ -230,6 +237,8 @@ export default function ListDetail() {
         await loadItems();
         setShowEnrichDialog(false);
         setEnrichItemId(null);
+        // Refresh header credit balance
+        refreshProfile();
       } else {
         setEnrichError(t('leadEnrichment.notFound'));
       }
@@ -589,7 +598,7 @@ export default function ListDetail() {
             <DialogDescription>{t('leadEnrichment.confirmMessage')}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">{t('leadEnrichment.costNote')}</p>
+            <p className="text-sm text-muted-foreground">{t('leadEnrichment.costNote', { cost: creditsPerEnrichment })}</p>
             {enrichError && (
               <div className="bg-destructive/10 text-destructive p-3 rounded-md text-sm">{enrichError}</div>
             )}

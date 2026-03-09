@@ -264,6 +264,7 @@ export async function getAdminSystemSettings(): Promise<{
     settings: {
         credits_per_page: number | null;
         credits_per_enrichment: number | null;
+        credits_per_lead: number | null;
         new_user_credits: number | null;
     };
 }> {
@@ -280,6 +281,7 @@ export async function getAdminSystemSettings(): Promise<{
 export async function updateAdminSystemSettings(data: {
     credits_per_page?: number;
     credits_per_enrichment?: number;
+    credits_per_lead?: number;
     new_user_credits?: number;
 }): Promise<{ success: boolean; settings: any }> {
     if (!ADMIN_SECRET) {
@@ -516,6 +518,18 @@ export async function getSearchSessions(): Promise<{ sessions: SearchSession[] }
  */
 export async function getSearchSession(sessionId: string): Promise<{ session: SearchSession }> {
     return apiRequest<{ session: SearchSession }>(`/api/search/sessions/${sessionId}`);
+}
+
+/**
+ * Get current credit costs from system_settings for UI display
+ * GET /api/search/credit-cost
+ */
+export async function getSearchCreditCost(): Promise<{
+    credits_per_page: number;
+    credits_per_enrichment: number;
+    credits_per_lead: number;
+}> {
+    return apiRequest('/api/search/credit-cost');
 }
 
 // PRODUCT_SPEC 5.5: Lead Lists
