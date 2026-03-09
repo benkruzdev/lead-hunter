@@ -400,7 +400,7 @@ export default function ListDetail() {
                     <td className="p-3 text-sm text-muted-foreground">{item.phone || '-'}</td>
                     <td className="p-3 text-sm text-muted-foreground">
                       {item.website ? (
-                        <a href={`https://${item.website}`} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                        <a href={`https://${item.website.replace(/^https?:\/\//, '')}`} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
                           {item.website}
                         </a>
                       ) : '-'}
