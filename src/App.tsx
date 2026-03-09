@@ -14,6 +14,7 @@ import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import Pricing from "./pages/Pricing";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
+import AdminRoute from "./components/auth/AdminRoute";
 import AppLayout from "./components/app/AppLayout";
 import SearchPage from "./pages/app/SearchPage";
 import SearchHistoryPage from "./pages/app/SearchHistoryPage";
@@ -84,7 +85,7 @@ const AppContent = () => {
                   <Route path="exports" element={<ExportsPage />} />
                   <Route path="billing" element={<BillingPage />} />
                   <Route path="settings" element={<SettingsPage />} />
-                  <Route path="admin" element={<AdminLayout />}>
+                  <Route path="admin" element={<AdminRoute />}>
                     <Route index element={<AdminDashboardPage />} />
                     <Route path="users" element={<AdminUsersPage />} />
                     <Route path="users/:id" element={<AdminUserDetailPage />} />
