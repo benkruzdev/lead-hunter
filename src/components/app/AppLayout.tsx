@@ -63,12 +63,14 @@ export default function AppLayout() {
   const profile = profileData?.profile;
   const credits = contextCredits ?? creditsData?.credits ?? 0;
 
-  // Sync credits from backend to context
+  // Sync credits from backend to context ONLY on initial load (contextCredits === null).
+  // After that, contextCredits is the single source of truth — refreshProfile() updates it
+  // directly. Never overwrite a fresh value with a stale React Query cache result.
   useEffect(() => {
-    if (creditsData?.credits !== undefined && creditsData.credits !== contextCredits) {
+    if (creditsData?.credits !== undefined && contextCredits === null) {
       setCredits(creditsData.credits);
     }
-  }, [creditsData?.credits, contextCredits, setCredits]);
+  }, [creditsData?.credits]);
 
   // Get display name (full_name or email)
   const displayName = profile?.full_name || profile?.email || "User";
