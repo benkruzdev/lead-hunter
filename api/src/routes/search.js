@@ -45,16 +45,12 @@ router.post('/', requireAuth, async (req, res) => {
                 return res.status(410).json({ error: 'Session expired' });
             }
 
-            // Use session filters to generate results
-            const sessionProvince = existingSession.province || existingSession.filters?.province || province;
-            const sessionCategory = existingSession.category || existingSession.filters?.category || category;
-            const mockResults = generateMockResults(200, sessionProvince, sessionCategory);
-
             // Return page 1 (always free for existing session)
+            // TODO: fetch real results from data source using session filters
             return res.json({
                 sessionId: existingSession.id,
-                results: mockResults.slice(0, 20),
-                totalResults: mockResults.length,
+                results: [],
+                totalResults: existingSession.total_results ?? 0,
                 currentPage: 1
             });
         }
@@ -67,9 +63,6 @@ router.post('/', requireAuth, async (req, res) => {
         console.log('[Search] New search request:', { province, district, category, userId });
 
         // TODO: Actual search logic with Google Maps API
-        // For now, return mock data
-        const mockResults = generateMockResults(200, province, category);
-
         // Create search session
         let session, sessionError;
 
@@ -84,7 +77,7 @@ router.post('/', requireAuth, async (req, res) => {
                 keyword: keyword || null,
                 min_rating: minRating || null,
                 min_reviews: minReviews || null,
-                total_results: mockResults.length,
+                total_results: 0,
                 viewed_pages: [1] // Page 1 is always free
             })
             .select()
@@ -102,7 +95,7 @@ router.post('/', requireAuth, async (req, res) => {
                     category,
                     min_rating: minRating || null,
                     min_reviews: minReviews || null,
-                    total_results: mockResults.length,
+                    total_results: 0,
                     viewed_pages: [1]
                 })
                 .select()
@@ -119,11 +112,11 @@ router.post('/', requireAuth, async (req, res) => {
 
         console.log('[Search] Session created:', session.id);
 
-        // Return first page (20 results)
+        // Return first page (no results until real API integration)
         res.json({
             sessionId: session.id,
-            results: mockResults.slice(0, 20), // Page 1
-            totalResults: mockResults.length,
+            results: [],
+            totalResults: 0,
             currentPage: 1
         });
     } catch (err) {
@@ -233,15 +226,9 @@ router.get('/:sessionId/page/:pageNumber', requireAuth, async (req, res) => {
             console.log('[Search] Page added to viewed:', page);
         }
 
-        // Get results for this page
-        // TODO: Fetch from actual data source
-        const mockResults = generateMockResults(session.total_results, session.province, session.category);
-        const startIndex = (page - 1) * 20;
-        const endIndex = startIndex + 20;
-        const pageResults = mockResults.slice(startIndex, endIndex);
-
+        // TODO: Fetch from actual data source (Google Maps API)
         res.json({
-            results: pageResults,
+            results: [],
             currentPage: page,
             totalResults: session.total_results,
             creditCost,
@@ -253,36 +240,7 @@ router.get('/:sessionId/page/:pageNumber', requireAuth, async (req, res) => {
     }
 });
 
-/**
- * Generate mock search results
- * TODO: Replace with actual Google Maps API integration
- */
-function generateMockResults(count, province, category) {
-    const categories = ["Restoran", "Kafe", "Berber", "Kuaför", "Market", "Eczane", "Veteriner", "Emlak"];
-    const districts = ["Kadıköy", "Beşiktaş", "Şişli", "Fatih", "Üsküdar", "Beyoğlu", "Çankaya", "Keçiören"];
-    const adjectives = ["Modern", "Lezzet", "Tarihi", "Yeni", "Anadolu", "Karadeniz", "Ege", "Akdeniz"];
 
-    return Array.from({ length: count }, (_, i) => {
-        const rating = Number((3.5 + Math.random() * 1.5).toFixed(1));
-        const reviews = Math.floor(Math.random() * 3000) + 100;
-        const score = calculateLeadScore(rating, reviews);
-
-        return {
-            id: i + 1,
-            name: `${adjectives[i % adjectives.length]} ${category || categories[i % categories.length]} ${Math.floor(i / 10) + 1}`,
-            category: category || categories[i % categories.length],
-            district: districts[i % districts.length],
-            rating,
-            reviews,
-            score,
-            isOpen: i % 3 !== 0,
-            phone: `+90 ${210 + (i % 6)}${(i % 10).toString().padStart(2, '0')} 555 ${String(1000 + i).slice(-4)}`,
-            website: `www.business${i + 1}.com`,
-            address: `${province || 'İstanbul'} / ${districts[i % districts.length]} Mah. No:${i + 1}`,
-            hours: i % 3 === 0 ? "09:00 - 23:00" : "08:00 - 22:00",
-        };
-    });
-}
 
 /**
  * GET /api/search/sessions
