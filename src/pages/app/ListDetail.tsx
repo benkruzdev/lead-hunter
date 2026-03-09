@@ -208,7 +208,17 @@ export default function ListDetail() {
   };
 
   const handleBulkEnrich = async () => {
-    const ids = [...selectedItemIds];
+    // Only enrich items that haven't been attempted yet
+    const ids = selectedItemIds
+      .map(id => items.find(item => item.id === id))
+      .filter(item => item && item.enrichment_status == null)
+      .map(item => item!.id);
+
+    if (ids.length === 0) {
+      setSelectedItemIds([]);
+      return;
+    }
+
     setIsBulkEnriching(true);
     setBulkEnrichProgress({ done: 0, total: ids.length });
     for (let i = 0; i < ids.length; i++) {
@@ -233,15 +243,15 @@ export default function ListDetail() {
       setIsEnriching(true);
       setEnrichError(null);
       const result = await enrichLeadListItem(listId, enrichItemId);
+      // Always reload items so enrichment_status badge updates in the table
+      await loadItems();
+      setShowEnrichDialog(false);
+      setEnrichItemId(null);
       if (result.status === 'success') {
-        await loadItems();
-        setShowEnrichDialog(false);
-        setEnrichItemId(null);
-        // Refresh header credit balance
+        // Refresh header credit balance only when a credit was spent
         refreshProfile();
-      } else {
-        setEnrichError(t('leadEnrichment.notFound'));
       }
+      // On 'failed': modal closes, table row shows "Detay bulunamadı" badge
     } catch (error: any) {
       console.error('[ListDetail] Enrichment failed:', error);
       if (error.status === 402) {
@@ -442,13 +452,13 @@ export default function ListDetail() {
                             {t('leadEnrichment.title')}
                           </Button>
                         ) : item.enrichment_status === 'success' ? (
-                          <span className="text-xs text-green-600 font-medium px-2">
+                          <Badge className="text-xs bg-green-100 text-green-700 border-green-200 hover:bg-green-100">
                             {t('leadEnrichment.statusFound')}
-                          </span>
+                          </Badge>
                         ) : (
-                          <span className="text-xs text-muted-foreground px-2">
+                          <Badge variant="outline" className="text-xs text-muted-foreground">
                             {t('leadEnrichment.statusNotFound')}
-                          </span>
+                          </Badge>
                         )}
                         <Button
                           variant="ghost"

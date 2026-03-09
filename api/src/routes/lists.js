@@ -446,6 +446,17 @@ router.post('/:listId/items/:itemId/enrich', requireAuth, async (req, res) => {
             return res.status(404).json({ error: 'Item not found' });
         }
 
+        // Idempotency guard: already enriched or attempted → return current state, no credit charge
+        if (item.enrichment_status === 'success' || item.enrichment_status === 'failed') {
+            return res.json({
+                status: item.enrichment_status,
+                email: item.email ?? null,
+                social_links: item.social_links ?? {},
+                creditSpent: 0,
+                skipped: true
+            });
+        }
+
         // Check if website exists
         if (!item.website) {
             // No website = failed (but free)
