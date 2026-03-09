@@ -573,6 +573,9 @@ const resources = {
                 pageChangeDesc: 'Sayfa {{page}} görüntülemek için 10 kredi harcanacak.',
                 pageChangeCreditInfo: 'Kalan krediniz: {{credits}}',
                 confirmPageBtn: 'Onayla (10 kredi)',
+                sessionLoadFailed: 'Arama oturumu yüklenemedi.',
+                searchFailed: 'Arama başarısız oldu. Lütfen tekrar deneyin.',
+                pageLoadFailed: 'Sayfa yüklenemedi. Lütfen tekrar deneyin.',
             },
             leadQuality: {
                 new: {
@@ -1224,6 +1227,9 @@ const resources = {
                 pageChangeDesc: 'Viewing page {{page}} will cost 10 credits.',
                 pageChangeCreditInfo: 'Your credits: {{credits}}',
                 confirmPageBtn: 'Confirm (10 credits)',
+                sessionLoadFailed: 'Failed to load search session.',
+                searchFailed: 'Search failed. Please try again.',
+                pageLoadFailed: 'Failed to load page. Please try again.',
             },
             leadQuality: {
                 new: {

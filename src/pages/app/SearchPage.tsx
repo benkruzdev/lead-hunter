@@ -187,7 +187,7 @@ export default function SearchPage() {
       if (error.status === 410) {
         navigate('/app/history', { replace: true });
       } else {
-        setErrorMessage('Arama oturumu yüklenemedi.');
+        setErrorMessage(t('searchPage.sessionLoadFailed'));
       }
     }
   };
@@ -227,7 +227,7 @@ export default function SearchPage() {
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.credits });
     } catch (error) {
       console.error('[SearchPage] Search failed:', error);
-      setErrorMessage('Arama baYarısız oldu. Lütfen tekrar deneyin.');
+      setErrorMessage(t('searchPage.searchFailed'));
       setIsSearching(false);
     }
   };
@@ -302,9 +302,9 @@ export default function SearchPage() {
 
       // Handle 402 Insufficient Credits
       if (error.message?.includes('Yeterli krediniz yok') || error.message?.includes('Insufficient')) {
-        setErrorMessage('Yeterli krediniz yok. Lütfen kredi satın alın.');
+        setErrorMessage(t('leadLists.insufficientCredits'));
       } else {
-        setErrorMessage('Sayfa yüklenemedi. Lütfen tekrar deneyin.');
+        setErrorMessage(t('searchPage.pageLoadFailed'));
       }
 
       if (!skipModal) {
