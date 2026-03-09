@@ -81,7 +81,7 @@ export default function SearchPage() {
   const [isSearching, setIsSearching] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   const [results, setResults] = useState<SearchResult[]>([]);
-  const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [detailItem, setDetailItem] = useState<SearchResult | null>(null);
 
   // Pagination state (PR3)
@@ -314,7 +314,7 @@ export default function SearchPage() {
     }
   };
 
-  const toggleSelect = (id: number) => {
+  const toggleSelect = (id: string) => {
     setSelectedIds((prev) =>
       prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
     );
@@ -325,7 +325,7 @@ export default function SearchPage() {
     if (selectedIds.length === results.length && results.length > 0) {
       setSelectedIds([]);
     } else {
-      setSelectedIds(results.map((r) => r.id));
+      setSelectedIds(results.map((r) => String(r.id)));
     }
   };
 
@@ -661,19 +661,24 @@ export default function SearchPage() {
                 {t('searchPage.previous')}
               </Button>
 
-              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                const pageNum = i + 1;
-                return (
-                  <Button
-                    key={pageNum}
-                    variant={currentPage === pageNum ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => handlePageChange(pageNum)}
-                  >
-                    {pageNum}
-                  </Button>
-                );
-              })}
+              {(() => {
+                const windowSize = Math.min(5, totalPages);
+                const half = Math.floor(windowSize / 2);
+                const start = Math.max(1, Math.min(currentPage - half, totalPages - windowSize + 1));
+                return Array.from({ length: windowSize }, (_, i) => {
+                  const pageNum = start + i;
+                  return (
+                    <Button
+                      key={pageNum}
+                      variant={currentPage === pageNum ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => handlePageChange(pageNum)}
+                    >
+                      {pageNum}
+                    </Button>
+                  );
+                });
+              })()}
 
               <Button
                 variant="outline"

@@ -385,17 +385,17 @@ export interface SearchParams {
 }
 
 export interface SearchResult {
-    id: number;
+    id: string;
     name: string;
     category: string;
     district: string;
     rating: number;
     reviews: number;
     isOpen: boolean;
-    phone: string;
-    website: string;
-    address: string;
-    hours: string;
+    phone: string | null;
+    website: string | null;
+    address: string | null;
+    hours: string | null;
 }
 
 export interface SearchResponse {
