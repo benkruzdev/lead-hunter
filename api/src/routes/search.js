@@ -50,7 +50,7 @@ router.post('/', requireAuth, async (req, res) => {
             return res.json({
                 sessionId: existingSession.id,
                 results: [],
-                totalResults: existingSession.total_results ?? 0,
+                totalResults: 0,
                 currentPage: 1
             });
         }
@@ -230,7 +230,7 @@ router.get('/:sessionId/page/:pageNumber', requireAuth, async (req, res) => {
         res.json({
             results: [],
             currentPage: page,
-            totalResults: session.total_results,
+            totalResults: 0,
             creditCost,
             alreadyViewed
         });
