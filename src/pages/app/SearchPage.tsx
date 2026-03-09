@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSearchParams, useNavigate } from "react-router-dom";
-import { performSearch, getSearchPage, getSearchSession, SearchResult, getLeadLists, addLeadsToList, LeadList } from "@/lib/api";
+import { performSearch, getSearchPage, getSearchSession, SearchResult, getLeadLists, addLeadsToList, createLeadList, LeadList } from "@/lib/api";
 import { useQueryClient } from "@tanstack/react-query";
 import { QUERY_KEYS } from "@/lib/queryKeys";
 import OnboardingTour from "@/components/onboarding/OnboardingTour";
@@ -101,6 +101,8 @@ export default function SearchPage() {
   const [isAddingToList, setIsAddingToList] = useState(false);
   const [dryRunCost, setDryRunCost] = useState<number | null>(null);
   const [listDialogError, setListDialogError] = useState<string | null>(null);
+  const [newListName, setNewListName] = useState("");
+  const [isCreatingList, setIsCreatingList] = useState(false);
 
   const { toast } = useToast();
   const [pendingDistrict, setPendingDistrict] = useState<string | null>(null);
@@ -832,7 +834,16 @@ export default function SearchPage() {
       </Dialog>
 
       {/* List Selection Dialog */}
-      <Dialog open={showListDialog} onOpenChange={setShowListDialog}>
+      <Dialog open={showListDialog} onOpenChange={(open) => {
+        setShowListDialog(open);
+        if (!open) {
+          setSelectedListId("");
+          setDryRunCost(null);
+          setListDialogError(null);
+          setNewListName("");
+          setIsCreatingList(false);
+        }
+      }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{t('leadLists.addToListTitle')}</DialogTitle>
@@ -845,33 +856,78 @@ export default function SearchPage() {
               <div className="text-center py-8">
                 <Loader2 className="w-6 h-6 animate-spin mx-auto text-muted-foreground" />
               </div>
-            ) : userLists.length === 0 ? (
-              <div className="text-center py-8">
-                <p className="text-sm text-muted-foreground">{t('leadLists.noListsYet')}</p>
-              </div>
             ) : (
-              <Select value={selectedListId} onValueChange={async (listId) => {
-                setSelectedListId(listId);
-                setDryRunCost(null);
-                try {
-                  const selectedLeads = results.filter(r => selectedIds.includes(r.id));
-                  const dryRunResult = await addLeadsToList(listId, selectedLeads, { dryRun: true });
-                  setDryRunCost(dryRunResult.creditCost || 0);
-                } catch (error) {
-                  console.error('[SearchPage] DryRun failed:', error);
-                }
-              }}>
-                <SelectTrigger>
-                  <SelectValue placeholder={t('leadLists.selectList')} />
-                </SelectTrigger>
-                <SelectContent>
-                  {userLists.map((list) => (
-                    <SelectItem key={list.id} value={list.id}>
-                      {list.name} ({list.lead_count} lead)
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <>
+                {/* Inline new-list creation */}
+                <div className="flex gap-2">
+                  <Input
+                    placeholder={t('leadLists.newListNamePlaceholder')}
+                    value={newListName}
+                    onChange={(e) => setNewListName(e.target.value)}
+                    onKeyDown={async (e) => {
+                      if (e.key === 'Enter' && newListName.trim()) e.currentTarget.blur();
+                    }}
+                    disabled={isCreatingList}
+                  />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={!newListName.trim() || isCreatingList}
+                    onClick={async () => {
+                      setIsCreatingList(true);
+                      setListDialogError(null);
+                      try {
+                        const { list } = await createLeadList(newListName.trim());
+                        setUserLists(prev => [list, ...prev]);
+                        setNewListName("");
+                        // Auto-select the new list and trigger dry-run
+                        setSelectedListId(list.id);
+                        setDryRunCost(null);
+                        try {
+                          const selectedLeads = results.filter(r => selectedIds.includes(r.id));
+                          const dryRunResult = await addLeadsToList(list.id, selectedLeads, { dryRun: true });
+                          setDryRunCost(dryRunResult.creditCost || 0);
+                        } catch { /* dry-run failure is non-fatal */ }
+                      } catch (error) {
+                        console.error('[SearchPage] Create list failed:', error);
+                        setListDialogError(t('leadLists.createListFailed'));
+                      } finally {
+                        setIsCreatingList(false);
+                      }
+                    }}
+                  >
+                    {isCreatingList ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+                  </Button>
+                </div>
+
+                {/* Existing list selector */}
+                {userLists.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-2">{t('leadLists.noListsYet')}</p>
+                ) : (
+                  <Select value={selectedListId} onValueChange={async (listId) => {
+                    setSelectedListId(listId);
+                    setDryRunCost(null);
+                    try {
+                      const selectedLeads = results.filter(r => selectedIds.includes(r.id));
+                      const dryRunResult = await addLeadsToList(listId, selectedLeads, { dryRun: true });
+                      setDryRunCost(dryRunResult.creditCost || 0);
+                    } catch (error) {
+                      console.error('[SearchPage] DryRun failed:', error);
+                    }
+                  }}>
+                    <SelectTrigger>
+                      <SelectValue placeholder={t('leadLists.selectList')} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {userLists.map((list) => (
+                        <SelectItem key={list.id} value={list.id}>
+                          {list.name} ({list.lead_count} lead)
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              </>
             )}
             {dryRunCost !== null && (
               <div className="bg-muted/50 rounded-lg p-4">
