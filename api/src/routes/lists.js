@@ -109,6 +109,86 @@ router.get('/:listId', requireAuth, async (req, res) => {
 });
 
 /**
+ * PATCH /api/lists/:listId
+ * Rename a lead list
+ */
+router.patch('/:listId', requireAuth, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const { listId } = req.params;
+        const { name } = req.body;
+
+        if (!name || !name.trim()) {
+            return res.status(400).json({ error: 'List name is required' });
+        }
+
+        const { data: list, error } = await supabaseAdmin
+            .from('lead_lists')
+            .update({ name: name.trim(), updated_at: new Date().toISOString() })
+            .eq('id', listId)
+            .eq('user_id', userId)
+            .select()
+            .single();
+
+        if (error || !list) {
+            return res.status(404).json({ error: 'List not found' });
+        }
+
+        res.json({ list });
+    } catch (err) {
+        console.error('[Lists] Error:', err);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+/**
+ * DELETE /api/lists/:listId
+ * Delete a lead list and all its items
+ */
+router.delete('/:listId', requireAuth, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const { listId } = req.params;
+
+        // Verify ownership first
+        const { data: list, error: listError } = await supabaseAdmin
+            .from('lead_lists')
+            .select('id')
+            .eq('id', listId)
+            .eq('user_id', userId)
+            .single();
+
+        if (listError || !list) {
+            return res.status(404).json({ error: 'List not found' });
+        }
+
+        // Delete all items first (FK constraint)
+        await supabaseAdmin
+            .from('lead_list_items')
+            .delete()
+            .eq('list_id', listId)
+            .eq('user_id', userId);
+
+        // Delete the list
+        const { error } = await supabaseAdmin
+            .from('lead_lists')
+            .delete()
+            .eq('id', listId)
+            .eq('user_id', userId);
+
+        if (error) {
+            console.error('[Lists] Delete error:', error);
+            return res.status(500).json({ error: 'Failed to delete list' });
+        }
+
+        res.json({ success: true });
+    } catch (err) {
+        console.error('[Lists] Error:', err);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+/**
  * GET /api/lists/:listId/items
  * Get list items
  */

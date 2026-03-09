@@ -507,6 +507,15 @@ export interface LeadListItem {
     pipeline: string | null;
     note: string | null;
     tags: string[] | null;
+    social_links: {
+        instagram?: string;
+        facebook?: string;
+        x?: string;
+        youtube?: string;
+        tiktok?: string;
+        linkedin?: string;
+        [key: string]: string | undefined;
+    } | null;
     raw: any;
     created_at: string;
     updated_at: string;
@@ -520,6 +529,19 @@ export async function createLeadList(name: string): Promise<{ list: LeadList }> 
     return apiRequest<{ list: LeadList }>('/api/lists', {
         method: 'POST',
         body: JSON.stringify({ name }),
+    });
+}
+
+export async function renameLeadList(listId: string, name: string): Promise<{ list: LeadList }> {
+    return apiRequest<{ list: LeadList }>(`/api/lists/${listId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ name }),
+    });
+}
+
+export async function deleteLeadList(listId: string): Promise<{ success: boolean }> {
+    return apiRequest<{ success: boolean }>(`/api/lists/${listId}`, {
+        method: 'DELETE',
     });
 }
 

@@ -28,9 +28,10 @@ import {
   Loader2,
   Tags,
   StickyNote,
+  Pencil,
+  Zap,
 } from "lucide-react";
 import { getLeadListItems, bulkUpdateListItems, bulkDeleteListItems, enrichLeadListItem, createExport, LeadListItem } from "@/lib/api";
-import { getListMeta, setListNotes, setListTag, ListTag } from "@/lib/listMeta";
 import { useToast } from "@/hooks/use-toast";
 
 export default function ListDetail() {
@@ -50,6 +51,20 @@ export default function ListDetail() {
   const [bulkNoteInput, setBulkNoteInput] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
 
+  // Per-row edit state
+  const [editTarget, setEditTarget] = useState<LeadListItem | null>(null);
+  const [editNote, setEditNote] = useState("");
+  const [editTags, setEditTags] = useState("");
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+
+  // Per-row delete state
+  const [deleteTarget, setDeleteTarget] = useState<LeadListItem | null>(null);
+  const [isDeletingSingle, setIsDeletingSingle] = useState(false);
+
+  // Bulk enrich state
+  const [isBulkEnriching, setIsBulkEnriching] = useState(false);
+  const [bulkEnrichProgress, setBulkEnrichProgress] = useState<{ done: number; total: number } | null>(null);
+
   // Enrichment state
   const [showEnrichDialog, setShowEnrichDialog] = useState(false);
   const [enrichItemId, setEnrichItemId] = useState<string | null>(null);
@@ -63,9 +78,6 @@ export default function ListDetail() {
   const [isExporting, setIsExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
 
-  // List metadata state
-  const [notes, setNotes] = useState('');
-  const [selectedTag, setSelectedTag] = useState<ListTag>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -88,12 +100,9 @@ export default function ListDetail() {
       setIsLoading(true);
       setError(null);
       const response = await getLeadListItems(listId);
-
-      // Normalize response shape
       const itemsArray = Array.isArray(response)
         ? response
         : ((response as any).items ?? (response as any).leadItems ?? []);
-
       setItems(itemsArray);
     } catch (err: any) {
       console.error('[ListDetail] Failed to load items:', err);
@@ -103,64 +112,19 @@ export default function ListDetail() {
     }
   };
 
-  // Load list metadata on mount
-  useEffect(() => {
-    if (listId) {
-      const meta = getListMeta(listId);
-      setNotes(meta.notes);
-      setSelectedTag(meta.tag);
-    }
-  }, [listId]);
-
-  // Autosave notes with debouncing
-  useEffect(() => {
-    if (!listId) return;
-
-    const timer = setTimeout(() => {
-      const meta = getListMeta(listId);
-      if (meta.notes !== notes) {
-        setListNotes(listId, notes);
-        toast({ description: t('listMeta.saved') });
-      }
-    }, 500);
-
-    return () => clearTimeout(timer);
-  }, [notes, listId, t, toast]);
-
-  const handleTagChange = (value: string) => {
-    if (!listId) return;
-
-    const newTag: ListTag = value === 'none' ? null : (value as ListTag);
-    setSelectedTag(newTag);
-    setListTag(listId, newTag);
-
-    if (newTag === null) {
-      toast({ description: t('listMeta.tagCleared') });
-    } else {
-      toast({ description: t('listMeta.tagSaved') });
-    }
-  };
-
   const handleSelectAll = (checked: boolean) => {
-    if (checked) {
-      setSelectedItemIds(items.map(item => item.id));
-    } else {
-      setSelectedItemIds([]);
-    }
+    setSelectedItemIds(checked ? items.map(item => item.id) : []);
   };
 
   const handleSelectItem = (itemId: string, checked: boolean) => {
-    if (checked) {
-      setSelectedItemIds(prev => [...prev, itemId]);
-    } else {
-      setSelectedItemIds(prev => prev.filter(id => id !== itemId));
-    }
+    setSelectedItemIds(prev =>
+      checked ? [...prev, itemId] : prev.filter(id => id !== itemId)
+    );
   };
 
   const handleBulkTag = async () => {
     const tags = bulkTagInput.split(',').map(t => t.trim()).filter(t => t.length > 0);
     if (tags.length === 0) return;
-
     try {
       setIsProcessing(true);
       await bulkUpdateListItems(listId!, selectedItemIds, { tags });
@@ -178,7 +142,6 @@ export default function ListDetail() {
   const handleBulkNote = async () => {
     const note = bulkNoteInput.trim();
     if (note.length === 0) return;
-
     try {
       setIsProcessing(true);
       await bulkUpdateListItems(listId!, selectedItemIds, { note });
@@ -207,17 +170,63 @@ export default function ListDetail() {
     }
   };
 
+  const handleSaveEdit = async () => {
+    if (!editTarget) return;
+    try {
+      setIsSavingEdit(true);
+      const tags = editTags.split(',').map(t => t.trim()).filter(t => t.length > 0);
+      await bulkUpdateListItems(listId!, [editTarget.id], {
+        note: editNote,
+        tags,
+      });
+      await loadItems();
+      setEditTarget(null);
+    } catch (error) {
+      console.error('[ListDetail] Edit failed:', error);
+    } finally {
+      setIsSavingEdit(false);
+    }
+  };
+
+  const handleSingleDelete = async () => {
+    if (!deleteTarget) return;
+    try {
+      setIsDeletingSingle(true);
+      await bulkDeleteListItems(listId!, [deleteTarget.id]);
+      await loadItems();
+      setDeleteTarget(null);
+    } catch (error) {
+      console.error('[ListDetail] Single delete failed:', error);
+    } finally {
+      setIsDeletingSingle(false);
+    }
+  };
+
+  const handleBulkEnrich = async () => {
+    const ids = [...selectedItemIds];
+    setIsBulkEnriching(true);
+    setBulkEnrichProgress({ done: 0, total: ids.length });
+    for (let i = 0; i < ids.length; i++) {
+      try {
+        await enrichLeadListItem(listId!, ids[i]);
+      } catch {
+        // continue on per-item error (e.g. no website, 402)
+      }
+      setBulkEnrichProgress({ done: i + 1, total: ids.length });
+    }
+    await loadItems();
+    setIsBulkEnriching(false);
+    setBulkEnrichProgress(null);
+    setSelectedItemIds([]);
+  };
+
   const handleEnrich = async () => {
     if (!enrichItemId || !listId) return;
-
     try {
       setIsEnriching(true);
       setEnrichError(null);
-
       const result = await enrichLeadListItem(listId, enrichItemId);
-
       if (result.status === 'success') {
-        // Reload items to show updated data
         await loadItems();
         setShowEnrichDialog(false);
         setEnrichItemId(null);
@@ -238,17 +247,11 @@ export default function ListDetail() {
 
   const handleExport = async () => {
     if (!listId) return;
-
     try {
       setIsExporting(true);
       setExportError(null);
-
       const result = await createExport(listId, exportFormat, exportNote || undefined);
-
-      // Auto-download using window.location.href to avoid popup blockers
       window.location.href = result.downloadUrl;
-
-      // Close dialog and reset
       setShowExportDialog(false);
       setExportFormat('csv');
       setExportNote('');
@@ -261,7 +264,6 @@ export default function ListDetail() {
   };
 
   const allSelected = items.length > 0 && selectedItemIds.length === items.length;
-  const someSelected = selectedItemIds.length > 0 && selectedItemIds.length < items.length;
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -276,9 +278,7 @@ export default function ListDetail() {
           </Link>
           <div>
             <h2 className="text-lg font-semibold">Liste Detayı</h2>
-            <p className="text-sm text-muted-foreground">
-              {items.length} lead
-            </p>
+            <p className="text-sm text-muted-foreground">{items.length} lead</p>
           </div>
         </div>
         <Button variant="outline" onClick={() => setShowExportDialog(true)}>
@@ -287,47 +287,18 @@ export default function ListDetail() {
         </Button>
       </div>
 
-      {/* List Metadata: Notes & Tags */}
-      <div className="grid md:grid-cols-2 gap-6">
-        {/* Notes Section */}
-        <div className="bg-card rounded-xl border shadow-soft p-6">
-          <h3 className="text-sm font-semibold mb-3">{t('listMeta.notesTitle')}</h3>
-          <Textarea
-            placeholder={t('listMeta.notesPlaceholder')}
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            rows={4}
-            className="resize-none"
-          />
-          <p className="text-xs text-muted-foreground mt-2">
-            {t('listMeta.saved')}
-          </p>
-        </div>
-
-        {/* Tag Selector */}
-        <div className="bg-card rounded-xl border shadow-soft p-6">
-          <h3 className="text-sm font-semibold mb-3">{t('listMeta.tagTitle')}</h3>
-          <Select value={selectedTag || 'none'} onValueChange={handleTagChange}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="none">{t('listMeta.tagNone')}</SelectItem>
-              <SelectItem value="hot">{t('listMeta.tagHot')}</SelectItem>
-              <SelectItem value="cold">{t('listMeta.tagCold')}</SelectItem>
-              <SelectItem value="followup">{t('listMeta.tagFollowup')}</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-
       {/* Bulk Action Bar */}
       {selectedItemIds.length > 0 && (
         <div className="bg-muted/50 border rounded-lg p-4 flex items-center justify-between">
-          <p className="text-sm font-medium">
-            {selectedItemIds.length} öğe seçildi
-          </p>
+          <p className="text-sm font-medium">{selectedItemIds.length} öğe seçildi</p>
           <div className="flex items-center gap-2">
+            <Button size="sm" variant="outline" onClick={handleBulkEnrich}
+              disabled={isBulkEnriching}>
+              <Zap className="w-4 h-4" />
+              {isBulkEnriching && bulkEnrichProgress
+                ? `Tamamla (${bulkEnrichProgress.done}/${bulkEnrichProgress.total})`
+                : 'Toplu Tamamla'}
+            </Button>
             <Button size="sm" variant="outline" onClick={() => setShowBulkTagDialog(true)}>
               <Tags className="w-4 h-4" />
               Toplu Etiket
@@ -352,9 +323,7 @@ export default function ListDetail() {
       ) : error ? (
         <div className="bg-card rounded-xl border shadow-soft p-12 text-center">
           <p className="text-destructive mb-4">{error}</p>
-          <Button onClick={loadItems}>
-            {t('common.retry')}
-          </Button>
+          <Button onClick={loadItems}>{t('common.retry')}</Button>
         </div>
       ) : items.length === 0 ? (
         <div className="bg-card rounded-xl border shadow-soft p-12 text-center">
@@ -380,8 +349,7 @@ export default function ListDetail() {
                   <th className="p-3 text-left text-sm font-medium">Telefon</th>
                   <th className="p-3 text-left text-sm font-medium">Website</th>
                   <th className="p-3 text-left text-sm font-medium">Email</th>
-                  <th className="p-3 text-left text-sm font-medium">Skor</th>
-                  <th className="p-3 text-left text-sm font-medium">Pipeline</th>
+                  <th className="p-3 text-left text-sm font-medium">Sosyal Medya</th>
                   <th className="p-3 text-left text-sm font-medium">Not</th>
                   <th className="p-3 text-left text-sm font-medium">Etiketler</th>
                   <th className="p-3 text-left text-sm font-medium">İşlem</th>
@@ -400,28 +368,39 @@ export default function ListDetail() {
                     <td className="p-3 text-sm text-muted-foreground">{item.phone || '-'}</td>
                     <td className="p-3 text-sm text-muted-foreground">
                       {item.website ? (
-                        <a href={`https://${item.website.replace(/^https?:\/\//, '')}`} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                        <a
+                          href={`https://${item.website.replace(/^https?:\/\//, '')}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-primary hover:underline"
+                        >
                           {item.website}
                         </a>
                       ) : '-'}
                     </td>
                     <td className="p-3 text-sm text-muted-foreground">{item.email || '-'}</td>
                     <td className="p-3">
-                      {item.score ? (
-                        <Badge variant={item.score === 'hot' ? 'destructive' : item.score === 'warm' ? 'default' : 'secondary'}>
-                          {item.score}
-                        </Badge>
+                      {item.social_links && Object.keys(item.social_links).length > 0 ? (
+                        <div className="flex flex-wrap gap-1">
+                          {Object.entries(item.social_links).map(([platform, url]) =>
+                            url ? (
+                              <a key={platform} href={url} target="_blank" rel="noopener noreferrer"
+                                className="text-xs text-primary hover:underline capitalize">
+                                {platform}
+                              </a>
+                            ) : null
+                          )}
+                        </div>
                       ) : '-'}
                     </td>
-                    <td className="p-3 text-sm">{item.pipeline || '-'}</td>
-                    <td className="p-3 text-sm text-muted-foreground max-w-xs truncate">{item.note || '-'}</td>
+                    <td className="p-3 text-sm text-muted-foreground max-w-xs truncate">
+                      {item.note || '-'}
+                    </td>
                     <td className="p-3">
                       <div className="flex flex-wrap gap-1">
                         {item.tags && item.tags.length > 0 ? (
                           item.tags.map((tag, idx) => (
-                            <Badge key={idx} variant="outline" className="text-xs">
-                              {tag}
-                            </Badge>
+                            <Badge key={idx} variant="outline" className="text-xs">{tag}</Badge>
                           ))
                         ) : (
                           <span className="text-sm text-muted-foreground">-</span>
@@ -429,17 +408,38 @@ export default function ListDetail() {
                       </div>
                     </td>
                     <td className="p-3">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setEnrichItemId(item.id);
-                          setShowEnrichDialog(true);
-                          setEnrichError(null);
-                        }}
-                      >
-                        {t('leadEnrichment.title')}
-                      </Button>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setEditTarget(item);
+                            setEditNote(item.note || '');
+                            setEditTags((item.tags || []).join(', '));
+                          }}
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setEnrichItemId(item.id);
+                            setShowEnrichDialog(true);
+                            setEnrichError(null);
+                          }}
+                        >
+                          {t('leadEnrichment.title')}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-destructive hover:text-destructive"
+                          onClick={() => setDeleteTarget(item)}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </Button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -448,6 +448,63 @@ export default function ListDetail() {
           </div>
         </div>
       )}
+
+      {/* Per-row Edit Dialog */}
+      <Dialog open={!!editTarget} onOpenChange={(open) => { if (!open) setEditTarget(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Lead Düzenle</DialogTitle>
+            <DialogDescription>{editTarget?.name}</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Not</label>
+              <Textarea
+                placeholder="Not ekle..."
+                value={editNote}
+                onChange={(e) => setEditNote(e.target.value)}
+                rows={3}
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Etiketler (virgülle ayırın)</label>
+              <Input
+                placeholder="örn: sıcak, takipte, potansiyel"
+                value={editTags}
+                onChange={(e) => setEditTags(e.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditTarget(null)} disabled={isSavingEdit}>
+              İptal
+            </Button>
+            <Button onClick={handleSaveEdit} disabled={isSavingEdit}>
+              {isSavingEdit ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Kaydet'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Per-row Delete Confirmation */}
+      <Dialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Lead'i Kaldır</DialogTitle>
+            <DialogDescription>
+              <strong>{deleteTarget?.name}</strong> bu listeden kaldırılacak. Emin misiniz?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteTarget(null)} disabled={isDeletingSingle}>
+              İptal
+            </Button>
+            <Button variant="destructive" onClick={handleSingleDelete} disabled={isDeletingSingle}>
+              {isDeletingSingle ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Trash2 className="w-3.5 h-3.5" />Kaldır</>}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Bulk Tag Dialog */}
       <Dialog open={showBulkTagDialog} onOpenChange={setShowBulkTagDialog}>
@@ -464,9 +521,7 @@ export default function ListDetail() {
             onChange={(e) => setBulkTagInput(e.target.value)}
           />
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowBulkTagDialog(false)}>
-              İptal
-            </Button>
+            <Button variant="outline" onClick={() => setShowBulkTagDialog(false)}>İptal</Button>
             <Button onClick={handleBulkTag} disabled={isProcessing || bulkTagInput.trim().length === 0}>
               {isProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Uygula'}
             </Button>
@@ -479,9 +534,7 @@ export default function ListDetail() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Toplu Not Ekle</DialogTitle>
-            <DialogDescription>
-              Seçili {selectedItemIds.length} lead'e not ekleyin
-            </DialogDescription>
+            <DialogDescription>Seçili {selectedItemIds.length} lead'e not ekleyin</DialogDescription>
           </DialogHeader>
           <Input
             placeholder="Not metni"
@@ -489,9 +542,7 @@ export default function ListDetail() {
             onChange={(e) => setBulkNoteInput(e.target.value)}
           />
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowBulkNoteDialog(false)}>
-              İptal
-            </Button>
+            <Button variant="outline" onClick={() => setShowBulkNoteDialog(false)}>İptal</Button>
             <Button onClick={handleBulkNote} disabled={isProcessing || bulkNoteInput.trim().length === 0}>
               {isProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Uygula'}
             </Button>
@@ -509,9 +560,7 @@ export default function ListDetail() {
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowBulkDeleteDialog(false)}>
-              İptal
-            </Button>
+            <Button variant="outline" onClick={() => setShowBulkDeleteDialog(false)}>İptal</Button>
             <Button variant="destructive" onClick={handleBulkDelete} disabled={isProcessing}>
               {isProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Sil'}
             </Button>
@@ -522,26 +571,17 @@ export default function ListDetail() {
       {/* Enrichment Dialog */}
       <Dialog open={showEnrichDialog} onOpenChange={(open) => {
         setShowEnrichDialog(open);
-        if (!open) {
-          setEnrichItemId(null);
-          setEnrichError(null);
-        }
+        if (!open) { setEnrichItemId(null); setEnrichError(null); }
       }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{t('leadEnrichment.confirmTitle')}</DialogTitle>
-            <DialogDescription>
-              {t('leadEnrichment.confirmMessage')}
-            </DialogDescription>
+            <DialogDescription>{t('leadEnrichment.confirmMessage')}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              {t('leadEnrichment.costNote')}
-            </p>
+            <p className="text-sm text-muted-foreground">{t('leadEnrichment.costNote')}</p>
             {enrichError && (
-              <div className="bg-destructive/10 text-destructive p-3 rounded-md text-sm">
-                {enrichError}
-              </div>
+              <div className="bg-destructive/10 text-destructive p-3 rounded-md text-sm">{enrichError}</div>
             )}
           </div>
           <DialogFooter>
@@ -558,26 +598,18 @@ export default function ListDetail() {
       {/* Export Dialog */}
       <Dialog open={showExportDialog} onOpenChange={(open) => {
         setShowExportDialog(open);
-        if (!open) {
-          setExportFormat('csv');
-          setExportNote('');
-          setExportError(null);
-        }
+        if (!open) { setExportFormat('csv'); setExportNote(''); setExportError(null); }
       }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{t('exports.dialogTitle')}</DialogTitle>
-            <DialogDescription>
-              {t('exports.dialogDescription')}
-            </DialogDescription>
+            <DialogDescription>{t('exports.dialogDescription')}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
               <label className="text-sm font-medium">{t('exports.format')}</label>
               <Select value={exportFormat} onValueChange={(value) => setExportFormat(value as 'csv' | 'xlsx')}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
+                <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="csv">{t('exports.csv')}</SelectItem>
                   <SelectItem value="xlsx">{t('exports.excel')}</SelectItem>
@@ -594,9 +626,7 @@ export default function ListDetail() {
               />
             </div>
             {exportError && (
-              <div className="bg-destructive/10 text-destructive p-3 rounded-md text-sm">
-                {exportError}
-              </div>
+              <div className="bg-destructive/10 text-destructive p-3 rounded-md text-sm">{exportError}</div>
             )}
           </div>
           <DialogFooter>
