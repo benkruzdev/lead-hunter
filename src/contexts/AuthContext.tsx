@@ -70,6 +70,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             } else {
                 setLoading(false);
             }
+        }).catch((err) => {
+            // getSession() itself rejected (network error, etc.) — must unblock loading
+            console.error('AuthContext: getSession() failed:', err);
+            setLoading(false);
         });
 
         // Listen for auth changes
@@ -86,12 +90,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             setSession(session);
             setUser(session?.user ?? null);
 
-            if (session?.user) {
-                await loadProfile(session.user.id);
-            } else {
-                setProfile(null);
+            try {
+                if (session?.user) {
+                    await loadProfile(session.user.id);
+                } else {
+                    setProfile(null);
+                }
+            } finally {
+                setLoading(false);
             }
-            setLoading(false);
         });
 
         return () => subscription.unsubscribe();
