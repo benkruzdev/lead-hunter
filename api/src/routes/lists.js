@@ -7,6 +7,20 @@ import { enrichWebsite } from '../utils/enrichment.js';
 const router = express.Router();
 
 /**
+ * Read credits_per_enrichment from system_settings. Fallback: 1.
+ */
+async function getCreditsPerEnrichment() {
+    const { data, error } = await supabaseAdmin
+        .from('system_settings')
+        .select('credits_per_enrichment')
+        .eq('id', 1)
+        .single();
+
+    if (error || data?.credits_per_enrichment == null) return 1;
+    return data.credits_per_enrichment;
+}
+
+/**
  * GET /api/lists
  * List user's lead lists with item counts
  */
@@ -402,9 +416,8 @@ router.delete('/:listId/items/bulk', requireAuth, async (req, res) => {
  * PRODUCT_SPEC 5.7: 1 credit per successful enrichment
  */
 router.post('/:listId/items/:itemId/enrich', requireAuth, async (req, res) => {
-    const ENRICHMENT_CREDIT_COST = 1;
-
     try {
+        const ENRICHMENT_CREDIT_COST = await getCreditsPerEnrichment();
         const userId = req.user.id;
         const { listId, itemId } = req.params;
 

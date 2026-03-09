@@ -25,6 +25,20 @@ async function getGoogleMapsApiKey() {
 }
 
 /**
+ * Read credits_per_page from system_settings. Fallback: 10.
+ */
+async function getCreditsPerPage() {
+    const { data, error } = await supabaseAdmin
+        .from('system_settings')
+        .select('credits_per_page')
+        .eq('id', 1)
+        .single();
+
+    if (error || data?.credits_per_page == null) return 10;
+    return data.credits_per_page;
+}
+
+/**
  * Build a localized Turkish query string for Places Text Search.
  * e.g. "İstanbul Kadıköy restoran pasta"
  */
@@ -352,9 +366,10 @@ router.get('/:sessionId/page/:pageNumber', requireAuth, async (req, res) => {
 
         const viewedPages = Array.isArray(session.viewed_pages) ? session.viewed_pages : [];
         const alreadyViewed = viewedPages.includes(page);
-        const creditCost = alreadyViewed ? 0 : 10;
+        const creditsPerPage = await getCreditsPerPage();
+        const creditCost = alreadyViewed ? 0 : creditsPerPage;
 
-        console.log('[Search] Page viewed check:', { page, alreadyViewed, creditCost });
+        console.log('[Search] Page viewed check:', { page, alreadyViewed, creditCost, creditsPerPage });
 
         if (!alreadyViewed) {
             // Check credits
