@@ -257,6 +257,41 @@ export async function updateAdminConfig(data: {
 }
 
 /**
+ * Get admin system settings — credit rules & plan defaults (admin only)
+ * GET /api/${ADMIN_SECRET}/admin/system-settings
+ */
+export async function getAdminSystemSettings(): Promise<{
+    settings: {
+        credits_per_page: number | null;
+        credits_per_enrichment: number | null;
+        new_user_credits: number | null;
+    };
+}> {
+    if (!ADMIN_SECRET) {
+        throw new Error('VITE_ADMIN_ROUTE_SECRET is not configured.');
+    }
+    return apiRequest(`/api/${ADMIN_SECRET}/admin/system-settings`);
+}
+
+/**
+ * Update admin system settings — credit rules & plan defaults (admin only)
+ * PATCH /api/${ADMIN_SECRET}/admin/system-settings
+ */
+export async function updateAdminSystemSettings(data: {
+    credits_per_page?: number;
+    credits_per_enrichment?: number;
+    new_user_credits?: number;
+}): Promise<{ success: boolean; settings: any }> {
+    if (!ADMIN_SECRET) {
+        throw new Error('VITE_ADMIN_ROUTE_SECRET is not configured.');
+    }
+    return apiRequest(`/api/${ADMIN_SECRET}/admin/system-settings`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+    });
+}
+
+/**
  * Get admin dashboard metrics (admin only)
  * GET /api/${ADMIN_SECRET}/admin/dashboard
  */

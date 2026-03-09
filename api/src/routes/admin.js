@@ -529,4 +529,73 @@ router.patch('/users/:id', requireAuth, requireAdmin, async (req, res) => {
     }
 });
 
+/**
+ * GET /api/${ADMIN_ROUTE_SECRET}/admin/system-settings
+ * Get credit rules and plan defaults (admin only)
+ */
+router.get('/system-settings', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        const { data, error } = await supabaseAdmin
+            .from('system_settings')
+            .select('credits_per_page, credits_per_enrichment, new_user_credits')
+            .eq('id', 1)
+            .single();
+
+        if (error) {
+            console.error('[Admin] Failed to fetch system settings:', error);
+            return res.status(500).json({ error: 'Database error', message: error.message });
+        }
+
+        res.json({ settings: data });
+    } catch (err) {
+        console.error('[Admin] Get system settings error:', err);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+/**
+ * PATCH /api/${ADMIN_ROUTE_SECRET}/admin/system-settings
+ * Update credit rules and plan defaults (admin only)
+ */
+router.patch('/system-settings', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        const { credits_per_page, credits_per_enrichment, new_user_credits } = req.body;
+
+        const updates = { updated_at: new Date().toISOString() };
+
+        if (credits_per_page !== undefined) {
+            const val = parseInt(credits_per_page);
+            if (isNaN(val) || val < 0) return res.status(400).json({ error: 'credits_per_page must be a non-negative integer' });
+            updates.credits_per_page = val;
+        }
+        if (credits_per_enrichment !== undefined) {
+            const val = parseInt(credits_per_enrichment);
+            if (isNaN(val) || val < 0) return res.status(400).json({ error: 'credits_per_enrichment must be a non-negative integer' });
+            updates.credits_per_enrichment = val;
+        }
+        if (new_user_credits !== undefined) {
+            const val = parseInt(new_user_credits);
+            if (isNaN(val) || val < 0) return res.status(400).json({ error: 'new_user_credits must be a non-negative integer' });
+            updates.new_user_credits = val;
+        }
+
+        const { data, error } = await supabaseAdmin
+            .from('system_settings')
+            .update(updates)
+            .eq('id', 1)
+            .select('credits_per_page, credits_per_enrichment, new_user_credits')
+            .single();
+
+        if (error) {
+            console.error('[Admin] Failed to update system settings:', error);
+            return res.status(500).json({ error: 'Database error', message: error.message });
+        }
+
+        res.json({ success: true, settings: data });
+    } catch (err) {
+        console.error('[Admin] Update system settings error:', err);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
 export default router;
