@@ -22,6 +22,9 @@ const resources = {
                 credits: 'Kredi',
                 creditsRemaining: 'Kalan Kredi',
                 retry: 'Tekrar Dene',
+                yes: 'Var',
+                no: 'Yok',
+                confirm: 'Onayla',
             },
 
             // Auth
@@ -134,6 +137,8 @@ const resources = {
                 insufficientCredits: 'Yeterli krediniz yok',
                 confirmTitle: 'Detayları Tamamla',
                 confirmMessage: 'Bu lead için web sitesinden email ve sosyal medya bağlantıları bulunacak.',
+                statusFound: 'Detaylar bulundu',
+                statusNotFound: 'Detay bulunamadı',
             },
 
             // Exports
@@ -634,16 +639,6 @@ const resources = {
                 cancel: 'İptal',
             },
 
-            // Common
-            common: {
-                yes: 'Var',
-                no: 'Yok',
-                loading: 'Yükleniyor...',
-                creditsRemaining: 'Kalan Kredi',
-                confirm: 'Onayla',
-                cancel: 'İptal',
-            },
-
             // List Metadata (Notes & Tags)
             listMeta: {
                 notesTitle: 'Notlar',
@@ -722,6 +717,9 @@ const resources = {
                 credits: 'Credits',
                 creditsRemaining: 'Credits Remaining',
                 retry: 'Retry',
+                yes: 'Available',
+                no: 'Not Available',
+                confirm: 'Confirm',
             },
 
             // Layout
@@ -790,6 +788,8 @@ const resources = {
                 insufficientCredits: 'Insufficient credits',
                 confirmTitle: 'Complete Details',
                 confirmMessage: 'Email and social media links will be extracted from the website.',
+                statusFound: 'Details found',
+                statusNotFound: 'No details found',
             },
 
             // Exports
@@ -1287,16 +1287,6 @@ const resources = {
                     desc: 'Name, website, Instagram, category, city',
                 },
                 download: 'Download',
-                cancel: 'Cancel',
-            },
-
-            // Common
-            common: {
-                yes: 'Available',
-                no: 'Not Available',
-                loading: 'Loading...',
-                creditsRemaining: 'Credits Remaining',
-                confirm: 'Confirm',
                 cancel: 'Cancel',
             },
 

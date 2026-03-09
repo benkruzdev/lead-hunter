@@ -44,7 +44,7 @@ router.post('/', requireAuth, async (req, res) => {
         // Fetch lead list items
         const { data: items, error: itemsError } = await supabaseAdmin
             .from('lead_list_items')
-            .select('name, phone, website, email, score, pipeline, note, tags')
+            .select('name, phone, website, email, social_links, note, tags')
             .eq('list_id', listId)
             .eq('user_id', userId);
 

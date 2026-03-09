@@ -516,6 +516,8 @@ export interface LeadListItem {
         linkedin?: string;
         [key: string]: string | undefined;
     } | null;
+    enrichment_status: 'success' | 'failed' | null;
+    enriched_at: string | null;
     raw: any;
     created_at: string;
     updated_at: string;

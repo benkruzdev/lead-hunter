@@ -420,17 +420,27 @@ export default function ListDetail() {
                         >
                           <Pencil className="w-3.5 h-3.5" />
                         </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setEnrichItemId(item.id);
-                            setShowEnrichDialog(true);
-                            setEnrichError(null);
-                          }}
-                        >
-                          {t('leadEnrichment.title')}
-                        </Button>
+                        {item.enrichment_status === null || item.enrichment_status === undefined ? (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setEnrichItemId(item.id);
+                              setShowEnrichDialog(true);
+                              setEnrichError(null);
+                            }}
+                          >
+                            {t('leadEnrichment.title')}
+                          </Button>
+                        ) : item.enrichment_status === 'success' ? (
+                          <span className="text-xs text-green-600 font-medium px-2">
+                            {t('leadEnrichment.statusFound')}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-muted-foreground px-2">
+                            {t('leadEnrichment.statusNotFound')}
+                          </span>
+                        )}
                         <Button
                           variant="ghost"
                           size="sm"
