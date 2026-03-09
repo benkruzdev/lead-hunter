@@ -118,11 +118,19 @@ export default function Register() {
       navigate("/app/search");
     } catch (error: any) {
       console.error("Registration error:", error);
-      toast({
-        title: t("auth.errors.registrationFailed", "Registration failed"),
-        description: error.message || t("auth.errors.tryAgain", "Please try again"),
-        variant: "destructive",
-      });
+      if (error.code === 'EMAIL_CONFIRMATION_REQUIRED') {
+        toast({
+          title: t("auth.registerSuccess"),
+          description: t("auth.errors.confirmEmailRequired", "Hesabınızı doğrulamak için e-postanızı kontrol edin."),
+        });
+        navigate("/login");
+      } else {
+        toast({
+          title: t("auth.errors.registrationFailed", "Registration failed"),
+          description: error.message || t("auth.errors.tryAgain", "Please try again"),
+          variant: "destructive",
+        });
+      }
     } finally {
       setIsLoading(false);
     }

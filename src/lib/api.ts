@@ -144,11 +144,6 @@ export async function updateProfile(data: {
     });
 }
 
-/**
-    return apiRequest<{
-        credits: number;
-    }>('/api/credits/balance');
-}
 
 /**
  * Get current credit balance

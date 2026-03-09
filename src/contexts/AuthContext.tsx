@@ -131,7 +131,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
             if (!session) {
                 // Email confirmation required - throw special error
-                throw new Error('Please check your email to confirm your account before logging in.');
+                const err = new Error('EMAIL_CONFIRMATION_REQUIRED') as any;
+                err.code = 'EMAIL_CONFIRMATION_REQUIRED';
+                throw err;
             }
         } catch (error: any) {
             // Propagate error as-is (don't wrap in new Error)

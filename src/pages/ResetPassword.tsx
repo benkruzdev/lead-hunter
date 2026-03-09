@@ -6,6 +6,7 @@ import { useState, useEffect } from "react";
 import { Lock, Eye, EyeOff, ArrowRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/lib/supabaseClient";
 import { useTranslation } from "react-i18next";
 import { useToast } from "@/hooks/use-toast";
 
@@ -20,19 +21,28 @@ export default function ResetPassword() {
     const { t } = useTranslation();
     const { toast } = useToast();
 
-    // Verify that we have a valid reset token from URL
+    // Verify that we have a valid reset token from URL or an active recovery session.
+    // Supabase SDK may consume the hash before useEffect runs, so we also check session.
     useEffect(() => {
         const hashParams = new URLSearchParams(window.location.hash.substring(1));
         const accessToken = hashParams.get('access_token');
         const type = hashParams.get('type');
 
-        if (type !== 'recovery' || !accessToken) {
-            toast({
-                title: t("auth.errors.invalidResetLink", "Invalid reset link"),
-                description: t("auth.errors.requestNewLink", "Please request a new password reset link"),
-                variant: "destructive",
+        const hashValid = type === 'recovery' && !!accessToken;
+
+        if (!hashValid) {
+            // Hash already consumed by Supabase SDK — check if a session was established
+            supabase.auth.getSession().then(({ data: { session } }) => {
+                if (!session) {
+                    toast({
+                        title: t("auth.errors.invalidResetLink", "Invalid reset link"),
+                        description: t("auth.errors.requestNewLink", "Please request a new password reset link"),
+                        variant: "destructive",
+                    });
+                    navigate("/forgot-password");
+                }
+                // session exists → SDK already handled the token, form is usable
             });
-            navigate("/forgot-password");
         }
     }, [navigate, toast, t]);
 
