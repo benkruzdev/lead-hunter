@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { performSearch, getSearchPage, getSearchSession, SearchResult, getLeadLists, addLeadsToList, LeadList } from "@/lib/api";
@@ -70,34 +70,7 @@ import { SearchIntelligenceBar } from "@/components/app/SearchIntelligenceBar";
 import { LeadQualityBadge } from "@/components/app/LeadQualityBadge";
 import { ExportTemplateDialog } from "@/components/app/ExportTemplateDialog";
 import { templates, mapItemToRecord, generateCSV, downloadCSV } from "@/lib/exportTemplates";
-import { getMockSocials } from "@/lib/socials";
 
-
-
-
-// Mock data generator (temporary for PR3 testing - will be replaced with real API)
-// Generates 200 results to test pagination modal, confirm/cancel, and same-page-free logic
-const generateMockResults = (count: number = 200) => {
-  const categories = ["Restoran", "Kafe", "Berber", "KuafÃ¶r", "Market", "Eczane", "Veteriner", "Emlak"];
-  const districts = ["KadÄ±kÃ¶y", "BeÅŸiktaÅŸ", "ÅiÅŸli", "Fatih", "ÃœskÃ¼dar", "BeyoÄŸlu", "Ã‡ankaya", "KeÃ§iÃ¶ren"];
-  const adjectives = ["Modern", "Lezzet", "Tarihi", "Yeni", "Anadolu", "Karadeniz", "Ege", "Akdeniz"];
-
-  return Array.from({ length: count }, (_, i) => ({
-    id: i + 1,
-    name: `${adjectives[i % adjectives.length]} ${categories[i % categories.length]} ${Math.floor(i / 10) + 1}`,
-    category: categories[i % categories.length],
-    district: districts[i % districts.length],
-    rating: Number((3.5 + Math.random() * 1.5).toFixed(1)),
-    reviews: Math.floor(Math.random() * 3000) + 100,
-    isOpen: i % 3 !== 0,
-    phone: `+90 ${210 + (i % 6)}${(i % 10).toString().padStart(2, '0')} 555 ${String(1000 + i).slice(-4)}`,
-    website: `www.business${i + 1}.com`,
-    address: `${districts[i % districts.length]} Mah. No:${i + 1}, Ä°stanbul`,
-    hours: i % 3 === 0 ? "09:00 - 23:00" : "08:00 - 22:00",
-  }));
-};
-
-const mockResults = generateMockResults(200);
 
 export default function SearchPage() {
   const { t } = useTranslation();
@@ -115,9 +88,9 @@ export default function SearchPage() {
   const [minReviews, setMinReviews] = useState("");
   const [isSearching, setIsSearching] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
-  const [results, setResults] = useState<typeof mockResults>([]);
+  const [results, setResults] = useState<SearchResult[]>([]);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
-  const [detailItem, setDetailItem] = useState<(typeof mockResults)[0] | null>(null);
+  const [detailItem, setDetailItem] = useState<SearchResult | null>(null);
 
   // Pagination state (PR3)
   const [sessionId, setSessionId] = useState<string | null>(null); // PR4: Backend session tracking
@@ -634,14 +607,6 @@ export default function SearchPage() {
                     <td className="p-4">
                       <div className="space-y-1">
                         <div className="font-medium">{item.name}</div>
-                        {(() => {
-                          const socialCount = Object.keys(getMockSocials(item)).length;
-                          return socialCount > 0 ? (
-                            <div className="text-xs text-muted-foreground">
-                              {t('searchPage.socialCount', { count: socialCount })}
-                            </div>
-                          ) : null;
-                        })()}
                         <LeadQualityBadge
                           variant={
                             item.reviews >= 1000 ? "engaged"
@@ -669,22 +634,10 @@ export default function SearchPage() {
                       </Badge>
                     </td>
                     <td className="p-4">
-                      {item.id % 2 === 0 ? (
-                        <span className="text-sm text-foreground">{t('common.yes')}</span>
-                      ) : (
-                        <span className="text-sm text-muted-foreground">{t('common.no')}</span>
-                      )}
+                      <span className="text-sm text-muted-foreground">—</span>
                     </td>
                     <td className="p-4">
-                      {(() => {
-                        const socials = getMockSocials(item);
-                        const hasSocials = Object.keys(socials).length > 0;
-                        return hasSocials ? (
-                          <span className="text-sm text-foreground">{t('common.yes')}</span>
-                        ) : (
-                          <span className="text-sm text-muted-foreground">{t('common.no')}</span>
-                        );
-                      })()}
+                      <span className="text-sm text-muted-foreground">—</span>
                     </td>
                     <td className="p-4">
                       <div className="flex items-center gap-2">
@@ -823,9 +776,7 @@ export default function SearchPage() {
                     <Mail className="w-5 h-5 text-muted-foreground mt-0.5" />
                     <div>
                       <p className="font-medium">{t('searchPage.email')}</p>
-                      <p className="text-muted-foreground">
-                        {detailItem.id % 2 === 0 ? t('common.yes') : t('common.no')}
-                      </p>
+                      <p className="text-muted-foreground">—</p>
                     </div>
                   </div>
 
@@ -833,25 +784,22 @@ export default function SearchPage() {
                     <Share2 className="w-5 h-5 text-muted-foreground mt-0.5" />
                     <div>
                       <p className="font-medium">{t('searchPage.socialProfiles')}</p>
-                      <p className="text-muted-foreground">
-                        {Object.keys(getMockSocials(detailItem)).length > 0 ? t('common.yes') : t('common.no')}
-                      </p>
+                      <p className="text-muted-foreground">—</p>
                     </div>
                   </div>
                 </div>
 
                 <div className="pt-4 space-y-3">
-                  <Button className="w-full" onClick={() => {
-                    alert("Lead listenize eklendi!");
-                    setDetailItem(null);
-                  }}>
-                    <Plus className="w-4 h-4" />
-                    Lead Listeme Ekle
-                  </Button>
-                  <Button variant="outline" className="w-full">
-                    <ExternalLink className="w-4 h-4" />
-                    Google Haritalar'da AÃ§
-                  </Button>
+                  {detailItem.website && (
+                    <Button
+                      variant="outline"
+                      className="w-full"
+                      onClick={() => window.open(`https://${detailItem.website.replace(/^https?:\/\//, '')}`, '_blank')}
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                      {detailItem.website}
+                    </Button>
+                  )}
                 </div>
               </div>
             </div>
