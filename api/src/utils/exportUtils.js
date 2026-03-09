@@ -6,13 +6,22 @@
 import XLSX from 'xlsx';
 
 /**
+ * Flatten social_links JSONB into a comma-separated string
+ * e.g. { instagram: 'https://...', facebook: 'https://...' } → 'https://... , https://...'
+ */
+function flattenSocialLinks(social_links) {
+    if (!social_links || typeof social_links !== 'object') return '';
+    return Object.values(social_links).filter(Boolean).join(' | ');
+}
+
+/**
  * Generate CSV from lead list items
  * @param {Array} items - Lead list items
  * @returns {string} CSV content
  */
 export function generateCSV(items) {
     // CSV headers
-    const headers = ['Name', 'Phone', 'Website', 'Email', 'Score', 'Pipeline', 'Note', 'Tags'];
+    const headers = ['Name', 'Phone', 'Website', 'Email', 'Social Links', 'Note', 'Tags'];
 
     // Convert items to rows
     const rows = items.map(item => [
@@ -20,8 +29,7 @@ export function generateCSV(items) {
         item.phone || '',
         item.website || '',
         item.email || '',
-        item.score || '',
-        item.pipeline || '',
+        flattenSocialLinks(item.social_links),
         item.note || '',
         Array.isArray(item.tags) ? item.tags.join(', ') : ''
     ]);
@@ -48,15 +56,14 @@ export function generateCSV(items) {
  */
 export function generateXLSX(items) {
     // Prepare data with headers
-    const headers = ['Name', 'Phone', 'Website', 'Email', 'Score', 'Pipeline', 'Note', 'Tags'];
+    const headers = ['Name', 'Phone', 'Website', 'Email', 'Social Links', 'Note', 'Tags'];
 
     const data = items.map(item => ({
         'Name': item.name || '',
         'Phone': item.phone || '',
         'Website': item.website || '',
         'Email': item.email || '',
-        'Score': item.score || '',
-        'Pipeline': item.pipeline || '',
+        'Social Links': flattenSocialLinks(item.social_links),
         'Note': item.note || '',
         'Tags': Array.isArray(item.tags) ? item.tags.join(', ') : ''
     }));
@@ -65,14 +72,14 @@ export function generateXLSX(items) {
     const ws = XLSX.utils.json_to_sheet(data, { header: headers });
 
     // Calculate column widths based on content
-    const colWidths = headers.map((header, idx) => {
+    const colWidths = headers.map((header) => {
         const headerLen = header.length;
         const maxLen = data.reduce((max, row) => {
             const val = String(row[header] || '');
             return Math.max(max, val.length);
         }, headerLen);
-        // Min width 12, max width 40
-        return { wch: Math.min(Math.max(maxLen, 12), 40) };
+        // Min width 12, max width 60 (social links can be long)
+        return { wch: Math.min(Math.max(maxLen, 12), 60) };
     });
     ws['!cols'] = colWidths;
 
@@ -90,7 +97,7 @@ export function generateXLSX(items) {
         };
     }
 
-    // Make website column clickable hyperlinks and wrap Note column
+    // Make website column (index 2) clickable hyperlinks; wrap Note (index 5) and Social Links (index 4)
     for (let row = 1; row <= range.e.r; row++) {
         // Website hyperlinks (column index 2)
         const websiteCell = XLSX.utils.encode_cell({ r: row, c: 2 });
@@ -100,8 +107,14 @@ export function generateXLSX(items) {
             ws[websiteCell].s = { font: { color: { rgb: "0563C1" }, underline: true } };
         }
 
-        // Wrap text for Note column (column index 6)
-        const noteCell = XLSX.utils.encode_cell({ r: row, c: 6 });
+        // Wrap Social Links column (column index 4)
+        const socialCell = XLSX.utils.encode_cell({ r: row, c: 4 });
+        if (ws[socialCell]) {
+            ws[socialCell].s = { alignment: { wrapText: true, vertical: 'top' } };
+        }
+
+        // Wrap Note column (column index 5)
+        const noteCell = XLSX.utils.encode_cell({ r: row, c: 5 });
         if (ws[noteCell]) {
             ws[noteCell].s = { alignment: { wrapText: true, vertical: 'top' } };
         }

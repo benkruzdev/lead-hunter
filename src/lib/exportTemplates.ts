@@ -1,5 +1,5 @@
 // Export template definitions and CSV generation utilities
-import { getMockSocials } from './socials';
+// social_links read from real enrichment data (item.social_links)
 
 export interface ExportTemplate {
     id: 'basic' | 'salesCrm' | 'outreach';
@@ -17,44 +17,14 @@ export const templates: Record<string, ExportTemplate> = {
     },
     outreach: {
         id: 'outreach',
-        columns: ['name', 'website', 'instagram', 'facebook', 'linkedin', 'twitter', 'tiktok', 'youtube', 'outreach_ready', 'category', 'city'],
+        columns: ['name', 'website', 'instagram', 'facebook', 'linkedin', 'x', 'tiktok', 'youtube', 'outreach_ready', 'category', 'city'],
     },
 };
 
-// Slug generator: normalize Turkish chars and create URL-safe slug
-function slugify(text: string): string {
-    const turkishMap: Record<string, string> = {
-        'ş': 's', 'Ş': 's',
-        'ı': 'i', 'İ': 'i',
-        'ö': 'o', 'Ö': 'o',
-        'ü': 'u', 'Ü': 'u',
-        'ç': 'c', 'Ç': 'c',
-        'ğ': 'g', 'Ğ': 'g',
-    };
-
-    let normalized = text;
-    for (const [tr, en] of Object.entries(turkishMap)) {
-        normalized = normalized.replace(new RegExp(tr, 'g'), en);
-    }
-
-    return normalized
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/^-+|-+$/g, '');
-}
-
-// Generate mock email based on item ID
-function generateMockEmail(item: any): string {
-    if (item.id % 2 === 0) {
-        const slug = slugify(item.name);
-        return `info@${slug}.com`;
-    }
-    return '';
-}
-
-// Map a search result item to a flat record based on template
+// Map a lead list item to a flat record based on template
 export function mapItemToRecord(item: any, template: ExportTemplate, city?: string): Record<string, string> {
     const record: Record<string, string> = {};
+    const socialLinks: Record<string, string> = item.social_links || {};
 
     for (const col of template.columns) {
         switch (col) {
@@ -74,13 +44,13 @@ export function mapItemToRecord(item: any, template: ExportTemplate, city?: stri
                 record[col] = item.website || '';
                 break;
             case 'email':
-                record[col] = generateMockEmail(item);
+                record[col] = item.email || '';
                 break;
             case 'rating':
                 record[col] = item.rating?.toString() || '';
                 break;
             case 'reviews':
-                record[col] = item.reviews?.toString() || '';
+                record[col] = (item.reviews ?? item.reviews_count)?.toString() || '';
                 break;
             case 'isOpen':
                 record[col] = item.isOpen ? 'Yes' : 'No';
@@ -88,17 +58,14 @@ export function mapItemToRecord(item: any, template: ExportTemplate, city?: stri
             case 'instagram':
             case 'facebook':
             case 'linkedin':
-            case 'twitter':
+            case 'x':
             case 'tiktok':
-            case 'youtube': {
-                const socials = getMockSocials(item);
-                record[col] = socials[col as keyof typeof socials] || '';
+            case 'youtube':
+                record[col] = socialLinks[col] || '';
                 break;
-            }
             case 'outreach_ready': {
-                const socials = getMockSocials(item);
-                const socialCount = Object.keys(socials).length;
-                record[col] = socialCount >= 2 ? 'yes' : 'no';
+                const socialCount = Object.values(socialLinks).filter(Boolean).length;
+                record[col] = socialCount >= 2 ? 'yes' : (item.email ? 'yes' : 'no');
                 break;
             }
             case 'city':
