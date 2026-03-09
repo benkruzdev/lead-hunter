@@ -251,12 +251,16 @@ export default function SettingsPage() {
           {t('settings.password')}
         </h3>
 
-        <div className="space-y-4">
+        <form
+          onSubmit={(e) => { e.preventDefault(); handleChangePassword(); }}
+          className="space-y-4"
+        >
           <div className="space-y-2">
             <Label htmlFor="currentPassword">{t('settings.currentPassword')}</Label>
             <Input
               id="currentPassword"
               type="password"
+              autoComplete="current-password"
               value={currentPassword}
               onChange={(e) => setCurrentPassword(e.target.value)}
               placeholder="••••••••"
@@ -268,6 +272,7 @@ export default function SettingsPage() {
             <Input
               id="newPassword"
               type="password"
+              autoComplete="new-password"
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
               placeholder="••••••••"
@@ -279,6 +284,7 @@ export default function SettingsPage() {
             <Input
               id="confirmPassword"
               type="password"
+              autoComplete="new-password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               placeholder="••••••••"
@@ -300,10 +306,10 @@ export default function SettingsPage() {
             </div>
           )}
 
-          <Button onClick={handleChangePassword} disabled={isChangingPassword}>
+          <Button type="submit" disabled={isChangingPassword}>
             {isChangingPassword ? t('common.loading') : t('settings.updatePassword')}
           </Button>
-        </div>
+        </form>
       </div>
 
       {/* Language Section */}
