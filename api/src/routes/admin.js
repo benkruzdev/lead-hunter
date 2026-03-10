@@ -530,6 +530,104 @@ router.patch('/users/:id', requireAuth, requireAdmin, async (req, res) => {
 });
 
 /**
+ * GET /api/${ADMIN_ROUTE_SECRET}/admin/search-logs
+ * Paginated search session logs across all users (admin only)
+ * Query params: limit, offset, query (user email/name search)
+ */
+router.get('/search-logs', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        const { limit = 50, offset = 0, query = '' } = req.query;
+        const parsedLimit = Math.min(parseInt(limit) || 50, 200);
+        const parsedOffset = parseInt(offset) || 0;
+
+        // If searching by user, first resolve matching user_ids from profiles
+        let filteredUserIds = null;
+        if (query) {
+            const { data: matchedProfiles } = await supabaseAdmin
+                .from('profiles')
+                .select('id')
+                .or(`full_name.ilike.%${query}%,email.ilike.%${query}%`)
+                .limit(100);
+            filteredUserIds = (matchedProfiles || []).map(p => p.id);
+            // If no profiles match, also check by province/district/category keyword
+        }
+
+        let sessionsQuery = supabaseAdmin
+            .from('search_sessions')
+            .select(
+                'id, user_id, province, district, category, keyword, min_rating, min_reviews, total_results, viewed_pages, created_at',
+                { count: 'exact' }
+            )
+            .order('created_at', { ascending: false })
+            .range(parsedOffset, parsedOffset + parsedLimit - 1);
+
+        if (filteredUserIds !== null) {
+            if (filteredUserIds.length === 0) {
+                // No users matched — also try matching on text fields
+                sessionsQuery = sessionsQuery.or(
+                    `province.ilike.%${query}%,district.ilike.%${query}%,category.ilike.%${query}%,keyword.ilike.%${query}%`
+                );
+            } else {
+                sessionsQuery = sessionsQuery.in('user_id', filteredUserIds);
+            }
+        }
+
+        const { data: sessions, count, error } = await sessionsQuery;
+
+        if (error) {
+            console.error('[Admin] Search logs error:', error);
+            return res.status(500).json({ error: 'Database error', message: error.message });
+        }
+
+        // Enrich with user info
+        const userIds = [...new Set((sessions || []).map(s => s.user_id))];
+        const profileMap = {};
+
+        if (userIds.length > 0) {
+            // Try with email first; fall back to full_name only
+            const { data: profilesWithEmail, error: emailErr } = await supabaseAdmin
+                .from('profiles')
+                .select('id, full_name, email')
+                .in('id', userIds);
+
+            if (!emailErr && profilesWithEmail) {
+                profilesWithEmail.forEach(p => { profileMap[p.id] = { full_name: p.full_name, email: p.email }; });
+            } else {
+                const { data: profilesNoEmail } = await supabaseAdmin
+                    .from('profiles')
+                    .select('id, full_name')
+                    .in('id', userIds);
+                (profilesNoEmail || []).forEach(p => { profileMap[p.id] = { full_name: p.full_name, email: null }; });
+            }
+
+            // Auth email fallback for users still missing email
+            const missingEmailIds = userIds.filter(id => !profileMap[id]?.email);
+            if (missingEmailIds.length > 0) {
+                await Promise.allSettled(missingEmailIds.map(async (id) => {
+                    const { data: authUser } = await supabaseAdmin.auth.admin.getUserById(id);
+                    if (authUser?.user?.email) {
+                        if (profileMap[id]) profileMap[id].email = authUser.user.email;
+                        else profileMap[id] = { full_name: null, email: authUser.user.email };
+                    }
+                }));
+            }
+        }
+
+        const enriched = (sessions || []).map(s => ({
+            ...s,
+            user_name: profileMap[s.user_id]?.full_name || null,
+            user_email: profileMap[s.user_id]?.email || null,
+            pages_viewed: Array.isArray(s.viewed_pages) ? s.viewed_pages.length : 0,
+        }));
+
+        res.json({ logs: enriched, total: count || 0 });
+    } catch (err) {
+        console.error('[Admin] Search logs error:', err);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+/**
  * GET /api/${ADMIN_ROUTE_SECRET}/admin/credits/ledger
  * Paginated credit transaction ledger across all users (admin only)
  */

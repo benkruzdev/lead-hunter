@@ -294,6 +294,40 @@ export async function updateAdminSystemSettings(data: {
 }
 
 /**
+ * Get admin search session logs (admin only)
+ * GET /api/${ADMIN_SECRET}/admin/search-logs
+ */
+export async function getAdminSearchLogs(params?: {
+    limit?: number;
+    offset?: number;
+    query?: string;
+}): Promise<{
+    logs: Array<{
+        id: string;
+        user_id: string;
+        user_name: string | null;
+        user_email: string | null;
+        province: string | null;
+        district: string | null;
+        category: string | null;
+        keyword: string | null;
+        min_rating: number | null;
+        min_reviews: number | null;
+        total_results: number;
+        pages_viewed: number;
+        created_at: string;
+    }>;
+    total: number;
+}> {
+    if (!ADMIN_SECRET) throw new Error('VITE_ADMIN_ROUTE_SECRET is not configured.');
+    const q = new URLSearchParams();
+    if (params?.limit) q.set('limit', String(params.limit));
+    if (params?.offset) q.set('offset', String(params.offset));
+    if (params?.query) q.set('query', params.query);
+    return apiRequest(`/api/${ADMIN_SECRET}/admin/search-logs?${q.toString()}`);
+}
+
+/**
  * Get credit transaction ledger (admin only)
  * GET /api/${ADMIN_SECRET}/admin/credits/ledger
  */
