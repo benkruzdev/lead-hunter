@@ -294,6 +294,37 @@ export async function updateAdminSystemSettings(data: {
 }
 
 /**
+ * Get admin cost/usage summary (admin only)
+ * GET /api/${ADMIN_SECRET}/admin/costs
+ */
+export async function getAdminCosts(): Promise<{
+    api_calls: {
+        total_search_sessions: number;
+        search_sessions_30d: number;
+        page_views_30d: number;
+        total_exports: number;
+        exports_30d: number;
+        leads_exported_30d: number;
+    };
+    credits: {
+        issued_30d: number;
+        consumed_30d: number;
+        sold_30d: number;
+        pending_orders: number;
+        revenue_try_30d: number;
+    };
+    daily_breakdown: Array<{
+        date: string;
+        searches: number;
+        exports: number;
+        leads_exported: number;
+    }>;
+}> {
+    if (!ADMIN_SECRET) throw new Error('VITE_ADMIN_ROUTE_SECRET is not configured.');
+    return apiRequest(`/api/${ADMIN_SECRET}/admin/costs`);
+}
+
+/**
  * Get admin order/payment records (admin only)
  * GET /api/${ADMIN_SECRET}/admin/payments
  */

@@ -530,6 +530,141 @@ router.patch('/users/:id', requireAuth, requireAdmin, async (req, res) => {
 });
 
 /**
+ * GET /api/${ADMIN_ROUTE_SECRET}/admin/costs
+ * Operational cost/usage summary derived from existing tables (admin only)
+ * Returns: api_calls summary, credit/revenue summary, last-30-day daily breakdown
+ */
+router.get('/costs', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+        const today = new Date().toISOString().slice(0, 10);
+
+        // ── API Calls summary ──────────────────────────────────────────────────
+        // Total search sessions (each session = 1 Google Places text search call)
+        const { count: totalSearchSessions } = await supabaseAdmin
+            .from('search_sessions')
+            .select('id', { count: 'exact', head: true });
+
+        // Search sessions this month
+        const { count: searchSessionsThisMonth } = await supabaseAdmin
+            .from('search_sessions')
+            .select('id', { count: 'exact', head: true })
+            .gte('created_at', thirtyDaysAgo);
+
+        // Total page views across all sessions (sum of viewed_pages array lengths)
+        const { data: allSessions } = await supabaseAdmin
+            .from('search_sessions')
+            .select('viewed_pages')
+            .gte('created_at', thirtyDaysAgo);
+
+        const totalPageViews = (allSessions || []).reduce(
+            (sum, s) => sum + (Array.isArray(s.viewed_pages) ? s.viewed_pages.length : 0), 0
+        );
+
+        // Total exports
+        const { count: totalExports } = await supabaseAdmin
+            .from('exports')
+            .select('id', { count: 'exact', head: true });
+
+        const { count: exportsThisMonth } = await supabaseAdmin
+            .from('exports')
+            .select('id', { count: 'exact', head: true })
+            .gte('created_at', thirtyDaysAgo);
+
+        // Total leads exported
+        const { data: exportSums } = await supabaseAdmin
+            .from('exports')
+            .select('lead_count')
+            .gte('created_at', thirtyDaysAgo);
+        const totalLeadsExported = (exportSums || []).reduce((sum, e) => sum + (e.lead_count || 0), 0);
+
+        // ── Credit / Revenue summary ───────────────────────────────────────────
+        // Credits issued (positive entries in credit_ledger)
+        const { data: ledgerEntries } = await supabaseAdmin
+            .from('credit_ledger')
+            .select('amount')
+            .gte('created_at', thirtyDaysAgo);
+
+        const creditsIssued = (ledgerEntries || [])
+            .filter(e => e.amount > 0)
+            .reduce((sum, e) => sum + e.amount, 0);
+
+        const creditsConsumed = (ledgerEntries || [])
+            .filter(e => e.amount < 0)
+            .reduce((sum, e) => sum + Math.abs(e.amount), 0);
+
+        // Completed orders revenue this month
+        const { data: completedOrders } = await supabaseAdmin
+            .from('orders')
+            .select('amount, credits')
+            .eq('status', 'completed')
+            .gte('created_at', thirtyDaysAgo);
+
+        const revenueThisMonth = (completedOrders || []).reduce((sum, o) => sum + (o.amount || 0), 0);
+        const creditsSoldThisMonth = (completedOrders || []).reduce((sum, o) => sum + (o.credits || 0), 0);
+
+        // Pending orders
+        const { count: pendingOrders } = await supabaseAdmin
+            .from('orders')
+            .select('id', { count: 'exact', head: true })
+            .eq('status', 'pending');
+
+        // ── Daily breakdown (last 30 days) ────────────────────────────────────
+        // search_sessions per day
+        const { data: dailySearchRaw } = await supabaseAdmin
+            .from('search_sessions')
+            .select('created_at')
+            .gte('created_at', thirtyDaysAgo)
+            .order('created_at', { ascending: true });
+
+        // exports per day
+        const { data: dailyExportRaw } = await supabaseAdmin
+            .from('exports')
+            .select('created_at, lead_count')
+            .gte('created_at', thirtyDaysAgo)
+            .order('created_at', { ascending: true });
+
+        // Build daily map
+        const dailyMap = {};
+        (dailySearchRaw || []).forEach(r => {
+            const day = r.created_at.slice(0, 10);
+            if (!dailyMap[day]) dailyMap[day] = { date: day, searches: 0, exports: 0, leads_exported: 0 };
+            dailyMap[day].searches++;
+        });
+        (dailyExportRaw || []).forEach(r => {
+            const day = r.created_at.slice(0, 10);
+            if (!dailyMap[day]) dailyMap[day] = { date: day, searches: 0, exports: 0, leads_exported: 0 };
+            dailyMap[day].exports++;
+            dailyMap[day].leads_exported += r.lead_count || 0;
+        });
+
+        const dailyBreakdown = Object.values(dailyMap).sort((a, b) => a.date.localeCompare(b.date));
+
+        res.json({
+            api_calls: {
+                total_search_sessions: totalSearchSessions || 0,
+                search_sessions_30d: searchSessionsThisMonth || 0,
+                page_views_30d: totalPageViews,
+                total_exports: totalExports || 0,
+                exports_30d: exportsThisMonth || 0,
+                leads_exported_30d: totalLeadsExported,
+            },
+            credits: {
+                issued_30d: creditsIssued,
+                consumed_30d: creditsConsumed,
+                sold_30d: creditsSoldThisMonth,
+                pending_orders: pendingOrders || 0,
+                revenue_try_30d: revenueThisMonth,
+            },
+            daily_breakdown: dailyBreakdown,
+        });
+    } catch (err) {
+        console.error('[Admin] Costs error:', err);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+/**
  * GET /api/${ADMIN_ROUTE_SECRET}/admin/payments
  * Paginated order records across all users (admin only)
  * Query params: limit, offset, status, query (user name/email)
