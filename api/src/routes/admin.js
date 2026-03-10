@@ -636,15 +636,19 @@ router.get('/payments', requireAuth, requireAdmin, async (req, res) => {
 /**
  * POST /api/${ADMIN_ROUTE_SECRET}/admin/payments/:orderId/complete
  * Complete a pending manual order and add credits to user (admin only)
+ * NOTE: Does NOT use complete_order_and_add_credits RPC — that RPC inserts into
+ * credit_transactions.type which does not exist. Instead we do direct DB ops
+ * matching the same pattern as the admin credit adjust endpoint.
  */
 router.post('/payments/:orderId/complete', requireAuth, requireAdmin, async (req, res) => {
     try {
         const { orderId } = req.params;
+        const adminId = req.user.id;
 
-        // Verify order exists and is pending
+        // Step 1: Verify order exists and is pending
         const { data: order, error: orderError } = await supabaseAdmin
             .from('orders')
-            .select('id, status, user_id, credits, amount')
+            .select('id, status, user_id, credits, amount, currency')
             .eq('id', orderId)
             .single();
 
@@ -656,32 +660,72 @@ router.post('/payments/:orderId/complete', requireAuth, requireAdmin, async (req
             return res.status(400).json({ error: 'Order is not pending', current_status: order.status });
         }
 
-        // Call RPC to complete order and add credits atomically
-        const { data, error } = await supabaseAdmin.rpc('complete_order_and_add_credits', {
-            p_order_id: orderId
-        });
+        // Step 2: Fetch current profile credits
+        const { data: profile, error: profileError } = await supabaseAdmin
+            .from('profiles')
+            .select('id, credits')
+            .eq('id', order.user_id)
+            .single();
 
-        if (error) {
-            console.error('[Admin] Failed to complete order:', error);
-            if (error.message?.includes('ORDER_INVALID')) {
-                return res.status(400).json({ error: error.message });
-            }
-            return res.status(500).json({ error: 'Failed to complete order', message: error.message });
+        if (profileError || !profile) {
+            return res.status(404).json({ error: 'User profile not found' });
         }
 
-        console.log(`[Admin] Order ${orderId} completed by admin ${req.user.id}`);
+        const newBalance = (profile.credits || 0) + order.credits;
+
+        // Step 3: Update profiles.credits
+        const { error: creditsError } = await supabaseAdmin
+            .from('profiles')
+            .update({ credits: newBalance, updated_at: new Date().toISOString() })
+            .eq('id', order.user_id);
+
+        if (creditsError) {
+            console.error('[Admin] Failed to update user credits:', creditsError);
+            return res.status(500).json({ error: 'Failed to update user credits', message: creditsError.message });
+        }
+
+        // Step 4: Mark order as completed
+        const { error: orderUpdateError } = await supabaseAdmin
+            .from('orders')
+            .update({ status: 'completed', updated_at: new Date().toISOString() })
+            .eq('id', orderId);
+
+        if (orderUpdateError) {
+            console.error('[Admin] Failed to update order status:', orderUpdateError);
+            // Non-fatal: credits are already added — log and continue
+        }
+
+        // Step 5: Log in credit_ledger (non-fatal if fails)
+        const { error: ledgerError } = await supabaseAdmin
+            .from('credit_ledger')
+            .insert({
+                user_id: order.user_id,
+                amount: order.credits,
+                type: 'order_complete',
+                description: `Manuel sipariş onaylandı (${orderId}) — admin: ${adminId}`,
+                created_at: new Date().toISOString(),
+            });
+
+        if (ledgerError) {
+            // Non-fatal: credits and order status are already updated
+            console.error('[Admin] Ledger write error (non-fatal):', ledgerError);
+        }
+
+        console.log(`[Admin] Order ${orderId} completed by admin ${adminId}: +${order.credits} credits → user ${order.user_id}`);
 
         res.json({
             success: true,
             order_id: orderId,
-            user_id: data?.userId || order.user_id,
-            credits_added: data?.creditsAdded || order.credits,
+            user_id: order.user_id,
+            credits_added: order.credits,
+            new_balance: newBalance,
         });
     } catch (err) {
         console.error('[Admin] Complete order error:', err);
         res.status(500).json({ error: 'Internal server error' });
     }
 });
+
 
 /**
  * GET /api/${ADMIN_ROUTE_SECRET}/admin/exports
