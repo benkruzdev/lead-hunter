@@ -530,6 +530,107 @@ router.patch('/users/:id', requireAuth, requireAdmin, async (req, res) => {
 });
 
 /**
+ * GET /api/${ADMIN_ROUTE_SECRET}/admin/exports
+ * Paginated export records across all users (admin only)
+ * Query params: limit, offset, query (user name/email search)
+ */
+router.get('/exports', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        const { limit = 50, offset = 0, query = '' } = req.query;
+        const parsedLimit = Math.min(parseInt(limit) || 50, 200);
+        const parsedOffset = parseInt(offset) || 0;
+
+        // Optional: resolve matching user_ids when query is a user name/email
+        let filteredUserIds = null;
+        if (query) {
+            const { data: matchedProfiles } = await supabaseAdmin
+                .from('profiles')
+                .select('id')
+                .or(`full_name.ilike.%${query}%,email.ilike.%${query}%`)
+                .limit(100);
+            filteredUserIds = (matchedProfiles || []).map(p => p.id);
+        }
+
+        let exportsQuery = supabaseAdmin
+            .from('exports')
+            .select(
+                'id, user_id, list_id, format, file_name, lead_count, note, created_at, lead_lists(name)',
+                { count: 'exact' }
+            )
+            .order('created_at', { ascending: false })
+            .range(parsedOffset, parsedOffset + parsedLimit - 1);
+
+        if (filteredUserIds !== null) {
+            if (filteredUserIds.length === 0) {
+                // No user match — filter on file_name/format instead
+                exportsQuery = exportsQuery.or(
+                    `format.ilike.%${query}%,file_name.ilike.%${query}%`
+                );
+            } else {
+                exportsQuery = exportsQuery.in('user_id', filteredUserIds);
+            }
+        }
+
+        const { data: exports_, count, error } = await exportsQuery;
+
+        if (error) {
+            console.error('[Admin] Exports error:', error);
+            return res.status(500).json({ error: 'Database error', message: error.message });
+        }
+
+        // Enrich with user info
+        const userIds = [...new Set((exports_ || []).map(e => e.user_id))];
+        const profileMap = {};
+
+        if (userIds.length > 0) {
+            const { data: profilesWithEmail, error: emailErr } = await supabaseAdmin
+                .from('profiles')
+                .select('id, full_name, email')
+                .in('id', userIds);
+
+            if (!emailErr && profilesWithEmail) {
+                profilesWithEmail.forEach(p => { profileMap[p.id] = { full_name: p.full_name, email: p.email }; });
+            } else {
+                const { data: profilesNoEmail } = await supabaseAdmin
+                    .from('profiles')
+                    .select('id, full_name')
+                    .in('id', userIds);
+                (profilesNoEmail || []).forEach(p => { profileMap[p.id] = { full_name: p.full_name, email: null }; });
+            }
+
+            const missingEmailIds = userIds.filter(id => !profileMap[id]?.email);
+            if (missingEmailIds.length > 0) {
+                await Promise.allSettled(missingEmailIds.map(async (id) => {
+                    const { data: authUser } = await supabaseAdmin.auth.admin.getUserById(id);
+                    if (authUser?.user?.email) {
+                        if (profileMap[id]) profileMap[id].email = authUser.user.email;
+                        else profileMap[id] = { full_name: null, email: authUser.user.email };
+                    }
+                }));
+            }
+        }
+
+        const enriched = (exports_ || []).map(e => ({
+            id: e.id,
+            user_id: e.user_id,
+            user_name: profileMap[e.user_id]?.full_name || null,
+            user_email: profileMap[e.user_id]?.email || null,
+            list_name: e.lead_lists?.name || null,
+            format: e.format,
+            file_name: e.file_name,
+            lead_count: e.lead_count,
+            note: e.note,
+            created_at: e.created_at,
+        }));
+
+        res.json({ exports: enriched, total: count || 0 });
+    } catch (err) {
+        console.error('[Admin] Exports error:', err);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+/**
  * GET /api/${ADMIN_ROUTE_SECRET}/admin/search-logs
  * Paginated search session logs across all users (admin only)
  * Query params: limit, offset, query (user email/name search)

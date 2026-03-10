@@ -294,6 +294,37 @@ export async function updateAdminSystemSettings(data: {
 }
 
 /**
+ * Get admin export records (admin only)
+ * GET /api/${ADMIN_SECRET}/admin/exports
+ */
+export async function getAdminExports(params?: {
+    limit?: number;
+    offset?: number;
+    query?: string;
+}): Promise<{
+    exports: Array<{
+        id: string;
+        user_id: string;
+        user_name: string | null;
+        user_email: string | null;
+        list_name: string | null;
+        format: string;
+        file_name: string;
+        lead_count: number;
+        note: string | null;
+        created_at: string;
+    }>;
+    total: number;
+}> {
+    if (!ADMIN_SECRET) throw new Error('VITE_ADMIN_ROUTE_SECRET is not configured.');
+    const q = new URLSearchParams();
+    if (params?.limit) q.set('limit', String(params.limit));
+    if (params?.offset) q.set('offset', String(params.offset));
+    if (params?.query) q.set('query', params.query);
+    return apiRequest(`/api/${ADMIN_SECRET}/admin/exports?${q.toString()}`);
+}
+
+/**
  * Get admin search session logs (admin only)
  * GET /api/${ADMIN_SECRET}/admin/search-logs
  */
