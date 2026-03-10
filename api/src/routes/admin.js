@@ -279,8 +279,30 @@ router.get('/users', requireAuth, requireAdmin, async (req, res) => {
             });
         }
 
+        // Enrich with auth data (last_sign_in_at, email from auth if missing in profile).
+        // supabaseAdmin.auth.admin.listUsers returns paginated auth users — we fetch all
+        // and build a map by user id.
+        let authMap = {};
+        try {
+            const { data: authList } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 });
+            (authList?.users || []).forEach(u => {
+                authMap[u.id] = {
+                    last_sign_in_at: u.last_sign_in_at || null,
+                    auth_email: u.email || null,
+                };
+            });
+        } catch (authErr) {
+            console.warn('[Admin] Failed to fetch auth users (non-fatal):', authErr.message);
+        }
+
+        const enriched = (users || []).map(u => ({
+            ...u,
+            last_sign_in_at: authMap[u.id]?.last_sign_in_at || null,
+            email: u.email || authMap[u.id]?.auth_email || null,
+        }));
+
         res.json({
-            users: users || [],
+            users: enriched,
             total: count || 0
         });
     } catch (err) {
@@ -288,6 +310,7 @@ router.get('/users', requireAuth, requireAdmin, async (req, res) => {
         res.status(500).json({ error: 'Internal server error' });
     }
 });
+
 
 /**
  * GET /api/${ADMIN_ROUTE_SECRET}/admin/users/:id
@@ -372,11 +395,113 @@ router.get('/users/:id', requireAuth, requireAdmin, async (req, res) => {
         }
 
         res.json(user);
+
+        // (unreachable — kept as guard)
     } catch (err) {
         console.error('Get user error:', err);
         res.status(500).json({ error: 'Internal server error' });
     }
 });
+
+/**
+ * GET /api/${ADMIN_ROUTE_SECRET}/admin/users/:id/activity
+ * Return aggregated activity stats + recent records for a user (admin only).
+ */
+router.get('/users/:id/activity', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+
+        // Run all queries in parallel for speed.
+        const [
+            searchTotal,
+            search30d,
+            recentSearches,
+            exportTotal,
+            recentExports,
+            recentOrders,
+            recentLedger,
+        ] = await Promise.allSettled([
+            // Total search session count
+            supabaseAdmin
+                .from('search_sessions')
+                .select('id', { count: 'exact', head: true })
+                .eq('user_id', id),
+            // Search sessions in last 30 days
+            supabaseAdmin
+                .from('search_sessions')
+                .select('id', { count: 'exact', head: true })
+                .eq('user_id', id)
+                .gte('created_at', thirtyDaysAgo),
+            // Last 5 searches
+            supabaseAdmin
+                .from('search_sessions')
+                .select('id, province, district, category, keyword, total_results, created_at')
+                .eq('user_id', id)
+                .order('created_at', { ascending: false })
+                .limit(5),
+            // Total export count
+            supabaseAdmin
+                .from('exports')
+                .select('id', { count: 'exact', head: true })
+                .eq('user_id', id),
+            // Last 5 exports
+            supabaseAdmin
+                .from('exports')
+                .select('id, list_name, format, lead_count, created_at')
+                .eq('user_id', id)
+                .order('created_at', { ascending: false })
+                .limit(5),
+            // Last 5 orders
+            supabaseAdmin
+                .from('orders')
+                .select('id, payment_method, amount, currency, credits, status, created_at, credit_packages(display_name_tr)')
+                .eq('user_id', id)
+                .order('created_at', { ascending: false })
+                .limit(5),
+            // Last 10 credit ledger entries
+            supabaseAdmin
+                .from('credit_ledger')
+                .select('id, amount, type, description, created_at')
+                .eq('user_id', id)
+                .order('created_at', { ascending: false })
+                .limit(10),
+        ]);
+
+        const safeCount = (result) => result.status === 'fulfilled' ? (result.value?.count || 0) : 0;
+        const safeData = (result) => result.status === 'fulfilled' ? (result.value?.data || []) : [];
+
+        const searches = safeData(recentSearches);
+        const exports_ = safeData(recentExports);
+        const orders = safeData(recentOrders);
+        const ledger = safeData(recentLedger);
+
+        res.json({
+            stats: {
+                total_searches: safeCount(searchTotal),
+                searches_30d: safeCount(search30d),
+                total_exports: safeCount(exportTotal),
+                last_search_at: searches[0]?.created_at || null,
+                last_export_at: exports_[0]?.created_at || null,
+                last_order_at: orders[0]?.created_at || null,
+                last_credit_at: ledger[0]?.created_at || null,
+                pending_orders: (orders.filter(o => o.status === 'pending')).length,
+            },
+            recent_searches: searches,
+            recent_exports: exports_,
+            recent_orders: orders.map(o => ({
+                ...o,
+                package_name: o.credit_packages?.display_name_tr || null,
+                credit_packages: undefined,
+            })),
+            recent_ledger: ledger,
+        });
+    } catch (err) {
+        console.error('[Admin] User activity error:', err);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
 
 /**
  * PATCH /api/${ADMIN_ROUTE_SECRET}/admin/users/:id

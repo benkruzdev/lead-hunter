@@ -622,15 +622,17 @@ export async function getAdminUsers(params?: { query?: string; limit?: number; o
     return apiRequest<{
         users: Array<{
             id: string;
-            email?: string;
+            email: string | null;
             full_name: string;
-            phone?: string;
+            phone: string | null;
             plan: string;
             credits: number;
             status: boolean;
             role: string;
             created_at: string;
-            last_login_ip?: string;
+            updated_at: string | null;
+            last_sign_in_at: string | null;
+            last_login_ip: string | null;
         }>;
         total: number;
     }>(url);
@@ -646,16 +648,73 @@ export async function getAdminUser(id: string) {
     }
     return apiRequest<{
         id: string;
-        email?: string;
+        email: string | null;
         full_name: string;
-        phone?: string;
+        phone: string | null;
         plan: string;
         credits: number;
         status: boolean;
         role: string;
         created_at: string;
+        updated_at: string | null;
+        last_sign_in_at: string | null;
+        last_login_ip: string | null;
     }>(`/api/${ADMIN_SECRET}/admin/users/${id}`);
 }
+
+/**
+ * Get user activity summary (admin only)
+ * GET /api/${ADMIN_SECRET}/admin/users/:id/activity
+ */
+export async function getAdminUserActivity(id: string): Promise<{
+    stats: {
+        total_searches: number;
+        searches_30d: number;
+        total_exports: number;
+        last_search_at: string | null;
+        last_export_at: string | null;
+        last_order_at: string | null;
+        last_credit_at: string | null;
+        pending_orders: number;
+    };
+    recent_searches: Array<{
+        id: string;
+        province: string | null;
+        district: string | null;
+        category: string | null;
+        keyword: string | null;
+        total_results: number | null;
+        created_at: string;
+    }>;
+    recent_exports: Array<{
+        id: string;
+        list_name: string | null;
+        format: string;
+        lead_count: number;
+        created_at: string;
+    }>;
+    recent_orders: Array<{
+        id: string;
+        payment_method: string;
+        amount: number;
+        currency: string;
+        credits: number;
+        status: string;
+        package_name: string | null;
+        created_at: string;
+    }>;
+    recent_ledger: Array<{
+        id: string;
+        amount: number;
+        type: string;
+        description: string | null;
+        created_at: string;
+    }>;
+}> {
+    if (!ADMIN_SECRET) throw new Error('VITE_ADMIN_ROUTE_SECRET is not configured.');
+    return apiRequest(`/api/${ADMIN_SECRET}/admin/users/${id}/activity`);
+}
+
 
 /**
  * Update admin user (admin only)
