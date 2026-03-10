@@ -635,30 +635,41 @@ router.get('/payments', requireAuth, requireAdmin, async (req, res) => {
 
 /**
  * POST /api/${ADMIN_ROUTE_SECRET}/admin/payments/:orderId/complete
- * Complete a pending manual order and add credits to user (admin only)
- * NOTE: Does NOT use complete_order_and_add_credits RPC — that RPC inserts into
- * credit_transactions.type which does not exist. Instead we do direct DB ops
- * matching the same pattern as the admin credit adjust endpoint.
+ * Complete a pending manual order and add credits to user (admin only).
+ *
+ * Idempotency guard: orders.status is flipped pending→completed FIRST with a
+ * conditional eq('status','pending') filter.  If the update matches 0 rows the
+ * order was already completed (or never existed) and credits are NOT touched.
  */
 router.post('/payments/:orderId/complete', requireAuth, requireAdmin, async (req, res) => {
     try {
         const { orderId } = req.params;
         const adminId = req.user.id;
 
-        // Step 1: Verify order exists and is pending
-        const { data: order, error: orderError } = await supabaseAdmin
+        // Step 1: Atomically flip status pending → completed.
+        // The eq('status','pending') ensures this only matches once even under
+        // concurrent requests.  We omit updated_at to avoid column-not-found errors.
+        const { data: updatedRows, error: flipError } = await supabaseAdmin
             .from('orders')
-            .select('id, status, user_id, credits, amount, currency')
+            .update({ status: 'completed' })
             .eq('id', orderId)
-            .single();
+            .eq('status', 'pending')
+            .select('id, user_id, credits, amount, currency');
 
-        if (orderError || !order) {
-            return res.status(404).json({ error: 'Order not found' });
+        if (flipError) {
+            console.error('[Admin] Order status flip error:', flipError);
+            return res.status(500).json({ error: 'Failed to update order status', message: flipError.message });
         }
 
-        if (order.status !== 'pending') {
-            return res.status(400).json({ error: 'Order is not pending', current_status: order.status });
+        if (!updatedRows || updatedRows.length === 0) {
+            // Either not found or already completed — safe to reject
+            return res.status(400).json({
+                error: 'Order cannot be completed',
+                message: 'Order not found, not in pending status, or already completed.',
+            });
         }
+
+        const order = updatedRows[0];
 
         // Step 2: Fetch current profile credits
         const { data: profile, error: profileError } = await supabaseAdmin
@@ -668,7 +679,9 @@ router.post('/payments/:orderId/complete', requireAuth, requireAdmin, async (req
             .single();
 
         if (profileError || !profile) {
-            return res.status(404).json({ error: 'User profile not found' });
+            // Order is already marked completed. Log and return partial success.
+            console.error('[Admin] Profile not found after order flip:', profileError);
+            return res.status(500).json({ error: 'Order marked completed but user profile not found' });
         }
 
         const newBalance = (profile.credits || 0) + order.credits;
@@ -676,26 +689,20 @@ router.post('/payments/:orderId/complete', requireAuth, requireAdmin, async (req
         // Step 3: Update profiles.credits
         const { error: creditsError } = await supabaseAdmin
             .from('profiles')
-            .update({ credits: newBalance, updated_at: new Date().toISOString() })
+            .update({ credits: newBalance })
             .eq('id', order.user_id);
 
         if (creditsError) {
             console.error('[Admin] Failed to update user credits:', creditsError);
-            return res.status(500).json({ error: 'Failed to update user credits', message: creditsError.message });
+            // Order is already completed — do NOT retry. Log prominently.
+            return res.status(500).json({
+                error: 'Order marked completed but credits update failed',
+                message: creditsError.message,
+                action: 'Manual credit adjustment required',
+            });
         }
 
-        // Step 4: Mark order as completed
-        const { error: orderUpdateError } = await supabaseAdmin
-            .from('orders')
-            .update({ status: 'completed', updated_at: new Date().toISOString() })
-            .eq('id', orderId);
-
-        if (orderUpdateError) {
-            console.error('[Admin] Failed to update order status:', orderUpdateError);
-            // Non-fatal: credits are already added — log and continue
-        }
-
-        // Step 5: Log in credit_ledger (non-fatal if fails)
+        // Step 4: Log in credit_ledger (non-fatal)
         const { error: ledgerError } = await supabaseAdmin
             .from('credit_ledger')
             .insert({
@@ -707,7 +714,6 @@ router.post('/payments/:orderId/complete', requireAuth, requireAdmin, async (req
             });
 
         if (ledgerError) {
-            // Non-fatal: credits and order status are already updated
             console.error('[Admin] Ledger write error (non-fatal):', ledgerError);
         }
 
