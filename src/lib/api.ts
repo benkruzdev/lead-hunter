@@ -964,7 +964,7 @@ export async function deleteUserAccount(): Promise<{ success: boolean }> {
 
 export interface PaymentProvider {
     id: number;
-    provider_code: 'paytr' | 'iyzico' | 'shopier' | 'stripe';
+    provider_code: 'paytr' | 'iyzico' | 'shopier' | 'stripe' | 'bank_transfer';
     display_name: string;
     enabled: boolean;
     mode: 'test' | 'live';
@@ -979,6 +979,11 @@ export interface PaymentProvider {
     webhook_secret: string | null;
     extra_config: Record<string, unknown>;
     sort_order: number;
+    // bank_transfer-specific fields (null for all other providers)
+    bank_name: string | null;
+    account_holder: string | null;
+    iban: string | null;
+    payment_note: string | null;
     created_at: string;
     updated_at: string;
 }
@@ -1000,7 +1005,7 @@ export async function getAdminPaymentProviders(): Promise<{ providers: PaymentPr
  * Region is enforced server-side and cannot be overridden.
  */
 export async function upsertAdminPaymentProvider(
-    code: 'paytr' | 'iyzico' | 'shopier' | 'stripe',
+    code: 'paytr' | 'iyzico' | 'shopier' | 'stripe' | 'bank_transfer',
     data: PaymentProviderUpdate
 ): Promise<{ success: boolean; provider: PaymentProvider }> {
     if (!ADMIN_SECRET) throw new Error('VITE_ADMIN_ROUTE_SECRET is not configured.');
@@ -1008,6 +1013,20 @@ export async function upsertAdminPaymentProvider(
         method: 'PUT',
         body: JSON.stringify(data),
     });
+}
+
+/**
+ * Get the bank_transfer provider row for checkout display (public — no auth).
+ * Returns null when bank_transfer is disabled or not configured.
+ * GET /api/billing/payment-providers (filtered client-side)
+ */
+export async function getBankTransferProvider(): Promise<PaymentProvider | null> {
+    try {
+        const res = await apiRequest<{ providers: PaymentProvider[] }>('/api/billing/payment-providers');
+        return res.providers.find(p => p.provider_code === 'bank_transfer') ?? null;
+    } catch {
+        return null;
+    }
 }
 
 /**

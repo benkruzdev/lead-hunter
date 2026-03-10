@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, AlertCircle, CreditCard, Globe, Lock } from "lucide-react";
+import { Loader2, AlertCircle, CreditCard, Globe, Lock, Building2 } from "lucide-react";
 import {
     getAdminPaymentProviders,
     upsertAdminPaymentProvider,
@@ -18,16 +18,159 @@ import {
 // Static provider metadata (display only — region is enforced server-side)
 // ---------------------------------------------------------------------------
 const PROVIDER_META: Record<string, { label: string; region: 'tr' | 'global'; currencyHint: string }> = {
-    paytr:   { label: 'PayTR',   region: 'tr',     currencyHint: 'TRY' },
-    iyzico:  { label: 'iyzico',  region: 'tr',     currencyHint: 'TRY' },
-    shopier: { label: 'Shopier', region: 'tr',     currencyHint: 'TRY' },
-    stripe:  { label: 'Stripe',  region: 'global', currencyHint: 'USD, EUR' },
+    paytr:         { label: 'PayTR',         region: 'tr',     currencyHint: 'TRY' },
+    iyzico:        { label: 'iyzico',        region: 'tr',     currencyHint: 'TRY' },
+    shopier:       { label: 'Shopier',       region: 'tr',     currencyHint: 'TRY' },
+    stripe:        { label: 'Stripe',        region: 'global', currencyHint: 'USD, EUR' },
+    bank_transfer: { label: 'IBAN / Havale', region: 'tr',     currencyHint: 'TRY' },
 };
 
 const MASK = '••••••••';
 
 // ---------------------------------------------------------------------------
-// ProviderCard
+// BankTransferCard — special card for bank_transfer provider
+// ---------------------------------------------------------------------------
+function BankTransferCard({ provider }: { provider: PaymentProvider }) {
+    const { toast } = useToast();
+    const queryClient = useQueryClient();
+
+    const [form, setForm] = useState({
+        display_name:  provider.display_name,
+        enabled:       provider.enabled,
+        bank_name:     provider.bank_name ?? '',
+        account_holder: provider.account_holder ?? '',
+        iban:          provider.iban ?? '',
+        payment_note:  provider.payment_note ?? '',
+        sort_order:    provider.sort_order,
+    });
+
+    const mutation = useMutation({
+        mutationFn: (data: PaymentProviderUpdate) =>
+            upsertAdminPaymentProvider('bank_transfer', data),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['adminPaymentProviders'] });
+            toast({ title: 'IBAN / Havale ayarları kaydedildi' });
+        },
+        onError: (err: any) => {
+            toast({ title: err.message || 'Kayıt başarısız', variant: 'destructive' });
+        },
+    });
+
+    const set = (key: keyof typeof form, value: unknown) =>
+        setForm(prev => ({ ...prev, [key]: value }));
+
+    return (
+        <Card>
+            <CardHeader className="pb-3">
+                <div className="flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                        <Building2 className="w-5 h-5 text-muted-foreground" />
+                        <div>
+                            <CardTitle className="text-base">IBAN / Havale</CardTitle>
+                            <CardDescription className="flex items-center gap-1 mt-0.5">
+                                <span className="text-xs font-medium">🇹🇷</span>
+                                <span className="text-xs">Türkiye · TRY · Manuel onay gerektirir</span>
+                            </CardDescription>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                        <Label htmlFor="enabled-bank_transfer" className="text-sm">
+                            {form.enabled ? 'Aktif' : 'Pasif'}
+                        </Label>
+                        <Switch
+                            id="enabled-bank_transfer"
+                            checked={!!form.enabled}
+                            onCheckedChange={v => set('enabled', v)}
+                        />
+                    </div>
+                </div>
+            </CardHeader>
+
+            <CardContent className="space-y-4">
+                {/* Display name */}
+                <div className="flex items-center gap-4">
+                    <Label className="w-40 shrink-0 text-sm">Görünen Ad</Label>
+                    <Input
+                        value={form.display_name}
+                        onChange={e => set('display_name', e.target.value)}
+                        placeholder="IBAN / Havale"
+                        className="max-w-sm"
+                    />
+                </div>
+
+                {/* Bank name */}
+                <div className="flex items-center gap-4">
+                    <Label className="w-40 shrink-0 text-sm">Banka Adı</Label>
+                    <Input
+                        value={form.bank_name}
+                        onChange={e => set('bank_name', e.target.value)}
+                        placeholder="Ziraat Bankası"
+                        className="max-w-sm"
+                    />
+                </div>
+
+                {/* Account holder */}
+                <div className="flex items-center gap-4">
+                    <Label className="w-40 shrink-0 text-sm">Hesap Sahibi</Label>
+                    <Input
+                        value={form.account_holder}
+                        onChange={e => set('account_holder', e.target.value)}
+                        placeholder="Şirket Adı A.Ş."
+                        className="max-w-sm"
+                    />
+                </div>
+
+                {/* IBAN */}
+                <div className="flex items-center gap-4">
+                    <Label className="w-40 shrink-0 text-sm">IBAN</Label>
+                    <Input
+                        value={form.iban}
+                        onChange={e => set('iban', e.target.value)}
+                        placeholder="TR00 0000 0000 0000 0000 0000 00"
+                        className="max-w-sm font-mono"
+                    />
+                </div>
+
+                {/* Payment note */}
+                <div className="flex items-center gap-4">
+                    <Label className="w-40 shrink-0 text-sm">Ödeme Notu</Label>
+                    <Input
+                        value={form.payment_note}
+                        onChange={e => set('payment_note', e.target.value)}
+                        placeholder="Açıklamaya sipariş numaranızı yazınız."
+                        className="max-w-sm"
+                    />
+                </div>
+
+                {/* Sort order */}
+                <div className="flex items-center gap-4">
+                    <Label className="w-40 shrink-0 text-sm">Sıralama</Label>
+                    <Input
+                        type="number"
+                        min={0}
+                        value={form.sort_order ?? 0}
+                        onChange={e => set('sort_order', parseInt(e.target.value) || 0)}
+                        className="w-24"
+                    />
+                </div>
+
+                <div className="pt-2">
+                    <Button
+                        size="sm"
+                        onClick={() => mutation.mutate(form as PaymentProviderUpdate)}
+                        disabled={mutation.isPending}
+                    >
+                        {mutation.isPending && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
+                        Kaydet
+                    </Button>
+                </div>
+            </CardContent>
+        </Card>
+    );
+}
+
+// ---------------------------------------------------------------------------
+// ProviderCard — gateway providers (paytr / iyzico / shopier / stripe)
 // ---------------------------------------------------------------------------
 function ProviderCard({ provider }: { provider: PaymentProvider }) {
     const { toast } = useToast();
@@ -256,6 +399,8 @@ export default function AdminPaymentProvidersPage() {
     }
 
     const providers = data?.providers ?? [];
+    const gatewayProviders = providers.filter(p => p.provider_code !== 'bank_transfer');
+    const bankTransferProvider = providers.find(p => p.provider_code === 'bank_transfer');
 
     return (
         <div className="space-y-6 animate-fade-in">
@@ -270,20 +415,36 @@ export default function AdminPaymentProvidersPage() {
             {/* Region legend */}
             <div className="flex gap-4 flex-wrap text-xs text-muted-foreground">
                 <span className="flex items-center gap-1">
-                    <span>🇹🇷</span> Türkiye ödemeleri: PayTR · iyzico · Shopier
+                    <span>🇹🇷</span> Türkiye kartlı ödemeler: PayTR · iyzico · Shopier
                 </span>
                 <span className="flex items-center gap-1">
                     <Globe className="w-3 h-3" /> Uluslararası ödemeler: Stripe
                 </span>
+                <span className="flex items-center gap-1">
+                    <Building2 className="w-3 h-3" /> Manuel havale: IBAN / Havale
+                </span>
             </div>
 
-            {providers.length === 0 ? (
+            {/* Gateway providers */}
+            {gatewayProviders.length === 0 ? (
                 <p className="text-muted-foreground text-sm">Kayıt bulunamadı.</p>
             ) : (
                 <div className="space-y-4">
-                    {providers.map(p => (
+                    {gatewayProviders.map(p => (
                         <ProviderCard key={p.provider_code} provider={p} />
                     ))}
+                </div>
+            )}
+
+            {/* Bank transfer provider */}
+            {bankTransferProvider && (
+                <div className="space-y-4">
+                    <div className="border-t pt-4">
+                        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-4">
+                            Manuel Ödeme Yöntemi
+                        </h2>
+                        <BankTransferCard provider={bankTransferProvider} />
+                    </div>
                 </div>
             )}
         </div>

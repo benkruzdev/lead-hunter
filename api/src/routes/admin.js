@@ -1589,7 +1589,7 @@ router.put('/payment-providers/:code', requireAuth, requireAdmin, async (req, re
     try {
         const { code } = req.params;
 
-        const VALID_CODES = ['paytr', 'iyzico', 'shopier', 'stripe'];
+        const VALID_CODES = ['paytr', 'iyzico', 'shopier', 'stripe', 'bank_transfer'];
         if (!VALID_CODES.includes(code)) {
             return res.status(400).json({ error: 'Invalid provider_code' });
         }
@@ -1601,7 +1601,7 @@ router.put('/payment-providers/:code', requireAuth, requireAdmin, async (req, re
         if (body.webhook_secret === MASK_PLACEHOLDER) delete body.webhook_secret;
 
         // Region is immutable via this endpoint — enforced by product rule
-        const REGION_MAP = { paytr: 'tr', iyzico: 'tr', shopier: 'tr', stripe: 'global' };
+        const REGION_MAP = { paytr: 'tr', iyzico: 'tr', shopier: 'tr', stripe: 'global', bank_transfer: 'tr' };
         body.region = REGION_MAP[code];
 
         const provider = await upsertProvider(supabaseAdmin, code, body);

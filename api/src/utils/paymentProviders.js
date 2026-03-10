@@ -7,10 +7,11 @@
  * by the public-facing billing endpoint — only admin endpoints expose them.
  *
  * Supported providers:
- *  - paytr   → region: tr
- *  - iyzico  → region: tr
- *  - shopier → region: tr
- *  - stripe  → region: global
+ *  - paytr         → region: tr
+ *  - iyzico        → region: tr
+ *  - shopier       → region: tr
+ *  - stripe        → region: global
+ *  - bank_transfer → region: tr  (IBAN / havale — no gateway, manual approval)
  */
 
 /** Fields that must NEVER be sent to the public checkout endpoint. */
@@ -53,6 +54,15 @@ export const SEED_PROVIDERS = [
         region: 'global',
         supported_currencies: ['USD', 'EUR'],
         sort_order: 4,
+    },
+    {
+        provider_code: 'bank_transfer',
+        display_name: 'IBAN / Havale',
+        enabled: false,
+        mode: 'live',
+        region: 'tr',
+        supported_currencies: ['TRY'],
+        sort_order: 5,
     },
 ];
 
@@ -120,6 +130,8 @@ export async function upsertProvider(supabase, code, fields) {
         'supported_currencies', 'merchant_id', 'api_key',
         'secret_key', 'public_key', 'webhook_secret',
         'extra_config', 'sort_order',
+        // bank_transfer-specific fields
+        'bank_name', 'account_holder', 'iban', 'payment_note',
     ];
 
     const sanitised = {};

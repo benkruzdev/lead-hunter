@@ -13,7 +13,7 @@ import {
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { CreditCard, Building2, CheckCircle2, ExternalLink } from 'lucide-react';
-import { getCreditPackages, createOrder, getOrders } from '@/lib/api';
+import { getCreditPackages, createOrder, getOrders, getBankTransferProvider, type PaymentProvider } from '@/lib/api';
 import { formatDistanceToNow } from 'date-fns';
 import { tr, enUS } from 'date-fns/locale';
 
@@ -49,6 +49,9 @@ export default function BillingPage() {
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethodUI>('card');
   const [isCreatingOrder, setIsCreatingOrder] = useState(false);
   const [orderError, setOrderError] = useState<string | null>(null);
+
+  // bank_transfer provider info (fetched from public endpoint)
+  const [bankTransferInfo, setBankTransferInfo] = useState<PaymentProvider | null>(null);
 
   // After successful bank_transfer order — show IBAN info
   const [bankTransferResult, setBankTransferResult] = useState<OrderResult | null>(null);
@@ -86,6 +89,11 @@ export default function BillingPage() {
       }
     };
     fetchOrders();
+  }, []);
+
+  // Fetch bank_transfer provider to check if enabled and get IBAN info
+  useEffect(() => {
+    getBankTransferProvider().then(setBankTransferInfo).catch(() => setBankTransferInfo(null));
   }, []);
 
   const refreshOrders = async () => {
@@ -308,26 +316,28 @@ export default function BillingPage() {
               </div>
             </label>
 
-            {/* Bank transfer */}
-            <label
-              htmlFor="bank_transfer"
-              className={`flex items-start gap-3 p-4 rounded-xl border cursor-pointer transition-colors ${
-                paymentMethod === 'bank_transfer'
-                  ? 'border-primary bg-primary/5'
-                  : 'border-border hover:border-primary/50'
-              }`}
-            >
-              <RadioGroupItem value="bank_transfer" id="bank_transfer" className="mt-0.5 shrink-0" />
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <Building2 className="w-4 h-4 text-primary shrink-0" />
-                  <span className="font-medium text-sm">IBAN / Havale ile Ödeme</span>
+            {/* Bank transfer — only shown when enabled */}
+            {bankTransferInfo?.enabled && (
+              <label
+                htmlFor="bank_transfer"
+                className={`flex items-start gap-3 p-4 rounded-xl border cursor-pointer transition-colors ${
+                  paymentMethod === 'bank_transfer'
+                    ? 'border-primary bg-primary/5'
+                    : 'border-border hover:border-primary/50'
+                }`}
+              >
+                <RadioGroupItem value="bank_transfer" id="bank_transfer" className="mt-0.5 shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <Building2 className="w-4 h-4 text-primary shrink-0" />
+                    <span className="font-medium text-sm">IBAN / Havale ile Ödeme</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                    Ödeme bildiriminin ardından admin onayıyla krediniz tanımlanır. 1&ndash;2 iş günü sürebilir.
+                  </p>
                 </div>
-                <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
-                  Ödeme bildiriminin ardından admin onayıyla krediniz tanımlanır. 1&ndash;2 iş günü sürebilir.
-                </p>
-              </div>
-            </label>
+              </label>
+            )}
           </RadioGroup>
 
           {orderError && (
@@ -377,9 +387,17 @@ export default function BillingPage() {
                   {bankTransferResult?.amount}
                 </span>
               </p>
+              {bankTransferInfo?.bank_name && (
+                <p>Banka: <span className="font-medium">{bankTransferInfo.bank_name}</span></p>
+              )}
+              {bankTransferInfo?.account_holder && (
+                <p>Hesap Sahibi: <span className="font-medium">{bankTransferInfo.account_holder}</span></p>
+              )}
+              {bankTransferInfo?.iban && (
+                <p className="font-mono text-sm break-all">IBAN: <span className="font-bold tracking-wide">{bankTransferInfo.iban}</span></p>
+              )}
               <p className="text-muted-foreground text-xs mt-2">
-                Açıklamaya sipariş numaranızı yazmayı unutmayın.
-                IBAN bilgisi için yönetici ile iletişime geçin.
+                {bankTransferInfo?.payment_note || 'Açıklamaya sipariş numaranızı yazmayı unutmayın.'}
               </p>
             </div>
 
