@@ -531,130 +531,224 @@ router.patch('/users/:id', requireAuth, requireAdmin, async (req, res) => {
 
 /**
  * GET /api/${ADMIN_ROUTE_SECRET}/admin/costs
- * Operational cost/usage summary derived from existing tables (admin only)
- * Returns: api_calls summary, credit/revenue summary, last-30-day daily breakdown
+ * Operational usage + Places API (New) cost estimation (admin only).
+ *
+ * Places API (New) pricing used (USD, as of 2024):
+ *   Text Search (New): $0.004 / call
+ *   Place Details (New): $0.005 / call
+ *
+ * Estimation logic (derived from search.js code, NOT from live telemetry):
+ *   Per new search session:
+ *     - Text Search calls: collectPlaceIdsFiltered runs up to ceil(60/20)=3 TextSearch calls.
+ *       We can't tell from DB how many pages it actually fetched, so we use AVG=2.
+ *       If session.min_reviews is set, we also fetched details for ALL placeIds:
+ *         that costs an extra up to 60 Place Details calls on top of page-1 calls.
+ *     - Place Details (first page, always free to user): always 1 batch of up to 20 details calls.
+ *   Per paid page view recorded in viewed_pages[]:
+ *     - Place Details: 1 batch of up to 20 details calls (we use PAGE_SIZE=20 as upper bound).
+ *
+ * These are UPPER-BOUND ESTIMATES. Actual call counts may be lower (fewer results, early break).
  */
 router.get('/costs', requireAuth, requireAdmin, async (req, res) => {
     try {
         const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-        const today = new Date().toISOString().slice(0, 10);
 
-        // ── API Calls summary ──────────────────────────────────────────────────
-        // Total search sessions (each session = 1 Google Places text search call)
+        // ── Places API pricing constants ────────────────────────────────────────
+        const PRICE_TEXT_SEARCH = 0.004;  // USD per call
+        const PRICE_PLACE_DETAILS = 0.005; // USD per call
+        const PAGE_SIZE = 20;              // results per page (matches search.js)
+        const AVG_TEXT_SEARCH_CALLS_PER_SESSION = 2; // estimated avg (up to 3 possible)
+        const DETAILS_PER_PAGE = PAGE_SIZE; // max details per page view
+
+        // ── Load system_settings for credits_per_page ──────────────────────────
+        const { data: settings } = await supabaseAdmin
+            .from('system_settings')
+            .select('credits_per_page, credits_per_enrichment, credits_per_lead')
+            .eq('id', 1)
+            .single();
+        const creditsPerPage = settings?.credits_per_page ?? 10;
+        const creditsPerEnrichment = settings?.credits_per_enrichment ?? 1;
+
+        // ── Search sessions summary ─────────────────────────────────────────────
         const { count: totalSearchSessions } = await supabaseAdmin
             .from('search_sessions')
             .select('id', { count: 'exact', head: true });
 
-        // Search sessions this month
-        const { count: searchSessionsThisMonth } = await supabaseAdmin
+        const { data: sessions30d } = await supabaseAdmin
             .from('search_sessions')
-            .select('id', { count: 'exact', head: true })
+            .select('viewed_pages, min_reviews, min_rating, total_results')
             .gte('created_at', thirtyDaysAgo);
 
-        // Total page views across all sessions (sum of viewed_pages array lengths)
-        const { data: allSessions } = await supabaseAdmin
-            .from('search_sessions')
-            .select('viewed_pages')
-            .gte('created_at', thirtyDaysAgo);
+        const sessionCount30d = (sessions30d || []).length;
 
-        const totalPageViews = (allSessions || []).reduce(
-            (sum, s) => sum + (Array.isArray(s.viewed_pages) ? s.viewed_pages.length : 0), 0
-        );
+        // Aggregate page-view counts and filter flags
+        let totalPageViews30d = 0;
+        let sessionsWithMinReviews = 0;
+        let paidPageViews30d = 0;
 
-        // Total exports
-        const { count: totalExports } = await supabaseAdmin
-            .from('exports')
-            .select('id', { count: 'exact', head: true });
+        (sessions30d || []).forEach(s => {
+            const pages = Array.isArray(s.viewed_pages) ? s.viewed_pages : [];
+            totalPageViews30d += pages.length;
+            // page 1 is always free — paid pages are those > 1
+            paidPageViews30d += pages.filter(p => p > 1).length;
+            if (s.min_reviews && s.min_reviews > 0) sessionsWithMinReviews++;
+        });
 
-        const { count: exportsThisMonth } = await supabaseAdmin
-            .from('exports')
-            .select('id', { count: 'exact', head: true })
-            .gte('created_at', thirtyDaysAgo);
+        // ── Places API call estimates ───────────────────────────────────────────
+        // Text Search calls:
+        //   Each session → up to 3 TextSearch calls, avg 2
+        const estimatedTextSearchCalls = sessionCount30d * AVG_TEXT_SEARCH_CALLS_PER_SESSION;
 
-        // Total leads exported
-        const { data: exportSums } = await supabaseAdmin
-            .from('exports')
-            .select('lead_count')
-            .gte('created_at', thirtyDaysAgo);
-        const totalLeadsExported = (exportSums || []).reduce((sum, e) => sum + (e.lead_count || 0), 0);
+        // Place Details calls:
+        //   - First page (every session): up to PAGE_SIZE details
+        //   - Paid pages (viewed_pages > 1): up to PAGE_SIZE details each
+        //   - minReviews filter: fetches ALL place_ids for filtering (up to 60 extra Details on top of page-1)
+        const detailsFromFirstPages = sessionCount30d * DETAILS_PER_PAGE;
+        const detailsFromPaidPages = paidPageViews30d * DETAILS_PER_PAGE;
+        const detailsFromMinReviewsFilter = sessionsWithMinReviews * 60; // fetches all 60 to filter
+        const estimatedPlaceDetailsCalls = detailsFromFirstPages + detailsFromPaidPages + detailsFromMinReviewsFilter;
 
-        // ── Credit / Revenue summary ───────────────────────────────────────────
-        // Credits issued (positive entries in credit_ledger)
+        // ── Cost estimates (USD) ───────────────────────────────────────────────
+        const estimatedTextSearchCostUsd = estimatedTextSearchCalls * PRICE_TEXT_SEARCH;
+        const estimatedDetailsCostUsd = estimatedPlaceDetailsCalls * PRICE_PLACE_DETAILS;
+        const estimatedTotalCostUsd = estimatedTextSearchCostUsd + estimatedDetailsCostUsd;
+
+        // ── Breakdown: free vs paid surface ────────────────────────────────────
+        // "Free to user" = what we pay but user doesn't pay credits for:
+        //   - ALL Text Search calls (user pays 0 credits for these)
+        //   - First-page Details (page 1, always free)
+        //   - minReviews extra Details (user pays 0 credits for filter overhead)
+        const freeSurfaceCostUsd = estimatedTextSearchCostUsd
+            + (detailsFromFirstPages * PRICE_PLACE_DETAILS)
+            + (detailsFromMinReviewsFilter * PRICE_PLACE_DETAILS);
+
+        // What the user pays credits for: paid page views
+        const paidSurfaceCostUsd = detailsFromPaidPages * PRICE_PLACE_DETAILS;
+
+        // ── Credits & revenue ──────────────────────────────────────────────────
         const { data: ledgerEntries } = await supabaseAdmin
             .from('credit_ledger')
             .select('amount')
             .gte('created_at', thirtyDaysAgo);
 
-        const creditsIssued = (ledgerEntries || [])
+        const creditsIssued30d = (ledgerEntries || [])
             .filter(e => e.amount > 0)
             .reduce((sum, e) => sum + e.amount, 0);
 
-        const creditsConsumed = (ledgerEntries || [])
+        const creditsConsumed30d = (ledgerEntries || [])
             .filter(e => e.amount < 0)
             .reduce((sum, e) => sum + Math.abs(e.amount), 0);
 
-        // Completed orders revenue this month
         const { data: completedOrders } = await supabaseAdmin
             .from('orders')
             .select('amount, credits')
             .eq('status', 'completed')
             .gte('created_at', thirtyDaysAgo);
 
-        const revenueThisMonth = (completedOrders || []).reduce((sum, o) => sum + (o.amount || 0), 0);
-        const creditsSoldThisMonth = (completedOrders || []).reduce((sum, o) => sum + (o.credits || 0), 0);
+        const revenueTry30d = (completedOrders || []).reduce((sum, o) => sum + (o.amount || 0), 0);
+        const creditsSold30d = (completedOrders || []).reduce((sum, o) => sum + (o.credits || 0), 0);
 
-        // Pending orders
         const { count: pendingOrders } = await supabaseAdmin
             .from('orders')
             .select('id', { count: 'exact', head: true })
             .eq('status', 'pending');
 
-        // ── Daily breakdown (last 30 days) ────────────────────────────────────
-        // search_sessions per day
+        // ── Exports summary ────────────────────────────────────────────────────
+        const { count: totalExports } = await supabaseAdmin
+            .from('exports')
+            .select('id', { count: 'exact', head: true });
+
+        const { count: exports30d } = await supabaseAdmin
+            .from('exports')
+            .select('id', { count: 'exact', head: true })
+            .gte('created_at', thirtyDaysAgo);
+
+        const { data: exportSums } = await supabaseAdmin
+            .from('exports')
+            .select('lead_count')
+            .gte('created_at', thirtyDaysAgo);
+        const leadsExported30d = (exportSums || []).reduce((sum, e) => sum + (e.lead_count || 0), 0);
+
+        // ── Daily breakdown ────────────────────────────────────────────────────
         const { data: dailySearchRaw } = await supabaseAdmin
             .from('search_sessions')
-            .select('created_at')
+            .select('created_at, viewed_pages, min_reviews')
             .gte('created_at', thirtyDaysAgo)
             .order('created_at', { ascending: true });
 
-        // exports per day
         const { data: dailyExportRaw } = await supabaseAdmin
             .from('exports')
             .select('created_at, lead_count')
             .gte('created_at', thirtyDaysAgo)
             .order('created_at', { ascending: true });
 
-        // Build daily map
         const dailyMap = {};
         (dailySearchRaw || []).forEach(r => {
             const day = r.created_at.slice(0, 10);
-            if (!dailyMap[day]) dailyMap[day] = { date: day, searches: 0, exports: 0, leads_exported: 0 };
+            if (!dailyMap[day]) dailyMap[day] = {
+                date: day, searches: 0, exports: 0, leads_exported: 0,
+                est_text_search_calls: 0, est_details_calls: 0
+            };
+            const pages = Array.isArray(r.viewed_pages) ? r.viewed_pages : [];
+            const paidPages = pages.filter(p => p > 1).length;
+            const hasMinReviews = r.min_reviews && r.min_reviews > 0;
             dailyMap[day].searches++;
+            dailyMap[day].est_text_search_calls += AVG_TEXT_SEARCH_CALLS_PER_SESSION;
+            dailyMap[day].est_details_calls += DETAILS_PER_PAGE // first page
+                + (paidPages * DETAILS_PER_PAGE)               // paid pages
+                + (hasMinReviews ? 60 : 0);                    // filter overhead
         });
         (dailyExportRaw || []).forEach(r => {
             const day = r.created_at.slice(0, 10);
-            if (!dailyMap[day]) dailyMap[day] = { date: day, searches: 0, exports: 0, leads_exported: 0 };
+            if (!dailyMap[day]) dailyMap[day] = {
+                date: day, searches: 0, exports: 0, leads_exported: 0,
+                est_text_search_calls: 0, est_details_calls: 0
+            };
             dailyMap[day].exports++;
             dailyMap[day].leads_exported += r.lead_count || 0;
         });
 
-        const dailyBreakdown = Object.values(dailyMap).sort((a, b) => a.date.localeCompare(b.date));
+        const dailyBreakdown = Object.values(dailyMap).map(d => ({
+            ...d,
+            est_cost_usd: parseFloat(
+                (d.est_text_search_calls * PRICE_TEXT_SEARCH + d.est_details_calls * PRICE_PLACE_DETAILS).toFixed(4)
+            ),
+        })).sort((a, b) => a.date.localeCompare(b.date));
 
         res.json({
-            api_calls: {
-                total_search_sessions: totalSearchSessions || 0,
-                search_sessions_30d: searchSessionsThisMonth || 0,
-                page_views_30d: totalPageViews,
+            usage: {
+                sessions_30d: sessionCount30d,
+                total_sessions: totalSearchSessions || 0,
+                total_page_views_30d: totalPageViews30d,
+                paid_page_views_30d: paidPageViews30d,
+                sessions_with_min_reviews_30d: sessionsWithMinReviews,
+                exports_30d: exports30d || 0,
                 total_exports: totalExports || 0,
-                exports_30d: exportsThisMonth || 0,
-                leads_exported_30d: totalLeadsExported,
+                leads_exported_30d: leadsExported30d,
+            },
+            places_estimates: {
+                // NOTE: these are upper-bound estimates from code logic, not live telemetry
+                text_search_calls_30d: estimatedTextSearchCalls,
+                place_details_calls_30d: estimatedPlaceDetailsCalls,
+                details_from_first_pages: detailsFromFirstPages,
+                details_from_paid_pages: detailsFromPaidPages,
+                details_from_min_reviews_filter: detailsFromMinReviewsFilter,
+                cost_text_search_usd: parseFloat(estimatedTextSearchCostUsd.toFixed(4)),
+                cost_details_usd: parseFloat(estimatedDetailsCostUsd.toFixed(4)),
+                cost_total_usd: parseFloat(estimatedTotalCostUsd.toFixed(4)),
+                cost_free_surface_usd: parseFloat(freeSurfaceCostUsd.toFixed(4)),
+                cost_paid_surface_usd: parseFloat(paidSurfaceCostUsd.toFixed(4)),
+                price_text_search_usd: PRICE_TEXT_SEARCH,
+                price_details_usd: PRICE_PLACE_DETAILS,
             },
             credits: {
-                issued_30d: creditsIssued,
-                consumed_30d: creditsConsumed,
-                sold_30d: creditsSoldThisMonth,
+                per_page: creditsPerPage,
+                per_enrichment: creditsPerEnrichment,
+                issued_30d: creditsIssued30d,
+                consumed_30d: creditsConsumed30d,
+                sold_30d: creditsSold30d,
+                revenue_try_30d: revenueTry30d,
                 pending_orders: pendingOrders || 0,
-                revenue_try_30d: revenueThisMonth,
             },
             daily_breakdown: dailyBreakdown,
         });
@@ -663,6 +757,7 @@ router.get('/costs', requireAuth, requireAdmin, async (req, res) => {
         res.status(500).json({ error: 'Internal server error' });
     }
 });
+
 
 /**
  * GET /api/${ADMIN_ROUTE_SECRET}/admin/payments

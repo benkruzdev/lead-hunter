@@ -298,26 +298,47 @@ export async function updateAdminSystemSettings(data: {
  * GET /api/${ADMIN_SECRET}/admin/costs
  */
 export async function getAdminCosts(): Promise<{
-    api_calls: {
-        total_search_sessions: number;
-        search_sessions_30d: number;
-        page_views_30d: number;
-        total_exports: number;
+    usage: {
+        sessions_30d: number;
+        total_sessions: number;
+        total_page_views_30d: number;
+        paid_page_views_30d: number;
+        sessions_with_min_reviews_30d: number;
         exports_30d: number;
+        total_exports: number;
         leads_exported_30d: number;
     };
+    places_estimates: {
+        text_search_calls_30d: number;
+        place_details_calls_30d: number;
+        details_from_first_pages: number;
+        details_from_paid_pages: number;
+        details_from_min_reviews_filter: number;
+        cost_text_search_usd: number;
+        cost_details_usd: number;
+        cost_total_usd: number;
+        cost_free_surface_usd: number;
+        cost_paid_surface_usd: number;
+        price_text_search_usd: number;
+        price_details_usd: number;
+    };
     credits: {
+        per_page: number;
+        per_enrichment: number;
         issued_30d: number;
         consumed_30d: number;
         sold_30d: number;
-        pending_orders: number;
         revenue_try_30d: number;
+        pending_orders: number;
     };
     daily_breakdown: Array<{
         date: string;
         searches: number;
         exports: number;
         leads_exported: number;
+        est_text_search_calls: number;
+        est_details_calls: number;
+        est_cost_usd: number;
     }>;
 }> {
     if (!ADMIN_SECRET) throw new Error('VITE_ADMIN_ROUTE_SECRET is not configured.');
