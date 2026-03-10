@@ -530,6 +530,140 @@ router.patch('/users/:id', requireAuth, requireAdmin, async (req, res) => {
 });
 
 /**
+ * GET /api/${ADMIN_ROUTE_SECRET}/admin/credits/ledger
+ * Paginated credit transaction ledger across all users (admin only)
+ */
+router.get('/credits/ledger', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        const { limit = 50, offset = 0, user_id } = req.query;
+        const parsedLimit = Math.min(parseInt(limit) || 50, 200);
+        const parsedOffset = parseInt(offset) || 0;
+
+        let query = supabaseAdmin
+            .from('credit_ledger')
+            .select('id, user_id, amount, type, description, created_at', { count: 'exact' })
+            .order('created_at', { ascending: false })
+            .range(parsedOffset, parsedOffset + parsedLimit - 1);
+
+        if (user_id) {
+            query = query.eq('user_id', user_id);
+        }
+
+        const { data: transactions, count, error } = await query;
+
+        if (error) {
+            console.error('[Admin] Credits ledger error:', error);
+            return res.status(500).json({ error: 'Database error', message: error.message });
+        }
+
+        // Fetch profile names for the returned user_ids in one query
+        const userIds = [...new Set((transactions || []).map(t => t.user_id))];
+        let profileMap = {};
+        if (userIds.length > 0) {
+            const { data: profiles } = await supabaseAdmin
+                .from('profiles')
+                .select('id, full_name, email')
+                .in('id', userIds);
+            (profiles || []).forEach(p => { profileMap[p.id] = p; });
+        }
+
+        const enriched = (transactions || []).map(t => ({
+            ...t,
+            user_name: profileMap[t.user_id]?.full_name || null,
+            user_email: profileMap[t.user_id]?.email || null,
+        }));
+
+        res.json({ transactions: enriched, total: count || 0 });
+    } catch (err) {
+        console.error('[Admin] Credits ledger error:', err);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+/**
+ * POST /api/${ADMIN_ROUTE_SECRET}/admin/credits/adjust
+ * Manually add or deduct credits for a user (admin only)
+ * Body: { user_id, amount, description }
+ * amount > 0 = add, amount < 0 = deduct
+ */
+router.post('/credits/adjust', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        const { user_id, amount, description } = req.body;
+        const adminId = req.user.id;
+
+        if (!user_id || amount === undefined || amount === null) {
+            return res.status(400).json({ error: 'user_id and amount are required' });
+        }
+
+        const parsedAmount = parseInt(amount);
+        if (isNaN(parsedAmount) || parsedAmount === 0) {
+            return res.status(400).json({ error: 'amount must be a non-zero integer' });
+        }
+
+        // Check user exists
+        const { data: profile, error: profileError } = await supabaseAdmin
+            .from('profiles')
+            .select('id, full_name, email, credits')
+            .eq('id', user_id)
+            .single();
+
+        if (profileError || !profile) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        const newBalance = (profile.credits || 0) + parsedAmount;
+        if (newBalance < 0) {
+            return res.status(400).json({
+                error: 'Insufficient credits',
+                current: profile.credits,
+                attempted_deduction: Math.abs(parsedAmount)
+            });
+        }
+
+        // Update credits directly
+        const { error: updateError } = await supabaseAdmin
+            .from('profiles')
+            .update({ credits: newBalance, updated_at: new Date().toISOString() })
+            .eq('id', user_id);
+
+        if (updateError) {
+            console.error('[Admin] Credits adjust update error:', updateError);
+            return res.status(500).json({ error: 'Failed to update credits', message: updateError.message });
+        }
+
+        // Write to credit_ledger
+        const ledgerDesc = description || (parsedAmount > 0 ? 'Admin credit grant' : 'Admin credit deduction');
+        const { error: ledgerError } = await supabaseAdmin
+            .from('credit_ledger')
+            .insert({
+                user_id,
+                amount: parsedAmount,
+                type: parsedAmount > 0 ? 'admin_grant' : 'admin_deduction',
+                description: ledgerDesc,
+                created_at: new Date().toISOString(),
+            });
+
+        if (ledgerError) {
+            // Non-fatal: credits are already updated
+            console.error('[Admin] Ledger write error (non-fatal):', ledgerError);
+        }
+
+        console.log(`[Admin] Credits adjusted for ${user_id}: ${parsedAmount > 0 ? '+' : ''}${parsedAmount} by admin ${adminId}`);
+
+        res.json({
+            success: true,
+            user_id,
+            previous_balance: profile.credits || 0,
+            adjustment: parsedAmount,
+            new_balance: newBalance,
+        });
+    } catch (err) {
+        console.error('[Admin] Credits adjust error:', err);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+/**
  * GET /api/${ADMIN_ROUTE_SECRET}/admin/system-settings
  * Get credit rules and plan defaults (admin only)
  */

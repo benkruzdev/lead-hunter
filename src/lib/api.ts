@@ -294,6 +294,57 @@ export async function updateAdminSystemSettings(data: {
 }
 
 /**
+ * Get credit transaction ledger (admin only)
+ * GET /api/${ADMIN_SECRET}/admin/credits/ledger
+ */
+export async function getAdminCreditsLedger(params?: {
+    limit?: number;
+    offset?: number;
+    user_id?: string;
+}): Promise<{
+    transactions: Array<{
+        id: string;
+        user_id: string;
+        user_name: string | null;
+        user_email: string | null;
+        amount: number;
+        type: string;
+        description: string | null;
+        created_at: string;
+    }>;
+    total: number;
+}> {
+    if (!ADMIN_SECRET) throw new Error('VITE_ADMIN_ROUTE_SECRET is not configured.');
+    const q = new URLSearchParams();
+    if (params?.limit) q.set('limit', String(params.limit));
+    if (params?.offset) q.set('offset', String(params.offset));
+    if (params?.user_id) q.set('user_id', params.user_id);
+    return apiRequest(`/api/${ADMIN_SECRET}/admin/credits/ledger?${q.toString()}`);
+}
+
+/**
+ * Manually adjust credits for a user (admin only)
+ * POST /api/${ADMIN_SECRET}/admin/credits/adjust
+ */
+export async function adjustAdminUserCredits(data: {
+    user_id: string;
+    amount: number;
+    description?: string;
+}): Promise<{
+    success: boolean;
+    user_id: string;
+    previous_balance: number;
+    adjustment: number;
+    new_balance: number;
+}> {
+    if (!ADMIN_SECRET) throw new Error('VITE_ADMIN_ROUTE_SECRET is not configured.');
+    return apiRequest(`/api/${ADMIN_SECRET}/admin/credits/adjust`, {
+        method: 'POST',
+        body: JSON.stringify(data),
+    });
+}
+
+/**
  * Get admin dashboard metrics (admin only)
  * GET /api/${ADMIN_SECRET}/admin/dashboard
  */
