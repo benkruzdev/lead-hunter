@@ -119,25 +119,58 @@ router.get('/orders', requireAuth, async (req, res) => {
 
 // ---------------------------------------------------------------------------
 // POST /api/billing/orders
-// Create order + initiate payment with the selected provider.
+// Create order + initiate payment.
+//
+// User-facing paymentMethod values (what the UI sends):
+//   'card'           — resolves to the first active TR gateway (paytr/iyzico/shopier),
+//                      or Stripe if no TR provider is active.
+//   'bank_transfer'  — pending order awaiting manual admin confirmation.
+//
+// Legacy direct provider codes (paytr/iyzico/shopier/stripe/manual) are still
+// accepted so that existing admin tooling / curl tests don't break.
 // ---------------------------------------------------------------------------
 router.post('/orders', requireAuth, async (req, res) => {
     try {
         const userId = req.user.id;
-        const { packageId, paymentMethod } = req.body;
+        let { packageId, paymentMethod } = req.body;
 
         if (!packageId || !paymentMethod) {
             return res.status(400).json({ error: 'packageId and paymentMethod are required' });
         }
 
-        if (!ALL_PROVIDERS.includes(paymentMethod) && paymentMethod !== 'manual') {
-            return res.status(400).json({ error: `Invalid paymentMethod. Supported: ${ALL_PROVIDERS.join(', ')}, manual` });
+        const VALID_UI_METHODS  = ['card', 'bank_transfer'];
+        const VALID_RAW_METHODS = [...ALL_PROVIDERS, 'manual'];
+
+        if (!VALID_UI_METHODS.includes(paymentMethod) && !VALID_RAW_METHODS.includes(paymentMethod)) {
+            return res.status(400).json({
+                error: `Invalid paymentMethod. Supported: ${[...VALID_UI_METHODS, ...VALID_RAW_METHODS].join(', ')}`,
+            });
         }
 
-        // Manual: admin only.
-        if (paymentMethod === 'manual' && !isAdmin(req.user)) {
-            return res.status(403).json({ error: 'Manual payment is admin-only' });
+        // --- Resolve 'card' → active TR provider (or Stripe fallback) ---
+        let resolvedProvider = null;  // the actual gateway code, null for bank_transfer
+
+        if (paymentMethod === 'card') {
+            const allProviders = await listProviders(supabaseAdmin);
+            // Prefer active TR provider in sorted order
+            const trProvider = allProviders.find(p => p.enabled && TR_PROVIDERS.includes(p.provider_code));
+            const stripeProvider = allProviders.find(p => p.enabled && p.provider_code === 'stripe');
+
+            if (trProvider) {
+                resolvedProvider = trProvider.provider_code;
+            } else if (stripeProvider) {
+                resolvedProvider = 'stripe';
+            } else {
+                return res.status(503).json({ error: 'No active payment provider available. Please use bank transfer.' });
+            }
+            paymentMethod = resolvedProvider;  // downstream logic reuses provider-level code
         }
+
+        // --- bank_transfer / manual: create pending order, no provider init ---
+        const isBankTransfer = (paymentMethod === 'bank_transfer' || paymentMethod === 'manual');
+
+        // Legacy 'manual' was admin-only — now bank_transfer is open to all users.
+        // Direct 'manual' keyword from admin tooling is also allowed without auth check.
 
         // Fetch package.
         const { data: pkg, error: pkgError } = await supabaseAdmin
@@ -151,12 +184,12 @@ router.post('/orders', requireAuth, async (req, res) => {
             return res.status(404).json({ error: 'Credit package not found' });
         }
 
-        // Determine currency and amount from provider region.
-        const isGlobal = GLOBAL_PROVIDERS.includes(paymentMethod);
+        // Determine currency and amount.
+        const isGlobal = resolvedProvider ? GLOBAL_PROVIDERS.includes(resolvedProvider) : false;
         const currency = isGlobal ? 'USD' : 'TRY';
         const amount   = isGlobal ? (pkg.price_usd || pkg.price_try / 30) : pkg.price_try;
 
-        // Fetch user profile for provider init.
+        // Fetch user info.
         const { data: userAuth } = await supabaseAdmin.auth.admin.getUserById(userId);
         const userEmail = userAuth?.user?.email || '';
         const { data: profile } = await supabaseAdmin
@@ -165,13 +198,14 @@ router.post('/orders', requireAuth, async (req, res) => {
             .eq('id', userId)
             .single();
 
-        // Create order in pending state.
+        // Create order (pending).
+        const storedMethod = isBankTransfer ? 'bank_transfer' : resolvedProvider || paymentMethod;
         const { data: order, error: orderError } = await supabaseAdmin
             .from('orders')
             .insert({
                 user_id: userId,
                 package_id: packageId,
-                payment_method: paymentMethod,
+                payment_method: storedMethod,
                 amount,
                 currency,
                 credits: pkg.credits,
@@ -185,17 +219,22 @@ router.post('/orders', requireAuth, async (req, res) => {
             return res.status(500).json({ error: 'Failed to create order' });
         }
 
-        // Manual payment: no provider init, just return orderId.
-        if (paymentMethod === 'manual') {
-            return res.json({ orderId: order.id, amount, currency, paymentMethod });
+        // ---- bank_transfer / manual: return immediately ----
+        if (isBankTransfer) {
+            return res.json({
+                orderId: order.id,
+                paymentMethod: 'bank_transfer',
+                amount,
+                currency,
+                status: 'pending',
+            });
         }
 
-        // Fetch provider config.
+        // ---- Provider-level gateway init ----
         const provConfig = await getProvider(supabaseAdmin, paymentMethod);
         if (!provConfig || !provConfig.enabled) {
-            // Roll back the order.
             await supabaseAdmin.from('orders').delete().eq('id', order.id);
-            return res.status(503).json({ error: `Payment provider "${paymentMethod}" is not enabled` });
+            return res.status(503).json({ error: `Payment provider is not enabled` });
         }
 
         const orderCtx = {
@@ -223,7 +262,8 @@ router.post('/orders', requireAuth, async (req, res) => {
 
             return res.json({
                 orderId: order.id,
-                paymentMethod,
+                paymentMethod: 'card',
+                resolvedProvider: paymentMethod,
                 iframeUrl: result.iframeUrl,
                 token: result.token,
             });
@@ -240,7 +280,8 @@ router.post('/orders', requireAuth, async (req, res) => {
 
             return res.json({
                 orderId: order.id,
-                paymentMethod,
+                paymentMethod: 'card',
+                resolvedProvider: paymentMethod,
                 token: result.token,
                 checkoutFormContent: result.checkoutFormContent,
                 paymentPageUrl: result.paymentPageUrl,
@@ -258,7 +299,8 @@ router.post('/orders', requireAuth, async (req, res) => {
 
             return res.json({
                 orderId: order.id,
-                paymentMethod,
+                paymentMethod: 'card',
+                resolvedProvider: paymentMethod,
                 redirectUrl: result.redirectUrl,
             });
         }
@@ -276,7 +318,8 @@ router.post('/orders', requireAuth, async (req, res) => {
 
             return res.json({
                 orderId: order.id,
-                paymentMethod,
+                paymentMethod: 'card',
+                resolvedProvider: paymentMethod,
                 sessionId: result.sessionId,
                 sessionUrl: result.sessionUrl,
             });

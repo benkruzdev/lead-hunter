@@ -12,15 +12,31 @@ import {
 } from '@/components/ui/dialog';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
-import { CreditCard } from 'lucide-react';
+import { CreditCard, Building2, CheckCircle2, ExternalLink } from 'lucide-react';
 import { getCreditPackages, createOrder, getOrders } from '@/lib/api';
 import { formatDistanceToNow } from 'date-fns';
 import { tr, enUS } from 'date-fns/locale';
 
+type PaymentMethodUI = 'card' | 'bank_transfer';
+
+interface OrderResult {
+  orderId: string;
+  paymentMethod: 'card' | 'bank_transfer';
+  resolvedProvider?: string;
+  // card responses — one of these will be set:
+  iframeUrl?: string;
+  paymentPageUrl?: string;
+  redirectUrl?: string;
+  sessionUrl?: string;
+  // bank_transfer
+  amount?: number;
+  currency?: string;
+  status?: string;
+}
+
 export default function BillingPage() {
   const { t, i18n } = useTranslation();
 
-  // State
   const [packages, setPackages] = useState<any[]>([]);
   const [orders, setOrders] = useState<any[]>([]);
   const [isLoadingPackages, setIsLoadingPackages] = useState(true);
@@ -30,11 +46,14 @@ export default function BillingPage() {
 
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
   const [selectedPackage, setSelectedPackage] = useState<any>(null);
-  const [paymentMethod, setPaymentMethod] = useState('manual');
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethodUI>('card');
   const [isCreatingOrder, setIsCreatingOrder] = useState(false);
   const [orderError, setOrderError] = useState<string | null>(null);
 
-  // Fetch packages on mount
+  // After successful bank_transfer order — show IBAN info
+  const [bankTransferResult, setBankTransferResult] = useState<OrderResult | null>(null);
+  const [showBankTransferInfo, setShowBankTransferInfo] = useState(false);
+
   useEffect(() => {
     const fetchPackages = async () => {
       try {
@@ -49,11 +68,9 @@ export default function BillingPage() {
         setIsLoadingPackages(false);
       }
     };
-
     fetchPackages();
   }, []);
 
-  // Fetch orders on mount
   useEffect(() => {
     const fetchOrders = async () => {
       try {
@@ -68,14 +85,21 @@ export default function BillingPage() {
         setIsLoadingOrders(false);
       }
     };
-
     fetchOrders();
   }, []);
 
+  const refreshOrders = async () => {
+    try {
+      const data = await getOrders();
+      setOrders(data.orders || []);
+    } catch (_) {}
+  };
+
   const handleBuyClick = (pkg: any) => {
     setSelectedPackage(pkg);
-    setShowPaymentDialog(true);
+    setPaymentMethod('card');
     setOrderError(null);
+    setShowPaymentDialog(true);
   };
 
   const handleConfirmOrder = async () => {
@@ -85,19 +109,27 @@ export default function BillingPage() {
       setIsCreatingOrder(true);
       setOrderError(null);
 
-      await createOrder(selectedPackage.id, paymentMethod);
+      const result = await createOrder(selectedPackage.id, paymentMethod) as OrderResult;
 
-      // Refresh orders
-      const data = await getOrders();
-      setOrders(data.orders || []);
+      if (result.paymentMethod === 'bank_transfer') {
+        // Show IBAN / bank transfer instructions
+        setBankTransferResult(result);
+        setShowPaymentDialog(false);
+        setShowBankTransferInfo(true);
+        await refreshOrders();
+        return;
+      }
 
-      // Close dialog and show success
+      // Card: provider redirect
+      const redirectTarget = result.sessionUrl || result.redirectUrl || result.paymentPageUrl || result.iframeUrl;
+      if (redirectTarget) {
+        window.location.href = redirectTarget;
+        return;
+      }
+
+      // Fallback — no redirect URL returned (provider not yet live)
       setShowPaymentDialog(false);
-      setSelectedPackage(null);
-      setPaymentMethod('manual');
-
-      // Show success message
-      alert(t('billing.orderCreated') + ': ' + t('billing.orderCreatedDesc'));
+      await refreshOrders();
     } catch (error: any) {
       console.error('[BillingPage] Order creation failed:', error);
       setOrderError(error.message || t('billing.orderFailed'));
@@ -106,16 +138,18 @@ export default function BillingPage() {
     }
   };
 
+  const closeBankTransferInfo = () => {
+    setShowBankTransferInfo(false);
+    setBankTransferResult(null);
+    setSelectedPackage(null);
+  };
+
   const getStatusBadgeVariant = (status: string) => {
     switch (status) {
-      case 'completed':
-        return 'default';
-      case 'pending':
-        return 'secondary';
-      case 'failed':
-        return 'destructive';
-      default:
-        return 'outline';
+      case 'completed': return 'default';
+      case 'pending':   return 'secondary';
+      case 'failed':    return 'destructive';
+      default:          return 'outline';
     }
   };
 
@@ -126,15 +160,11 @@ export default function BillingPage() {
         <h2 className="text-2xl font-bold mb-4">{t('billing.packages')}</h2>
 
         {isLoadingPackages && (
-          <div className="text-center py-12 text-muted-foreground">
-            {t('common.loading')}
-          </div>
+          <div className="text-center py-12 text-muted-foreground">{t('common.loading')}</div>
         )}
 
         {packagesError && (
-          <div className="bg-destructive/10 text-destructive p-4 rounded-lg">
-            {t('billing.loadPackagesFailed')}
-          </div>
+          <div className="bg-destructive/10 text-destructive p-4 rounded-lg">{t('billing.loadPackagesFailed')}</div>
         )}
 
         {!isLoadingPackages && !packagesError && packages.length > 0 && (
@@ -142,8 +172,9 @@ export default function BillingPage() {
             {packages.map((pkg, index) => (
               <div
                 key={pkg.id}
-                className={`relative bg-card rounded-xl border p-6 transition-all duration-300 hover:shadow-card ${index === 1 ? 'border-primary shadow-glow' : ''
-                  }`}
+                className={`relative bg-card rounded-xl border p-6 transition-all duration-300 hover:shadow-card ${
+                  index === 1 ? 'border-primary shadow-glow' : ''
+                }`}
               >
                 {index === 1 && (
                   <div className="absolute -top-3 left-4 px-3 py-1 bg-primary text-primary-foreground text-xs font-medium rounded-full">
@@ -180,23 +211,17 @@ export default function BillingPage() {
         <h3 className="text-lg font-semibold mb-4">{t('billing.orderHistory')}</h3>
 
         {isLoadingOrders && (
-          <div className="text-center py-8 text-muted-foreground">
-            {t('common.loading')}
-          </div>
+          <div className="text-center py-8 text-muted-foreground">{t('common.loading')}</div>
         )}
 
         {ordersError && (
-          <div className="bg-destructive/10 text-destructive p-4 rounded-lg">
-            {t('billing.loadOrdersFailed')}
-          </div>
+          <div className="bg-destructive/10 text-destructive p-4 rounded-lg">{t('billing.loadOrdersFailed')}</div>
         )}
 
         {!isLoadingOrders && !ordersError && orders.length === 0 && (
           <div className="bg-card rounded-xl border p-8 text-center">
             <p className="text-muted-foreground mb-2">{t('billing.noOrders')}</p>
-            <p className="text-sm text-muted-foreground">
-              {t('billing.noOrdersDesc')}
-            </p>
+            <p className="text-sm text-muted-foreground">{t('billing.noOrdersDesc')}</p>
           </div>
         )}
 
@@ -206,33 +231,18 @@ export default function BillingPage() {
               <table className="w-full">
                 <thead>
                   <tr className="border-b bg-muted/20">
-                    <th className="text-left p-4 text-sm font-medium text-muted-foreground">
-                      {t('billing.packageName')}
-                    </th>
-                    <th className="text-left p-4 text-sm font-medium text-muted-foreground">
-                      {t('billing.amount')}
-                    </th>
-                    <th className="text-left p-4 text-sm font-medium text-muted-foreground">
-                      {t('billing.credits')}
-                    </th>
-                    <th className="text-left p-4 text-sm font-medium text-muted-foreground">
-                      Status
-                    </th>
-                    <th className="text-left p-4 text-sm font-medium text-muted-foreground">
-                      {t('billing.orderDate')}
-                    </th>
+                    <th className="text-left p-4 text-sm font-medium text-muted-foreground">{t('billing.packageName')}</th>
+                    <th className="text-left p-4 text-sm font-medium text-muted-foreground">{t('billing.amount')}</th>
+                    <th className="text-left p-4 text-sm font-medium text-muted-foreground">{t('billing.credits')}</th>
+                    <th className="text-left p-4 text-sm font-medium text-muted-foreground">Status</th>
+                    <th className="text-left p-4 text-sm font-medium text-muted-foreground">{t('billing.orderDate')}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {orders.map((order) => (
-                    <tr
-                      key={order.id}
-                      className="border-b hover:bg-muted/30 transition-colors"
-                    >
+                    <tr key={order.id} className="border-b hover:bg-muted/30 transition-colors">
                       <td className="p-4">{order.packageName}</td>
-                      <td className="p-4">
-                        ₺{order.amount} {order.currency}
-                      </td>
+                      <td className="p-4">₺{order.amount} {order.currency}</td>
                       <td className="p-4">{order.credits.toLocaleString()}</td>
                       <td className="p-4">
                         <Badge variant={getStatusBadgeVariant(order.status)}>
@@ -254,69 +264,74 @@ export default function BillingPage() {
         )}
       </div>
 
-      {/* Payment Method Dialog */}
+      {/* ------------------------------------------------------------------ */}
+      {/* Payment Method Dialog                                               */}
+      {/* ------------------------------------------------------------------ */}
       <Dialog open={showPaymentDialog} onOpenChange={setShowPaymentDialog}>
-        <DialogContent>
+        <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>{t('billing.selectPaymentMethod')}</DialogTitle>
+            <DialogTitle>Ödeme Yöntemi Seç</DialogTitle>
             <DialogDescription>
               {selectedPackage && (
                 <>
-                  {selectedPackage.displayName} - {selectedPackage.credits.toLocaleString()}{' '}
-                  {t('billing.credits')}
+                  {selectedPackage.displayName} &mdash; {selectedPackage.credits.toLocaleString()} {t('billing.credits')}
                   <br />
-                  {t('billing.costTransparency', {
-                    amount: selectedPackage.price,
-                    currency: selectedPackage.currency,
-                  })}
+                  <span className="font-medium text-foreground">₺{selectedPackage.price}</span>
                 </>
               )}
             </DialogDescription>
           </DialogHeader>
 
-          <RadioGroup value={paymentMethod} onValueChange={setPaymentMethod}>
-            <div className="flex items-center space-x-2">
-              <RadioGroupItem value="manual" id="manual" />
-              <Label htmlFor="manual" className="flex-1 cursor-pointer">
-                {t('billing.paymentMethods.manual')}
-              </Label>
-            </div>
+          <RadioGroup
+            value={paymentMethod}
+            onValueChange={(v) => setPaymentMethod(v as PaymentMethodUI)}
+            className="space-y-3"
+          >
+            {/* Card */}
+            <label
+              htmlFor="card"
+              className={`flex items-start gap-3 p-4 rounded-xl border cursor-pointer transition-colors ${
+                paymentMethod === 'card'
+                  ? 'border-primary bg-primary/5'
+                  : 'border-border hover:border-primary/50'
+              }`}
+            >
+              <RadioGroupItem value="card" id="card" className="mt-0.5 shrink-0" />
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <CreditCard className="w-4 h-4 text-primary shrink-0" />
+                  <span className="font-medium text-sm">Kredi / Banka Kartı ile Ödeme</span>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                  Güvenli ödeme sağlayıcısı üzerinden anında işlenir.
+                </p>
+              </div>
+            </label>
 
-            <div className="flex items-center space-x-2 opacity-50">
-              <RadioGroupItem value="paytr" id="paytr" disabled />
-              <Label htmlFor="paytr" className="flex-1">
-                {t('billing.paymentMethods.paytr')}
-                <Badge variant="secondary" className="ml-2">
-                  {t('billing.comingSoon')}
-                </Badge>
-              </Label>
-            </div>
-
-            <div className="flex items-center space-x-2 opacity-50">
-              <RadioGroupItem value="iyzico" id="iyzico" disabled />
-              <Label htmlFor="iyzico" className="flex-1">
-                {t('billing.paymentMethods.iyzico')}
-                <Badge variant="secondary" className="ml-2">
-                  {t('billing.comingSoon')}
-                </Badge>
-              </Label>
-            </div>
-
-            <div className="flex items-center space-x-2 opacity-50">
-              <RadioGroupItem value="shopier" id="shopier" disabled />
-              <Label htmlFor="shopier" className="flex-1">
-                {t('billing.paymentMethods.shopier')}
-                <Badge variant="secondary" className="ml-2">
-                  {t('billing.comingSoon')}
-                </Badge>
-              </Label>
-            </div>
+            {/* Bank transfer */}
+            <label
+              htmlFor="bank_transfer"
+              className={`flex items-start gap-3 p-4 rounded-xl border cursor-pointer transition-colors ${
+                paymentMethod === 'bank_transfer'
+                  ? 'border-primary bg-primary/5'
+                  : 'border-border hover:border-primary/50'
+              }`}
+            >
+              <RadioGroupItem value="bank_transfer" id="bank_transfer" className="mt-0.5 shrink-0" />
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <Building2 className="w-4 h-4 text-primary shrink-0" />
+                  <span className="font-medium text-sm">IBAN / Havale ile Ödeme</span>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                  Ödeme bildiriminin ardından admin onayıyla krediniz tanımlanır. 1&ndash;2 iş günü sürebilir.
+                </p>
+              </div>
+            </label>
           </RadioGroup>
 
           {orderError && (
-            <div className="bg-destructive/10 text-destructive p-3 rounded-md text-sm">
-              {orderError}
-            </div>
+            <div className="bg-destructive/10 text-destructive p-3 rounded-md text-sm">{orderError}</div>
           )}
 
           <DialogFooter>
@@ -330,6 +345,51 @@ export default function BillingPage() {
             <Button onClick={handleConfirmOrder} disabled={isCreatingOrder}>
               {isCreatingOrder ? t('common.loading') : t('common.confirm')}
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ------------------------------------------------------------------ */}
+      {/* Bank Transfer Info Dialog (shown after order creation)              */}
+      {/* ------------------------------------------------------------------ */}
+      <Dialog open={showBankTransferInfo} onOpenChange={closeBankTransferInfo}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CheckCircle2 className="w-5 h-5 text-green-500" />
+              Sipariş Alındı
+            </DialogTitle>
+            <DialogDescription>
+              Havale / EFT ödemenizi aşağıdaki bilgilere göre gerçekleştirin.
+              Ödemeniz onaylandıktan sonra krediniz hesabınıza yüklenir.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3 text-sm">
+            <div className="rounded-lg bg-muted/50 border p-4 space-y-2">
+              <p className="font-medium text-muted-foreground text-xs uppercase tracking-wide">Ödeme Talimatı</p>
+              <p>
+                Sipariş numaranız: <span className="font-mono font-medium">{bankTransferResult?.orderId}</span>
+              </p>
+              <p>
+                Tutar: <span className="font-medium">
+                  {bankTransferResult?.currency === 'TRY' ? '₺' : '$'}
+                  {bankTransferResult?.amount}
+                </span>
+              </p>
+              <p className="text-muted-foreground text-xs mt-2">
+                Açıklamaya sipariş numaranızı yazmayı unutmayın.
+                IBAN bilgisi için yönetici ile iletişime geçin.
+              </p>
+            </div>
+
+            <div className="rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800 p-3 text-xs text-amber-800 dark:text-amber-300">
+              Siparişiniz onay bekliyor durumunda. Havale sonrası admin tarafından onaylandığında krediniz otomatik olarak tanımlanır.
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button onClick={closeBankTransferInfo}>Tamam, Anladım</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
