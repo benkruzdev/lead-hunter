@@ -583,6 +583,8 @@ const resources = {
                 sessionLoadFailed: 'Arama oturumu yüklenemedi.',
                 searchFailed: 'Arama başarısız oldu. Lütfen tekrar deneyin.',
                 pageLoadFailed: 'Sayfa yüklenemedi. Lütfen tekrar deneyin.',
+                phoneCopied: 'Telefon numarası kopyalandı',
+                markForEnrichment: 'Zenginleştirme için İşaretle',
             },
             leadQuality: {
                 new: {

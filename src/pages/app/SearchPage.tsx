@@ -7,7 +7,6 @@ import { QUERY_KEYS } from "@/lib/queryKeys";
 import OnboardingTour from "@/components/onboarding/OnboardingTour";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -36,6 +35,11 @@ import {
   AlertCircle,
   Mail,
   Share2,
+  ChevronDown,
+  ChevronUp,
+  Copy,
+  Navigation,
+  Zap,
 } from "lucide-react";
 import {
   Sheet,
@@ -43,11 +47,6 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 import {
   Dialog,
   DialogContent,
@@ -58,12 +57,47 @@ import {
 } from "@/components/ui/dialog";
 import turkeyData from "@/data/turkey.json";
 import { useToast } from "@/hooks/use-toast";
-import { SearchIntelligenceBar } from "@/components/app/SearchIntelligenceBar";
-import { LeadQualityBadge } from "@/components/app/LeadQualityBadge";
 import { ExportTemplateDialog } from "@/components/app/ExportTemplateDialog";
 import { templates, mapItemToRecord, generateCSV, downloadCSV } from "@/lib/exportTemplates";
 
+// ─── Contact status helper ─────────────────────────────────────────────────
+type ContactStatusKey = "phoneAndWebsite" | "hasPhone" | "hasWebsite" | "needsEnrichment";
 
+function getContactStatus(item: SearchResult): ContactStatusKey {
+  if (item.phone && item.website) return "phoneAndWebsite";
+  if (item.phone) return "hasPhone";
+  if (item.website) return "hasWebsite";
+  return "needsEnrichment";
+}
+
+const contactStatusConfig: Record<ContactStatusKey, { label: string; className: string }> = {
+  phoneAndWebsite: { label: "Telefon + Website", className: "bg-emerald-50 text-emerald-700 border-emerald-200" },
+  hasPhone:        { label: "Telefon Var",       className: "bg-blue-50 text-blue-700 border-blue-200" },
+  hasWebsite:      { label: "Website Var",        className: "bg-indigo-50 text-indigo-700 border-indigo-200" },
+  needsEnrichment: { label: "Zenginleştirme Gerekli", className: "bg-orange-50 text-orange-700 border-orange-200" },
+};
+
+// ─── Business signal badges (max 2) ─────────────────────────────────────────
+interface SignalBadge { label: string; className: string }
+
+function getBusinessBadges(item: SearchResult): SignalBadge[] {
+  const badges: SignalBadge[] = [];
+  if (item.isOpen) {
+    badges.push({ label: "Açık", className: "bg-green-50 text-green-700 border-green-200" });
+  } else {
+    badges.push({ label: "Kapalı", className: "bg-gray-100 text-gray-500 border-gray-200" });
+  }
+  if (item.rating >= 4.5) {
+    badges.push({ label: "Yüksek Puan", className: "bg-amber-50 text-amber-700 border-amber-200" });
+  } else if (item.reviews >= 100) {
+    badges.push({ label: "Çok Yorumlu", className: "bg-blue-50 text-blue-700 border-blue-200" });
+  } else if (item.website) {
+    badges.push({ label: "Website Var", className: "bg-indigo-50 text-indigo-700 border-indigo-200" });
+  }
+  return badges.slice(0, 2);
+}
+
+// ─── Component ───────────────────────────────────────────────────────────────
 export default function SearchPage() {
   const { t } = useTranslation();
   const { profile, refreshProfile } = useAuth();
@@ -71,29 +105,39 @@ export default function SearchPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [showOnboarding, setShowOnboarding] = useState(false);
+
+  // ── Location state (global-ready naming) ──
+  // country: currently always Türkiye (locked), region = city, subregion = district
+  const [country] = useState("Türkiye");
   const [city, setCity] = useState("");
   const [district, setDistrict] = useState("");
   const [availableDistricts, setAvailableDistricts] = useState<string[]>([]);
+
+  // ── Search filters ──
   const [category, setCategory] = useState("");
   const [keyword, setKeyword] = useState("");
   const [minRating, setMinRating] = useState([0]);
   const [minReviews, setMinReviews] = useState("");
+
+  // ── UI state ──
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   const [results, setResults] = useState<SearchResult[]>([]);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [detailItem, setDetailItem] = useState<SearchResult | null>(null);
+  const [copiedPhone, setCopiedPhone] = useState(false);
 
-  // Pagination state (PR3)
-  const [sessionId, setSessionId] = useState<string | null>(null); // PR4: Backend session tracking
+  // ── Pagination state ──
+  const [sessionId, setSessionId] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalResults, setTotalResults] = useState(0);
   const [viewedPages, setViewedPages] = useState<Set<number>>(new Set([1]));
   const [showPaginationModal, setShowPaginationModal] = useState(false);
   const [pendingPage, setPendingPage] = useState<number | null>(null);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null); // PR4: Error handling
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // List selection dialog state
+  // ── List dialog state ──
   const [showListDialog, setShowListDialog] = useState(false);
   const [userLists, setUserLists] = useState<LeadList[]>([]);
   const [selectedListId, setSelectedListId] = useState<string>("");
@@ -106,33 +150,27 @@ export default function SearchPage() {
 
   const { toast } = useToast();
   const [pendingDistrict, setPendingDistrict] = useState<string | null>(null);
-  // Live credit costs from system_settings (fetched once on first search)
   const [creditsPerPage, setCreditsPerPage] = useState(10);
   const [creditsPerEnrichment, setCreditsPerEnrichment] = useState(1);
 
-  // Export template dialog state
+  // ── Export template dialog state ──
   const [showExportTemplateDialog, setShowExportTemplateDialog] = useState(false);
-
 
   const resultsPerPage = 20;
   const totalPages = Math.max(1, Math.ceil(totalResults / resultsPerPage));
-  // PR4.1: Backend returns 20 results per page, no frontend slicing needed
 
-  // Update available districts when city changes
+  // ─── Effects ───────────────────────────────────────────────────────────────
   useEffect(() => {
     if (city) {
       const selectedProvince = turkeyData.provinces.find((p) => p.name === city);
       const districts = selectedProvince?.districts || [];
       setAvailableDistricts(districts);
-
-      // Apply pending district from preset if available
       if (pendingDistrict && districts.includes(pendingDistrict)) {
         setDistrict(pendingDistrict);
         setPendingDistrict(null);
       } else if (!pendingDistrict) {
-        setDistrict(""); // Reset district when city changes manually
+        setDistrict("");
       } else {
-        // Pending district not in list, clear both
         setPendingDistrict(null);
         setDistrict("");
       }
@@ -143,23 +181,20 @@ export default function SearchPage() {
     }
   }, [city, pendingDistrict]);
 
-  // Show onboarding tour for first-time users
   useEffect(() => {
     if (profile && profile.onboarding_completed === false) {
       setShowOnboarding(true);
     }
   }, [profile]);
 
-
-
-  // PRODUCT_SPEC 5.4 - Load session from URL param (Continue search)
   useEffect(() => {
-    const sid = searchParams.get('sessionId');
+    const sid = searchParams.get("sessionId");
     if (sid) {
       loadSession(sid);
     }
   }, [searchParams]);
 
+  // ─── Handlers ──────────────────────────────────────────────────────────────
   const loadSession = async (sid: string) => {
     try {
       const { session } = await getSearchSession(sid);
@@ -174,13 +209,11 @@ export default function SearchPage() {
       setTotalResults(session.total_results);
       setHasSearched(true);
 
-      // Fetch live credit costs for modal display (once per session load)
       getSearchCreditCost().then(costs => {
         setCreditsPerPage(costs.credits_per_page);
         setCreditsPerEnrichment(costs.credits_per_enrichment);
       }).catch(() => { /* keep defaults */ });
 
-      // PRODUCT_SPEC 5.4: Auto-load page 1 results for resumed session
       const searchResponse = await performSearch({
         province: session.province || "",
         district: session.district || "",
@@ -188,21 +221,20 @@ export default function SearchPage() {
         keyword: session.keyword || "",
         minRating: session.min_rating || undefined,
         minReviews: session.min_reviews || undefined,
-        sessionId: sid
+        sessionId: sid,
       });
 
       setResults(searchResponse.results);
       setCurrentPage(1);
     } catch (error: any) {
-      console.error('[SearchPage] Session load error:', error);
+      console.error("[SearchPage] Session load error:", error);
       if (error.status === 410) {
-        navigate('/app/history', { replace: true });
+        navigate("/app/history", { replace: true });
       } else {
-        setErrorMessage(t('searchPage.sessionLoadFailed'));
+        setErrorMessage(t("searchPage.sessionLoadFailed"));
       }
     }
   };
-
 
   const handleOnboardingComplete = () => {
     setShowOnboarding(false);
@@ -215,7 +247,6 @@ export default function SearchPage() {
     setViewedPages(new Set([1]));
 
     try {
-      // Call backend API
       const response = await performSearch({
         province: city,
         district: district || undefined,
@@ -232,58 +263,37 @@ export default function SearchPage() {
       setIsSearching(false);
       setHasSearched(true);
 
-      // Fetch live credit costs for modal display
       getSearchCreditCost().then(costs => {
         setCreditsPerPage(costs.credits_per_page);
         setCreditsPerEnrichment(costs.credits_per_enrichment);
       }).catch(() => { /* keep defaults */ });
 
-      // Refresh profile to get updated credits
       refreshProfile();
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.credits });
     } catch (error) {
-      console.error('[SearchPage] Search failed:', error);
-      setErrorMessage(t('searchPage.searchFailed'));
+      console.error("[SearchPage] Search failed:", error);
+      setErrorMessage(t("searchPage.searchFailed"));
       setIsSearching(false);
     }
   };
 
-
-
-  const handleExportConfirm = (templateId: 'basic' | 'salesCrm' | 'outreach') => {
+  const handleExportConfirm = (templateId: "basic" | "salesCrm" | "outreach") => {
     const template = templates[templateId];
     const selectedItems = results.filter(item => selectedIds.includes(item.id));
-
-    // Map items to records based on template
     const records = selectedItems.map(item => mapItemToRecord(item, template, city));
-
-    // Generate CSV
     const csvContent = generateCSV(records, template.columns);
-
-    // Generate filename with timestamp
-    const timestamp = new Date().toISOString().split('T')[0];
+    const timestamp = new Date().toISOString().split("T")[0];
     const filename = `leads_${templateId}_${timestamp}.csv`;
-
-    // Trigger download
     downloadCSV(csvContent, filename);
   };
 
-
-
   const handlePageChange = (newPage: number) => {
     if (newPage === currentPage) return;
-
-    // Page boundary validation (PR4.1)
     if (newPage < 1 || newPage > totalPages) return;
-
-    // Check if page already viewed (free)
     if (viewedPages.has(newPage)) {
-      // Already viewed - fetch without modal
       confirmPageChange(newPage, true);
       return;
     }
-
-    // Show modal for unviewed page (10 credits)
     setPendingPage(newPage);
     setShowPaginationModal(true);
   };
@@ -293,36 +303,25 @@ export default function SearchPage() {
     if (targetPage === null || !sessionId) return;
 
     setErrorMessage(null);
-
     try {
-      // Call backend API (10 credits or 0 if already viewed)
       const response = await getSearchPage(sessionId, targetPage);
-
-      // PR4.1: Backend returns 20 results for the requested page
-      // Replace current results with new page results
       setResults(response.results as any[]);
       setViewedPages(prev => new Set([...prev, targetPage]));
       setCurrentPage(targetPage);
-
       if (!skipModal) {
         setShowPaginationModal(false);
         setPendingPage(null);
       }
-
-      // PR4.1: Use refreshProfile instead of window.reload
       if (response.creditCost > 0) {
         await refreshProfile();
       }
     } catch (error: any) {
-      console.error('[SearchPage] Page change failed:', error);
-
-      // Handle 402 Insufficient Credits
+      console.error("[SearchPage] Page change failed:", error);
       if (error.status === 402) {
-        setErrorMessage(t('leadLists.insufficientCredits'));
+        setErrorMessage(t("leadLists.insufficientCredits"));
       } else {
-        setErrorMessage(t('searchPage.pageLoadFailed'));
+        setErrorMessage(t("searchPage.pageLoadFailed"));
       }
-
       if (!skipModal) {
         setShowPaginationModal(false);
         setPendingPage(null);
@@ -331,23 +330,55 @@ export default function SearchPage() {
   };
 
   const toggleSelect = (id: string) => {
-    setSelectedIds((prev) =>
-      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
+    setSelectedIds(prev =>
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
     );
   };
 
   const toggleSelectAll = () => {
-    // PR4.1: results already contains only current page (20 items)
     if (selectedIds.length === results.length && results.length > 0) {
       setSelectedIds([]);
     } else {
-      setSelectedIds(results.map((r) => String(r.id)));
+      setSelectedIds(results.map(r => String(r.id)));
     }
   };
 
+  const openListDialog = async () => {
+    setIsLoadingLists(true);
+    setShowListDialog(true);
+    try {
+      const { lists } = await getLeadLists();
+      setUserLists(lists);
+    } catch (error) {
+      console.error("[SearchPage] Failed to load lists:", error);
+      setErrorMessage(t("leadLists.loadListsFailed"));
+    } finally {
+      setIsLoadingLists(false);
+    }
+  };
+
+  const handleCopyPhone = async (phone: string) => {
+    try {
+      await navigator.clipboard.writeText(phone);
+      setCopiedPhone(true);
+      setTimeout(() => setCopiedPhone(false), 2000);
+      toast({ description: t("searchPage.phoneCopied") });
+    } catch {
+      /* clipboard not available */
+    }
+  };
+
+  const handleOpenMap = (item: SearchResult) => {
+    const query = encodeURIComponent(
+      [item.name, item.address || item.district || city].filter(Boolean).join(", ")
+    );
+    window.open(`https://www.google.com/maps/search/?api=1&query=${query}`, "_blank");
+  };
+
+  // ─── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="space-y-6 animate-fade-in">
-      {/* Error Message (PR4 Backend Integration) */}
+      {/* Error banner */}
       {errorMessage && (
         <div className="bg-destructive/10 border border-destructive text-destructive rounded-xl p-4 flex items-center gap-3">
           <AlertCircle className="w-5 h-5 flex-shrink-0" />
@@ -363,21 +394,38 @@ export default function SearchPage() {
         </div>
       )}
 
-      {/* Filter Panel */}
-      <div className="bg-card rounded-xl border shadow-soft p-6">
-        <div className="grid sm:grid-cols-2 lg:grid-cols-6 gap-4">
-          {/* Şehir */}
+      {/* ── Filter Panel ── */}
+      <div className="bg-card rounded-xl border shadow-soft p-6 space-y-4">
+        {/* Basic filters */}
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* Country (locked, global-ready slot) */}
           <div className="space-y-2">
-            <Label className="flex items-center gap-2">
+            <Label className="flex items-center gap-2 text-sm font-medium">
               <MapPin className="w-4 h-4 text-muted-foreground" />
-              {t('searchPage.city')}
+              Ülke
+            </Label>
+            <Select value={country} disabled>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Türkiye">🇹🇷 Türkiye</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* City / Region */}
+          <div className="space-y-2">
+            <Label className="flex items-center gap-2 text-sm font-medium">
+              <MapPin className="w-4 h-4 text-muted-foreground" />
+              {t("searchPage.city")}
             </Label>
             <Select value={city} onValueChange={setCity}>
               <SelectTrigger data-onboarding="city-select" id="city-select">
-                <SelectValue placeholder={t('searchPage.selectCity')} />
+                <SelectValue placeholder={t("searchPage.selectCity")} />
               </SelectTrigger>
               <SelectContent>
-                {turkeyData.provinces.map((province) => (
+                {turkeyData.provinces.map(province => (
                   <SelectItem key={province.id} value={province.name}>
                     {province.name}
                   </SelectItem>
@@ -386,18 +434,18 @@ export default function SearchPage() {
             </Select>
           </div>
 
-          {/* İlçe */}
+          {/* District / Subregion */}
           <div className="space-y-2">
-            <Label className="flex items-center gap-2">
+            <Label className="flex items-center gap-2 text-sm font-medium">
               <MapPin className="w-4 h-4 text-muted-foreground" />
-              {t('searchPage.district')}
+              {t("searchPage.district")}
             </Label>
             <Select value={district} onValueChange={setDistrict} disabled={!city}>
               <SelectTrigger data-onboarding="district-select" id="district-select">
-                <SelectValue placeholder={t('searchPage.selectDistrict')} />
+                <SelectValue placeholder={city ? t("searchPage.selectDistrict") : "Önce şehir seçin"} />
               </SelectTrigger>
               <SelectContent>
-                {availableDistricts.map((d) => (
+                {availableDistricts.map(d => (
                   <SelectItem key={d} value={d}>
                     {d}
                   </SelectItem>
@@ -406,103 +454,121 @@ export default function SearchPage() {
             </Select>
           </div>
 
-          {/* Kategori (Free text input per PRODUCT_SPEC) */}
+          {/* Category */}
           <div className="space-y-2">
-            <Label className="flex items-center gap-2">
+            <Label className="flex items-center gap-2 text-sm font-medium">
               <Tag className="w-4 h-4 text-muted-foreground" />
-              {t('searchPage.category')}
+              {t("searchPage.category")}
             </Label>
             <Input
               data-onboarding="category-input"
               id="category-input"
               type="text"
-              placeholder={t('searchPage.categoryPlaceholder')}
+              placeholder={t("searchPage.categoryPlaceholder")}
               value={category}
-              onChange={(e) => setCategory(e.target.value)}
+              onChange={e => setCategory(e.target.value)}
             />
           </div>
+        </div>
 
-          {/* Anahtar Kelime */}
-          <div className="space-y-2">
-            <Label className="flex items-center gap-2">
-              <Tag className="w-4 h-4 text-muted-foreground" />
-              {t('searchPage.keyword')}
-            </Label>
-            <Input
-              id="keyword-input"
-              type="text"
-              placeholder={t('searchPage.keywordPlaceholder')}
-              value={keyword}
-              onChange={(e) => setKeyword(e.target.value)}
-            />
-          </div>
+        {/* Advanced filters toggle */}
+        <div>
+          <button
+            type="button"
+            onClick={() => setShowAdvanced(v => !v)}
+            className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+          >
+            {showAdvanced ? (
+              <><ChevronUp className="w-4 h-4" /> Gelişmiş filtreleri gizle</>
+            ) : (
+              <><ChevronDown className="w-4 h-4" /> Gelişmiş filtreler</>
+            )}
+          </button>
 
-          {/* Min Rating */}
-          <div className="space-y-2">
-            <Label className="flex items-center gap-2">
-              <Star className="w-4 h-4 text-muted-foreground" />
-              {t('searchPage.minRating')}: {minRating[0].toFixed(1)}
-            </Label>
-            <Slider
-              id="min-rating-slider"
-              value={minRating}
-              onValueChange={setMinRating}
-              min={0}
-              max={5}
-              step={0.1}
-              className="py-2"
-            />
-          </div>
+          {showAdvanced && (
+            <div className="grid sm:grid-cols-3 gap-4 mt-4 pt-4 border-t">
+              {/* Keyword */}
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2 text-sm font-medium">
+                  <Search className="w-4 h-4 text-muted-foreground" />
+                  {t("searchPage.keyword")}
+                </Label>
+                <Input
+                  id="keyword-input"
+                  type="text"
+                  placeholder={t("searchPage.keywordPlaceholder")}
+                  value={keyword}
+                  onChange={e => setKeyword(e.target.value)}
+                />
+              </div>
 
-          {/* Min Reviews */}
-          <div className="space-y-2">
-            <Label className="flex items-center gap-2">
-              <MessageSquare className="w-4 h-4 text-muted-foreground" />
-              {t('searchPage.minReviews')}
-            </Label>
-            <Input
-              id="min-reviews-input"
-              type="number"
-              min="0"
-              placeholder={t('searchPage.minReviewsPlaceholder')}
-              value={minReviews}
-              onChange={(e) => {
-                const value = Number(e.target.value);
-                setMinReviews(value < 0 ? "0" : e.target.value);
-              }}
-            />
-          </div>
+              {/* Min rating */}
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2 text-sm font-medium">
+                  <Star className="w-4 h-4 text-muted-foreground" />
+                  {t("searchPage.minRating")}: {minRating[0].toFixed(1)}
+                </Label>
+                <Slider
+                  id="min-rating-slider"
+                  value={minRating}
+                  onValueChange={setMinRating}
+                  min={0}
+                  max={5}
+                  step={0.1}
+                  className="py-2"
+                />
+              </div>
 
-          {/* Search Button */}
-          <div className="flex items-end">
-            <Button
-              data-onboarding="search-button"
-              onClick={handleSearch}
-              className="w-full"
-              disabled={!city || !category || isSearching}
-            >
-              {isSearching ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  {t('searchPage.searching')}
-                </>
-              ) : (
-                <>
-                  <Search className="w-4 h-4" />
-                  {t('searchPage.search')}
-                </>
-              )}
-            </Button>
-          </div>
+              {/* Min reviews */}
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2 text-sm font-medium">
+                  <MessageSquare className="w-4 h-4 text-muted-foreground" />
+                  {t("searchPage.minReviews")}
+                </Label>
+                <Input
+                  id="min-reviews-input"
+                  type="number"
+                  min="0"
+                  placeholder={t("searchPage.minReviewsPlaceholder")}
+                  value={minReviews}
+                  onChange={e => {
+                    const value = Number(e.target.value);
+                    setMinReviews(value < 0 ? "0" : e.target.value);
+                  }}
+                />
+              </div>
+            </div>
+          )}
+        </div>
 
+        {/* Search button */}
+        <div className="flex justify-end">
+          <Button
+            data-onboarding="search-button"
+            onClick={handleSearch}
+            className="min-w-[140px]"
+            disabled={!city || !category || isSearching}
+          >
+            {isSearching ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                {t("searchPage.searching")}
+              </>
+            ) : (
+              <>
+                <Search className="w-4 h-4" />
+                {t("searchPage.search")}
+              </>
+            )}
+          </Button>
         </div>
       </div>
 
-      {/* Results */}
+      {/* ── Results ── */}
       {isSearching ? (
         <div className="bg-card rounded-xl border shadow-soft p-6">
           <div className="space-y-4">
-            {[1, 2, 3, 4].map((i) => (
+            {[1, 2, 3, 4].map(i => (
               <div key={i} className="flex items-center gap-4 p-4 bg-muted/50 rounded-lg skeleton-loading">
                 <div className="w-5 h-5 bg-muted rounded" />
                 <div className="flex-1 space-y-2">
@@ -517,150 +583,153 @@ export default function SearchPage() {
       ) : hasSearched ? (
         <div className="bg-card rounded-xl border shadow-soft overflow-hidden">
           {/* Results header */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 border-b bg-muted/30">
-            <div className="flex items-center gap-4">
-              <span className="text-sm text-muted-foreground">
-                {t('searchPage.resultsFound', { count: totalResults })}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-3 border-b bg-muted/20">
+            <div className="flex items-center gap-4 flex-wrap">
+              <span className="text-sm font-medium">
+                {totalResults.toLocaleString()} sonuç
               </span>
               <span className="text-sm text-muted-foreground">
-                {t('searchPage.pageOf', { page: currentPage, total: totalPages })}
+                Sayfa {currentPage} / {totalPages}
               </span>
               {selectedIds.length > 0 && (
                 <span className="text-sm font-medium text-primary">
-                  {t('searchPage.selectedCount', { count: selectedIds.length })}
+                  {selectedIds.length} seçili
                 </span>
               )}
             </div>
-            <div className="flex items-center gap-3">
-              <Button
-                data-onboarding="add-to-list"
-                disabled={selectedIds.length === 0}
-                onClick={async () => {
-                  setIsLoadingLists(true);
-                  setShowListDialog(true);
-                  try {
-                    const { lists } = await getLeadLists();
-                    setUserLists(lists);
-                  } catch (error) {
-                    console.error('[SearchPage] Failed to load lists:', error);
-                    setErrorMessage(t('leadLists.loadListsFailed'));
-                  } finally {
-                    setIsLoadingLists(false);
-                  }
-                }}
-              >
-                <Plus className="w-4 h-4" />
-                {t('searchPage.addSelected', { count: selectedIds.length })}
-              </Button>
-            </div>
-          </div>
-
-          {/* Search Intelligence Bar */}
-          <div className="px-4 pb-3">
-            <SearchIntelligenceBar cost={0} />
+            <Button
+              data-onboarding="add-to-list"
+              disabled={selectedIds.length === 0}
+              size="sm"
+              onClick={openListDialog}
+            >
+              <Plus className="w-4 h-4" />
+              Seçilenleri Listeye Ekle
+              {selectedIds.length > 0 && ` (${selectedIds.length})`}
+            </Button>
           </div>
 
           {/* Table */}
           <div className="overflow-x-auto">
-            <table className="w-full">
+            <table className="w-full text-sm">
               <thead>
                 <tr className="border-b bg-muted/20">
-                  <th className="text-left p-4 w-12">
+                  <th className="text-left p-4 w-10">
                     <Checkbox
                       checked={selectedIds.length === results.length && results.length > 0}
                       onCheckedChange={toggleSelectAll}
                     />
                   </th>
-                  <th className="text-left p-4 text-sm font-medium text-muted-foreground">
-                    {t('searchPage.businessName')}
-                  </th>
-                  <th className="text-left p-4 text-sm font-medium text-muted-foreground">
-                    {t('searchPage.tableCategory')}
-                  </th>
-                  <th className="text-left p-4 text-sm font-medium text-muted-foreground">
-                    {t('searchPage.tableDistrict')}
-                  </th>
-                  <th className="text-left p-4 text-sm font-medium text-muted-foreground">
-                    {t('searchPage.rating')}
-                  </th>
-                  <th className="text-left p-4 text-sm font-medium text-muted-foreground">
-                    {t('searchPage.reviews')}
-                  </th>
-                  <th className="text-left p-4 text-sm font-medium text-muted-foreground">
-                    {t('searchPage.status')}
-                  </th>
-                  <th className="text-left p-4 text-sm font-medium text-muted-foreground">
-                    {t('searchPage.email')}
-                  </th>
-                  <th className="text-left p-4 text-sm font-medium text-muted-foreground">
-                    {t('searchPage.socialProfiles')}
-                  </th>
-                  <th className="text-left p-4 text-sm font-medium text-muted-foreground">
-                    {t('searchPage.actions')}
-                  </th>
+                  <th className="text-left p-4 font-medium text-muted-foreground">İşletme</th>
+                  <th className="text-left p-4 font-medium text-muted-foreground">Konum</th>
+                  <th className="text-left p-4 font-medium text-muted-foreground">Kategori</th>
+                  <th className="text-left p-4 font-medium text-muted-foreground">Puan</th>
+                  <th className="text-left p-4 font-medium text-muted-foreground">Yorum</th>
+                  <th className="text-left p-4 font-medium text-muted-foreground">İletişim</th>
+                  <th className="text-left p-4 font-medium text-muted-foreground">Website</th>
+                  <th className="text-left p-4 font-medium text-muted-foreground w-24">İşlemler</th>
                 </tr>
               </thead>
               <tbody>
-                {results.map((item) => (
-                  <tr
-                    key={item.id}
-                    className="border-b hover:bg-muted/30 transition-colors"
-                  >
-                    <td className="p-4">
-                      <Checkbox
-                        checked={selectedIds.includes(item.id)}
-                        onCheckedChange={() => toggleSelect(item.id)}
-                      />
-                    </td>
-                    <td className="p-4">
-                      <div className="space-y-1">
-                        <div className="font-medium">{item.name}</div>
-                        <LeadQualityBadge
-                          variant={
-                            item.reviews >= 1000 ? "engaged"
-                              : item.rating >= 4.5 ? "active"
-                                : "new"
-                          }
+                {results.map(item => {
+                  const badges = getBusinessBadges(item);
+                  const contactStatus = contactStatusConfig[getContactStatus(item)];
+                  const websiteDisplay = item.website
+                    ? item.website.replace(/^https?:\/\//, "").replace(/\/$/, "").slice(0, 24)
+                    : null;
+
+                  return (
+                    <tr
+                      key={item.id}
+                      className="border-b hover:bg-muted/30 transition-colors"
+                    >
+                      {/* Checkbox */}
+                      <td className="p-4">
+                        <Checkbox
+                          checked={selectedIds.includes(item.id)}
+                          onCheckedChange={() => toggleSelect(item.id)}
                         />
-                      </div>
-                    </td>
-                    <td className="p-4 text-muted-foreground">{item.category}</td>
-                    <td className="p-4 text-muted-foreground">{item.district}</td>
-                    <td className="p-4">
-                      <span className="flex items-center gap-1">
-                        <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
-                        {item.rating}
-                      </span>
-                    </td>
-                    <td className="p-4 text-muted-foreground">{item.reviews.toLocaleString()}</td>
-                    <td className="p-4">
-                      <Badge
-                        variant={item.isOpen ? "default" : "secondary"}
-                        className={item.isOpen ? "bg-green-500" : ""}
-                      >
-                        {item.isOpen ? t('searchPage.open') : t('searchPage.closed')}
-                      </Badge>
-                    </td>
-                    <td className="p-4">
-                      <span className="text-sm text-muted-foreground">-</span>
-                    </td>
-                    <td className="p-4">
-                      <span className="text-sm text-muted-foreground">-</span>
-                    </td>
-                    <td className="p-4">
-                      <div className="flex items-center gap-2">
+                      </td>
+
+                      {/* Business name + badges */}
+                      <td className="p-4 min-w-[180px]">
+                        <div className="font-medium leading-snug">{item.name}</div>
+                        <div className="flex gap-1 mt-1 flex-wrap">
+                          {badges.map(b => (
+                            <span
+                              key={b.label}
+                              className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium leading-none ${b.className}`}
+                            >
+                              {b.label}
+                            </span>
+                          ))}
+                        </div>
+                      </td>
+
+                      {/* Location */}
+                      <td className="p-4 text-muted-foreground whitespace-nowrap">
+                        {item.district || city || "—"}
+                      </td>
+
+                      {/* Category */}
+                      <td className="p-4 text-muted-foreground max-w-[140px] truncate">
+                        {item.category || "—"}
+                      </td>
+
+                      {/* Rating */}
+                      <td className="p-4 whitespace-nowrap">
+                        <span className="flex items-center gap-1">
+                          <Star className="w-3.5 h-3.5 text-yellow-500 fill-yellow-500" />
+                          <span className="font-medium">{item.rating ?? "—"}</span>
+                        </span>
+                      </td>
+
+                      {/* Reviews */}
+                      <td className="p-4 text-muted-foreground whitespace-nowrap">
+                        {typeof item.reviews === "number" ? item.reviews.toLocaleString() : "—"}
+                      </td>
+
+                      {/* Contact status */}
+                      <td className="p-4">
+                        <span
+                          className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium ${contactStatus.className}`}
+                        >
+                          {contactStatus.label}
+                        </span>
+                      </td>
+
+                      {/* Website */}
+                      <td className="p-4 max-w-[160px]">
+                        {websiteDisplay ? (
+                          <a
+                            href={`https://${item.website!.replace(/^https?:\/\//, "")}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-primary hover:underline text-xs truncate block"
+                            title={item.website ?? undefined}
+                          >
+                            {websiteDisplay}
+                          </a>
+                        ) : (
+                          <span className="text-muted-foreground text-xs">—</span>
+                        )}
+                      </td>
+
+                      {/* Actions */}
+                      <td className="p-4">
                         <Button
                           variant="ghost"
                           size="sm"
                           onClick={() => setDetailItem(item)}
+                          className="h-8 px-2 text-xs"
                         >
-                          <Eye className="w-4 h-4 mr-1" />
-                          {t('searchPage.detail')}
+                          <Eye className="w-3.5 h-3.5 mr-1" />
+                          Detay
                         </Button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -674,7 +743,7 @@ export default function SearchPage() {
                 disabled={currentPage === 1}
                 onClick={() => handlePageChange(currentPage - 1)}
               >
-                {t('searchPage.previous')}
+                {t("searchPage.previous")}
               </Button>
 
               {(() => {
@@ -702,7 +771,7 @@ export default function SearchPage() {
                 disabled={currentPage === totalPages}
                 onClick={() => handlePageChange(currentPage + 1)}
               >
-                {t('searchPage.next')}
+                {t("searchPage.next")}
               </Button>
             </div>
           )}
@@ -712,122 +781,225 @@ export default function SearchPage() {
           <div className="w-16 h-16 mx-auto mb-4 bg-muted rounded-full flex items-center justify-center">
             <Search className="w-8 h-8 text-muted-foreground" />
           </div>
-          <h3 className="text-lg font-semibold mb-2">{t('searchPage.emptyTitle')}</h3>
-          <p className="text-muted-foreground max-w-md mx-auto">
-            {t('searchPage.emptyDescription')}
+          <h3 className="text-lg font-semibold mb-2">{t("searchPage.emptyTitle")}</h3>
+          <p className="text-muted-foreground max-w-sm mx-auto text-sm">
+            {t("searchPage.emptyDescription")}
           </p>
         </div>
-      )
-      }
+      )}
 
-      {/* Detail Sheet */}
+      {/* ── Detail Drawer ── */}
       <Sheet open={!!detailItem} onOpenChange={() => setDetailItem(null)}>
-        <SheetContent className="sm:max-w-lg">
+        <SheetContent className="sm:max-w-md overflow-y-auto">
           {detailItem && (
-            <div className="animate-slide-in-right">
-              <SheetHeader className="mb-6">
-                <SheetTitle className="text-2xl">{detailItem.name}</SheetTitle>
-                <div className="flex items-center gap-3 mt-2">
-                  <span className="px-2.5 py-0.5 bg-primary/10 text-primary rounded-full text-sm font-medium">
+            <div className="animate-slide-in-right space-y-6 pb-6">
+              <SheetHeader>
+                <SheetTitle className="text-xl leading-snug">{detailItem.name}</SheetTitle>
+                <div className="flex flex-wrap gap-2 mt-1">
+                  <span className="px-2.5 py-0.5 bg-primary/10 text-primary rounded-full text-xs font-medium">
                     {detailItem.category}
                   </span>
                   <span
-                    className={`px-2.5 py-0.5 rounded-full text-xs font-medium border ${detailItem.isOpen ? "chip-open" : "chip-closed"
-                      }`}
+                    className={`px-2.5 py-0.5 rounded-full text-xs font-medium border ${
+                      detailItem.isOpen ? "chip-open" : "chip-closed"
+                    }`}
                   >
-                    {detailItem.isOpen ? t('searchPage.open') : t('searchPage.closed')}
+                    {detailItem.isOpen ? "Açık" : "Kapalı"}
                   </span>
                 </div>
               </SheetHeader>
 
-              <div className="space-y-6">
-                <div className="flex items-center gap-4">
-                  <div className="flex items-center gap-1">
-                    <Star className="w-5 h-5 text-yellow-500 fill-yellow-500" />
-                    <span className="text-lg font-semibold">{detailItem.rating}</span>
+              {/* A) Genel */}
+              <section>
+                <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
+                  Genel
+                </h4>
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Star className="w-4 h-4 text-yellow-500 fill-yellow-500 flex-shrink-0" />
+                    <span className="font-semibold">{detailItem.rating ?? "—"}</span>
+                    <span className="text-muted-foreground text-sm">
+                      ({typeof detailItem.reviews === "number" ? detailItem.reviews.toLocaleString() : "—"} yorum)
+                    </span>
                   </div>
-                  <span className="text-muted-foreground">
-                    ({detailItem.reviews.toLocaleString()} {t('searchPage.reviews')})
-                  </span>
+                  <div className="flex items-start gap-2">
+                    <MapPin className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                    <span className="text-sm text-muted-foreground leading-relaxed">
+                      {detailItem.address ||
+                        [detailItem.district, city].filter(Boolean).join(", ") ||
+                        "Konum bilgisi mevcut değil"}
+                    </span>
+                  </div>
+                  {detailItem.hours && (
+                    <div className="flex items-start gap-2">
+                      <Clock className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                      <span className="text-sm text-muted-foreground">{detailItem.hours}</span>
+                    </div>
+                  )}
                 </div>
+              </section>
 
-                <div className="space-y-4">
-                  <div className="flex items-start gap-3">
-                    <MapPin className="w-5 h-5 text-muted-foreground mt-0.5" />
+              <div className="border-t" />
+
+              {/* B) İletişim */}
+              <section>
+                <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
+                  İletişim
+                </h4>
+                <div className="space-y-3">
+                  {/* Phone */}
+                  <div className="flex items-start gap-2">
+                    <Phone className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
                     <div>
-                      <p className="font-medium">{t('searchPage.detailAddress')}</p>
-                      <p className="text-muted-foreground">{detailItem.address}</p>
+                      <p className="text-xs text-muted-foreground mb-0.5">Telefon</p>
+                      {detailItem.phone ? (
+                        <p className="text-sm font-medium">{detailItem.phone}</p>
+                      ) : (
+                        <p className="text-sm text-muted-foreground italic">
+                          Zenginleştirme sonrası alınabilir
+                        </p>
+                      )}
                     </div>
                   </div>
 
-                  <div className="flex items-start gap-3">
-                    <Phone className="w-5 h-5 text-muted-foreground mt-0.5" />
+                  {/* Website */}
+                  <div className="flex items-start gap-2">
+                    <Globe className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
                     <div>
-                      <p className="font-medium">{t('searchPage.detailPhone')}</p>
-                      <p className="text-muted-foreground">{detailItem.phone}</p>
+                      <p className="text-xs text-muted-foreground mb-0.5">Website</p>
+                      {detailItem.website ? (
+                        <a
+                          href={`https://${detailItem.website.replace(/^https?:\/\//, "")}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sm text-primary hover:underline break-all"
+                        >
+                          {detailItem.website.replace(/^https?:\/\//, "")}
+                        </a>
+                      ) : (
+                        <p className="text-sm text-muted-foreground italic">
+                          Zenginleştirme sonrası alınabilir
+                        </p>
+                      )}
                     </div>
                   </div>
 
-                  <div className="flex items-start gap-3">
-                    <Globe className="w-5 h-5 text-muted-foreground mt-0.5" />
+                  {/* Email */}
+                  <div className="flex items-start gap-2">
+                    <Mail className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
                     <div>
-                      <p className="font-medium">{t('searchPage.detailWebsite')}</p>
-                      <p className="text-primary">{detailItem.website}</p>
+                      <p className="text-xs text-muted-foreground mb-0.5">E-posta</p>
+                      <p className="text-sm text-muted-foreground italic">
+                        Zenginleştirme sonrası alınabilir
+                      </p>
                     </div>
                   </div>
 
-                  <div className="flex items-start gap-3">
-                    <Clock className="w-5 h-5 text-muted-foreground mt-0.5" />
+                  {/* Social */}
+                  <div className="flex items-start gap-2">
+                    <Share2 className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
                     <div>
-                      <p className="font-medium">{t('searchPage.detailHours')}</p>
-                      <p className="text-muted-foreground">{detailItem.hours}</p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-start gap-3">
-                    <Mail className="w-5 h-5 text-muted-foreground mt-0.5" />
-                    <div>
-                      <p className="font-medium">{t('searchPage.email')}</p>
-                      <p className="text-muted-foreground">-</p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-start gap-3">
-                    <Share2 className="w-5 h-5 text-muted-foreground mt-0.5" />
-                    <div>
-                      <p className="font-medium">{t('searchPage.socialProfiles')}</p>
-                      <p className="text-muted-foreground">-</p>
+                      <p className="text-xs text-muted-foreground mb-0.5">Sosyal Profiller</p>
+                      <p className="text-sm text-muted-foreground italic">
+                        Zenginleştirme sonrası alınabilir
+                      </p>
                     </div>
                   </div>
                 </div>
+              </section>
 
-                <div className="pt-4 space-y-3">
+              <div className="border-t" />
+
+              {/* C) Aksiyonlar */}
+              <section>
+                <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
+                  Aksiyonlar
+                </h4>
+                <div className="space-y-2">
+                  {/* Add to list */}
+                  <Button
+                    className="w-full justify-start"
+                    onClick={() => {
+                      setSelectedIds(prev =>
+                        prev.includes(detailItem.id) ? prev : [...prev, detailItem.id]
+                      );
+                      setDetailItem(null);
+                      openListDialog();
+                    }}
+                  >
+                    <Plus className="w-4 h-4" />
+                    Listeye Ekle
+                  </Button>
+
+                  {/* Open website */}
                   {detailItem.website && (
                     <Button
                       variant="outline"
-                      className="w-full"
-                      onClick={() => window.open(`https://${detailItem.website.replace(/^https?:\/\//, '')}`, '_blank')}
+                      className="w-full justify-start"
+                      onClick={() =>
+                        window.open(
+                          `https://${detailItem.website!.replace(/^https?:\/\//, "")}`,
+                          "_blank"
+                        )
+                      }
                     >
                       <ExternalLink className="w-4 h-4" />
-                      {detailItem.website}
+                      Siteyi Aç
                     </Button>
                   )}
+
+                  {/* Copy phone */}
+                  {detailItem.phone && (
+                    <Button
+                      variant="outline"
+                      className="w-full justify-start"
+                      onClick={() => handleCopyPhone(detailItem.phone!)}
+                    >
+                      <Copy className="w-4 h-4" />
+                      {copiedPhone ? "Kopyalandı!" : "Telefonu Kopyala"}
+                    </Button>
+                  )}
+
+                  {/* Open maps */}
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start"
+                    onClick={() => handleOpenMap(detailItem)}
+                  >
+                    <Navigation className="w-4 h-4" />
+                    Haritada Aç
+                  </Button>
+
+                  {/* Mark for enrichment — adds to selection so user can batch-enrich from ListDetail */}
+                  <Button
+                    variant="ghost"
+                    className="w-full justify-start text-muted-foreground"
+                    onClick={() => {
+                      setSelectedIds(prev =>
+                        prev.includes(detailItem.id) ? prev : [...prev, detailItem.id]
+                      );
+                      setDetailItem(null);
+                    }}
+                  >
+                    <Zap className="w-4 h-4" />
+                    {t("searchPage.markForEnrichment")}
+                  </Button>
                 </div>
-              </div>
+              </section>
             </div>
           )}
         </SheetContent>
       </Sheet>
 
-      {/* Credit Confirmation Modal (PR3) */}
+      {/* ── Credit Confirmation Modal ── */}
       <Dialog open={showPaginationModal} onOpenChange={setShowPaginationModal}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{t('searchPage.pageChangeTitle')}</DialogTitle>
+            <DialogTitle>{t("searchPage.pageChangeTitle")}</DialogTitle>
             <DialogDescription>
-              {t('searchPage.pageChangeDesc', { page: pendingPage, cost: creditsPerPage })}
+              {t("searchPage.pageChangeDesc", { page: pendingPage, cost: creditsPerPage })}
               <br />
-              {t('searchPage.pageChangeCreditInfo', { credits: profile?.credits || 0 })}
+              {t("searchPage.pageChangeCreditInfo", { credits: profile?.credits || 0 })}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="flex gap-2">
@@ -838,31 +1010,34 @@ export default function SearchPage() {
                 setPendingPage(null);
               }}
             >
-              {t('common.cancel')}
+              {t("common.cancel")}
             </Button>
             <Button onClick={() => confirmPageChange()}>
-              {t('searchPage.confirmPageBtn', { cost: creditsPerPage })}
+              {t("searchPage.confirmPageBtn", { cost: creditsPerPage })}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* List Selection Dialog */}
-      <Dialog open={showListDialog} onOpenChange={(open) => {
-        setShowListDialog(open);
-        if (!open) {
-          setSelectedListId("");
-          setDryRunCost(null);
-          setListDialogError(null);
-          setNewListName("");
-          setIsCreatingList(false);
-        }
-      }}>
+      {/* ── List Selection Dialog ── */}
+      <Dialog
+        open={showListDialog}
+        onOpenChange={open => {
+          setShowListDialog(open);
+          if (!open) {
+            setSelectedListId("");
+            setDryRunCost(null);
+            setListDialogError(null);
+            setNewListName("");
+            setIsCreatingList(false);
+          }
+        }}
+      >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{t('leadLists.addToListTitle')}</DialogTitle>
+            <DialogTitle>{t("leadLists.addToListTitle")}</DialogTitle>
             <DialogDescription>
-              {t('leadLists.leadsSelected', { count: selectedIds.length })}
+              {t("leadLists.leadsSelected", { count: selectedIds.length })}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
@@ -875,12 +1050,9 @@ export default function SearchPage() {
                 {/* Inline new-list creation */}
                 <div className="flex gap-2">
                   <Input
-                    placeholder={t('leadLists.newListNamePlaceholder')}
+                    placeholder={t("leadLists.newListNamePlaceholder")}
                     value={newListName}
-                    onChange={(e) => setNewListName(e.target.value)}
-                    onKeyDown={async (e) => {
-                      if (e.key === 'Enter' && newListName.trim()) e.currentTarget.blur();
-                    }}
+                    onChange={e => setNewListName(e.target.value)}
                     disabled={isCreatingList}
                   />
                   <Button
@@ -894,7 +1066,6 @@ export default function SearchPage() {
                         const { list } = await createLeadList(newListName.trim());
                         setUserLists(prev => [list, ...prev]);
                         setNewListName("");
-                        // Auto-select the new list and trigger dry-run
                         setSelectedListId(list.id);
                         setDryRunCost(null);
                         try {
@@ -903,8 +1074,8 @@ export default function SearchPage() {
                           setDryRunCost(dryRunResult.creditCost || 0);
                         } catch { /* dry-run failure is non-fatal */ }
                       } catch (error) {
-                        console.error('[SearchPage] Create list failed:', error);
-                        setListDialogError(t('leadLists.createListFailed'));
+                        console.error("[SearchPage] Create list failed:", error);
+                        setListDialogError(t("leadLists.createListFailed"));
                       } finally {
                         setIsCreatingList(false);
                       }
@@ -916,24 +1087,27 @@ export default function SearchPage() {
 
                 {/* Existing list selector */}
                 {userLists.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-2">{t('leadLists.noListsYet')}</p>
+                  <p className="text-sm text-muted-foreground text-center py-2">{t("leadLists.noListsYet")}</p>
                 ) : (
-                  <Select value={selectedListId} onValueChange={async (listId) => {
-                    setSelectedListId(listId);
-                    setDryRunCost(null);
-                    try {
-                      const selectedLeads = results.filter(r => selectedIds.includes(r.id));
-                      const dryRunResult = await addLeadsToList(listId, selectedLeads, { dryRun: true });
-                      setDryRunCost(dryRunResult.creditCost || 0);
-                    } catch (error) {
-                      console.error('[SearchPage] DryRun failed:', error);
-                    }
-                  }}>
+                  <Select
+                    value={selectedListId}
+                    onValueChange={async listId => {
+                      setSelectedListId(listId);
+                      setDryRunCost(null);
+                      try {
+                        const selectedLeads = results.filter(r => selectedIds.includes(r.id));
+                        const dryRunResult = await addLeadsToList(listId, selectedLeads, { dryRun: true });
+                        setDryRunCost(dryRunResult.creditCost || 0);
+                      } catch (error) {
+                        console.error("[SearchPage] DryRun failed:", error);
+                      }
+                    }}
+                  >
                     <SelectTrigger>
-                      <SelectValue placeholder={t('leadLists.selectList')} />
+                      <SelectValue placeholder={t("leadLists.selectList")} />
                     </SelectTrigger>
                     <SelectContent>
-                      {userLists.map((list) => (
+                      {userLists.map(list => (
                         <SelectItem key={list.id} value={list.id}>
                           {list.name} ({list.lead_count} lead)
                         </SelectItem>
@@ -943,14 +1117,18 @@ export default function SearchPage() {
                 )}
               </>
             )}
+
             {dryRunCost !== null && (
               <div className="bg-muted/50 rounded-lg p-4">
-                <p className="text-sm font-medium">{t('leadLists.costLabel', { cost: dryRunCost })}</p>
+                <p className="text-sm font-medium">{t("leadLists.costLabel", { cost: dryRunCost })}</p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  {dryRunCost === 0 ? t('leadLists.allDuplicates') : t('leadLists.willAddN', { count: dryRunCost })}
+                  {dryRunCost === 0
+                    ? t("leadLists.allDuplicates")
+                    : t("leadLists.willAddN", { count: dryRunCost })}
                 </p>
               </div>
             )}
+
             {listDialogError && (
               <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-3 text-sm text-destructive">
                 {listDialogError}
@@ -958,13 +1136,16 @@ export default function SearchPage() {
             )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => {
-              setShowListDialog(false);
-              setSelectedListId("");
-              setDryRunCost(null);
-              setListDialogError(null);
-            }}>
-              {t('common.cancel')}
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowListDialog(false);
+                setSelectedListId("");
+                setDryRunCost(null);
+                setListDialogError(null);
+              }}
+            >
+              {t("common.cancel")}
             </Button>
             <Button
               disabled={!selectedListId || isAddingToList || dryRunCost === null}
@@ -985,18 +1166,18 @@ export default function SearchPage() {
 
                   setErrorMessage(
                     result.skippedCount
-                      ? t('leadLists.addSuccessWithSkipped', { added: result.addedCount, skipped: result.skippedCount })
-                      : t('leadLists.addSuccess', { count: result.addedCount })
+                      ? t("leadLists.addSuccessWithSkipped", { added: result.addedCount, skipped: result.skippedCount })
+                      : t("leadLists.addSuccess", { count: result.addedCount })
                   );
                   setTimeout(() => setErrorMessage(null), 5000);
                 } catch (error: any) {
-                  console.error('[SearchPage] Add to list failed:', error);
+                  console.error("[SearchPage] Add to list failed:", error);
                   if (error.status === 402) {
-                    const requiredText = error.required ? ` ${error.required} kredi gerekli,` : '';
-                    const availableText = error.available !== undefined ? ` ${error.available} kredi mevcut.` : '';
-                    setListDialogError(t('leadLists.insufficientCredits') + requiredText + availableText);
+                    const requiredText = error.required ? ` ${error.required} kredi gerekli,` : "";
+                    const availableText = error.available !== undefined ? ` ${error.available} kredi mevcut.` : "";
+                    setListDialogError(t("leadLists.insufficientCredits") + requiredText + availableText);
                   } else {
-                    setListDialogError(t('leadLists.addFailed'));
+                    setListDialogError(t("leadLists.addFailed"));
                   }
                 } finally {
                   setIsAddingToList(false);
@@ -1006,19 +1187,18 @@ export default function SearchPage() {
               {isAddingToList ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  {t('leadLists.adding')}
+                  {t("leadLists.adding")}
                 </>
               ) : (
                 <>
                   <Plus className="w-4 h-4" />
-                  {t('leadLists.addButtonWithCost', { cost: dryRunCost ?? '?' })}
+                  {t("leadLists.addButtonWithCost", { cost: dryRunCost ?? "?" })}
                 </>
               )}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
 
       {/* Export Template Dialog */}
       <ExportTemplateDialog
@@ -1029,18 +1209,9 @@ export default function SearchPage() {
       />
 
       {/* Onboarding Tour */}
-      {
-        showOnboarding && profile && !profile.onboarding_completed && (
-          <OnboardingTour onComplete={handleOnboardingComplete} />
-        )
-      }
-    </div >
+      {showOnboarding && profile && !profile.onboarding_completed && (
+        <OnboardingTour onComplete={handleOnboardingComplete} />
+      )}
+    </div>
   );
 }
-
-
-
-
-
-
-
