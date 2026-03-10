@@ -490,6 +490,36 @@ export async function getAdminCreditsLedger(params?: {
 }
 
 /**
+ * Get system event log derived from credit_ledger (admin only)
+ * GET /api/${ADMIN_SECRET}/admin/system-logs
+ */
+export async function getAdminSystemLogs(params?: {
+    limit?: number;
+    offset?: number;
+    type?: string;
+}): Promise<{
+    events: Array<{
+        id: string;
+        type: string;
+        description: string | null;
+        amount: number;
+        actor_id: string | null;
+        actor_name: string | null;
+        actor_email: string | null;
+        level: 'info' | 'warn' | 'success';
+        created_at: string;
+    }>;
+    total: number;
+}> {
+    if (!ADMIN_SECRET) throw new Error('VITE_ADMIN_ROUTE_SECRET is not configured.');
+    const q = new URLSearchParams();
+    if (params?.limit) q.set('limit', String(params.limit));
+    if (params?.offset) q.set('offset', String(params.offset));
+    if (params?.type) q.set('type', params.type);
+    return apiRequest(`/api/${ADMIN_SECRET}/admin/system-logs?${q.toString()}`);
+}
+
+/**
  * Manually adjust credits for a user (admin only)
  * POST /api/${ADMIN_SECRET}/admin/credits/adjust
  */

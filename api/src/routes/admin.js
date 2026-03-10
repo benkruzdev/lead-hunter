@@ -1403,4 +1403,114 @@ router.patch('/system-settings', requireAuth, requireAdmin, async (req, res) => 
     }
 });
 
+/**
+ * GET /api/${ADMIN_ROUTE_SECRET}/admin/system-logs
+ * System event log derived from credit_ledger (admin only).
+ *
+ * NOTE: There is no dedicated audit/log table in the schema.
+ * credit_ledger is the most complete event record available:
+ *   - order_complete   → payment confirmed by admin
+ *   - admin_grant      → manual credit addition by admin
+ *   - admin_deduction  → manual credit removal by admin
+ *   - page_view        → user paid for a search page
+ *   - enrichment       → user triggered lead enrichment
+ *   - (any other type written by the system)
+ *
+ * Query params:
+ *   limit   (default 50, max 200)
+ *   offset  (default 0)
+ *   type    (optional — filter by credit_ledger.type exact match)
+ */
+router.get('/system-logs', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        const { limit = 50, offset = 0, type = '' } = req.query;
+        const parsedLimit = Math.min(parseInt(limit) || 50, 200);
+        const parsedOffset = parseInt(offset) || 0;
+
+        // ── Fetch credit_ledger events ──────────────────────────────────────────
+        let logsQuery = supabaseAdmin
+            .from('credit_ledger')
+            .select('id, user_id, amount, type, description, created_at', { count: 'exact' })
+            .order('created_at', { ascending: false })
+            .range(parsedOffset, parsedOffset + parsedLimit - 1);
+
+        if (type) {
+            logsQuery = logsQuery.eq('type', type);
+        }
+
+        const { data: logs, count, error: logsError } = await logsQuery;
+
+        if (logsError) {
+            console.error('[Admin] System logs fetch error:', logsError);
+            return res.status(500).json({ error: 'Database error', message: logsError.message });
+        }
+
+        // ── Enrich with user info ───────────────────────────────────────────────
+        const userIds = [...new Set((logs || []).map(l => l.user_id).filter(Boolean))];
+        const profileMap = {};
+
+        if (userIds.length > 0) {
+            // Try with email column first
+            const { data: profilesWithEmail, error: emailErr } = await supabaseAdmin
+                .from('profiles')
+                .select('id, full_name, email')
+                .in('id', userIds);
+
+            if (!emailErr && profilesWithEmail) {
+                profilesWithEmail.forEach(p => {
+                    profileMap[p.id] = { full_name: p.full_name, email: p.email };
+                });
+            } else {
+                const { data: profilesNoEmail } = await supabaseAdmin
+                    .from('profiles')
+                    .select('id, full_name')
+                    .in('id', userIds);
+                (profilesNoEmail || []).forEach(p => {
+                    profileMap[p.id] = { full_name: p.full_name, email: null };
+                });
+            }
+
+            // Fill missing emails from auth admin
+            const missingEmailIds = userIds.filter(id => profileMap[id] && !profileMap[id].email);
+            if (missingEmailIds.length > 0) {
+                await Promise.allSettled(missingEmailIds.map(async (id) => {
+                    const { data: authUser } = await supabaseAdmin.auth.admin.getUserById(id);
+                    if (authUser?.user?.email) {
+                        if (profileMap[id]) profileMap[id].email = authUser.user.email;
+                        else profileMap[id] = { full_name: null, email: authUser.user.email };
+                    }
+                }));
+            }
+        }
+
+        // ── Derive level from type / amount ─────────────────────────────────────
+        // info  → normal user activity (page_view, enrichment, new_user, etc.)
+        // warn  → admin manual actions (admin_grant, admin_deduction)
+        // success → positive completions (order_complete)
+        const levelFor = (type, amount) => {
+            if (type === 'order_complete') return 'success';
+            if (type === 'admin_grant' || type === 'admin_deduction') return 'warn';
+            return 'info';
+        };
+
+        const events = (logs || []).map(l => ({
+            id: l.id,
+            type: l.type,
+            description: l.description || null,
+            amount: l.amount,
+            actor_id: l.user_id || null,
+            actor_name: profileMap[l.user_id]?.full_name || null,
+            actor_email: profileMap[l.user_id]?.email || null,
+            level: levelFor(l.type, l.amount),
+            created_at: l.created_at,
+        }));
+
+        res.json({ events, total: count || 0 });
+    } catch (err) {
+        console.error('[Admin] System logs error:', err);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
 export default router;
+
