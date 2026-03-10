@@ -7,17 +7,23 @@ import { useTranslation } from "react-i18next";
 
 const PAGE_SIZE = 50;
 
-// All known credit_ledger event types — used in the filter dropdown.
-// Unknown types are also fetched; this list just powers the <select>.
+// Only types actually written to credit_ledger by Node.js routes:
+//   order_complete  → admin.js: POST /payments/:orderId/complete
+//   admin_grant     → admin.js: POST /credits/adjust (amount > 0)
+//   admin_deduction → admin.js: POST /credits/adjust (amount < 0)
+//
+// NOT logged anywhere (no credit_ledger INSERT in their code paths):
+//   page_view   — search pagination uses decrement_credits RPC (no ledger write in JS)
+//   enrichment  — lists.js uses decrement_credits RPC (no ledger write in JS)
+//   new_user    — signup does not write to credit_ledger at all
+//   lead_add    — add_leads_to_list_atomic RPC updates profiles.credits directly, no ledger
 const KNOWN_TYPES = [
     { value: '', label: 'Tümü' },
     { value: 'order_complete', label: 'Ödeme Onayı' },
     { value: 'admin_grant', label: 'Admin Kredi Yükleme' },
     { value: 'admin_deduction', label: 'Admin Kredi Düşme' },
-    { value: 'page_view', label: 'Sayfa Görüntüleme' },
-    { value: 'enrichment', label: 'Zenginleştirme' },
-    { value: 'new_user', label: 'Yeni Kayıt' },
 ];
+
 
 type LogEvent = {
     id: string;
@@ -113,9 +119,9 @@ export default function AdminSystemLogsPage() {
             <div className="flex items-start gap-2 rounded-lg border border-blue-300 bg-blue-50 dark:bg-blue-950/20 p-3 text-sm text-blue-800 dark:text-blue-300">
                 <FileText className="w-4 h-4 mt-0.5 flex-shrink-0" />
                 <span>
-                    Sistem logları <strong>credit_ledger</strong> tablosundan türetilmektedir.
-                    Dedicated bir audit/log tablosu mevcut değil.
-                    Gösterilen olaylar: ödeme onayı, admin kredi aksiyonları, sayfa görüntüleme, zenginleştirme.
+                    Sistem logları <strong>credit_ledger</strong> tablosundan türetilmektedir — dedicated audit tablosu mevcut değil.{' '}
+                    <strong>Loglanan olaylar:</strong> Ödeme onayı, admin kredi yükleme/düşme.{' '}
+                    <strong>Loglanmayanlar:</strong> Sayfa görüntüleme / sayfalama (RPC doğrudan profiles günceller), zenginleştirme (decrement_credits RPC), lead ekleme (add_leads_to_list_atomic RPC), yeni kayıt.
                 </span>
             </div>
 
