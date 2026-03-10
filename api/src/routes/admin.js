@@ -556,15 +556,43 @@ router.get('/credits/ledger', requireAuth, requireAdmin, async (req, res) => {
             return res.status(500).json({ error: 'Database error', message: error.message });
         }
 
-        // Fetch profile names for the returned user_ids in one query
         const userIds = [...new Set((transactions || []).map(t => t.user_id))];
-        let profileMap = {};
+        const profileMap = {};
+
         if (userIds.length > 0) {
-            const { data: profiles } = await supabaseAdmin
+            // Stage 1a: try profiles with email column
+            const { data: profilesWithEmail, error: emailColError } = await supabaseAdmin
                 .from('profiles')
                 .select('id, full_name, email')
                 .in('id', userIds);
-            (profiles || []).forEach(p => { profileMap[p.id] = p; });
+
+            if (!emailColError && profilesWithEmail) {
+                profilesWithEmail.forEach(p => { profileMap[p.id] = { full_name: p.full_name, email: p.email }; });
+            } else {
+                // Stage 1b: email column missing — select without it
+                const { data: profilesNoEmail } = await supabaseAdmin
+                    .from('profiles')
+                    .select('id, full_name')
+                    .in('id', userIds);
+                (profilesNoEmail || []).forEach(p => { profileMap[p.id] = { full_name: p.full_name, email: null }; });
+            }
+
+            // Stage 2: for users still missing email, fetch from auth admin
+            const missingEmailIds = userIds.filter(id => profileMap[id] && !profileMap[id].email);
+            if (missingEmailIds.length > 0) {
+                await Promise.allSettled(
+                    missingEmailIds.map(async (id) => {
+                        const { data: authUser } = await supabaseAdmin.auth.admin.getUserById(id);
+                        if (authUser?.user?.email) {
+                            if (profileMap[id]) {
+                                profileMap[id].email = authUser.user.email;
+                            } else {
+                                profileMap[id] = { full_name: null, email: authUser.user.email };
+                            }
+                        }
+                    })
+                );
+            }
         }
 
         const enriched = (transactions || []).map(t => ({
@@ -579,6 +607,7 @@ router.get('/credits/ledger', requireAuth, requireAdmin, async (req, res) => {
         res.status(500).json({ error: 'Internal server error' });
     }
 });
+
 
 /**
  * POST /api/${ADMIN_ROUTE_SECRET}/admin/credits/adjust
