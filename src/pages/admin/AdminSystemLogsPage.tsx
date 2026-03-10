@@ -1,39 +1,42 @@
 import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { FileText, AlertCircle, Loader2, RefreshCw, ChevronLeft, ChevronRight } from "lucide-react";
+import { Activity, AlertCircle, Loader2, RefreshCw, ChevronLeft, ChevronRight } from "lucide-react";
 import { getAdminSystemLogs } from "@/lib/api";
 import { useTranslation } from "react-i18next";
 
 const PAGE_SIZE = 50;
 
-// Only types actually written to credit_ledger by Node.js routes:
-//   order_complete  → admin.js: POST /payments/:orderId/complete
-//   admin_grant     → admin.js: POST /credits/adjust (amount > 0)
-//   admin_deduction → admin.js: POST /credits/adjust (amount < 0)
-//
-// NOT logged anywhere (no credit_ledger INSERT in their code paths):
-//   page_view   — search pagination uses decrement_credits RPC (no ledger write in JS)
-//   enrichment  — lists.js uses decrement_credits RPC (no ledger write in JS)
-//   new_user    — signup does not write to credit_ledger at all
-//   lead_add    — add_leads_to_list_atomic RPC updates profiles.credits directly, no ledger
-const KNOWN_TYPES = [
+const EVENT_TYPES = [
     { value: '', label: 'Tümü' },
-    { value: 'order_complete', label: 'Ödeme Onayı' },
     { value: 'admin_grant', label: 'Admin Kredi Yükleme' },
     { value: 'admin_deduction', label: 'Admin Kredi Düşme' },
+    { value: 'order_complete', label: 'Ödeme Onayı' },
+    { value: 'search_started', label: 'Arama Başlatıldı' },
+    { value: 'page_view_paid', label: 'Sayfa Görüntüleme (Ücretli)' },
+    { value: 'enrichment_success', label: 'Zenginleştirme Başarılı' },
+    { value: 'enrichment_failed', label: 'Zenginleştirme Başarısız' },
+    { value: 'export_created', label: 'Dışa Aktarma' },
+    { value: 'lead_added_to_list', label: 'Lead Listeye Eklendi' },
+    { value: 'system_settings_updated', label: 'Sistem Ayarları Güncellendi' },
 ];
-
 
 type LogEvent = {
     id: string;
-    type: string;
-    description: string | null;
-    amount: number;
-    actor_id: string | null;
+    level: 'info' | 'warn' | 'error' | 'success';
+    source: string;
+    event_type: string;
+    actor_user_id: string | null;
     actor_name: string | null;
     actor_email: string | null;
-    level: 'info' | 'warn' | 'success';
+    subject_user_id: string | null;
+    subject_name: string | null;
+    subject_email: string | null;
+    target_type: string | null;
+    target_id: string | null;
+    message: string;
+    credit_delta: number | null;
+    metadata: Record<string, unknown>;
     created_at: string;
 };
 
@@ -42,11 +45,13 @@ function LevelBadge({ level }: { level: LogEvent['level'] }) {
         info: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
         warn: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
         success: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300',
+        error: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300',
     };
     const labels: Record<string, string> = {
         info: 'info',
         warn: 'uyarı',
         success: 'başarı',
+        error: 'hata',
     };
     return (
         <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium ${styles[level] || styles.info}`}>
@@ -55,13 +60,24 @@ function LevelBadge({ level }: { level: LogEvent['level'] }) {
     );
 }
 
-function AmountBadge({ amount }: { amount: number }) {
-    if (amount === 0) return <span className="text-muted-foreground text-xs">—</span>;
-    const positive = amount > 0;
+function CreditDeltaBadge({ delta }: { delta: number | null }) {
+    if (delta == null) return <span className="text-muted-foreground text-xs">—</span>;
+    if (delta === 0) return <span className="text-muted-foreground text-xs">0</span>;
+    const positive = delta > 0;
     return (
         <span className={`text-xs font-semibold ${positive ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-            {positive ? '+' : ''}{amount}
+            {positive ? '+' : ''}{delta}
         </span>
+    );
+}
+
+function UserCell({ name, email }: { name: string | null; email: string | null }) {
+    if (!name && !email) return <span className="text-muted-foreground text-xs">—</span>;
+    return (
+        <div>
+            {name && <p className="font-medium truncate">{name}</p>}
+            {email && <p className="text-xs text-muted-foreground truncate">{email}</p>}
+        </div>
     );
 }
 
@@ -73,16 +89,16 @@ export default function AdminSystemLogsPage() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [page, setPage] = useState(0);
-    const [typeFilter, setTypeFilter] = useState('');
+    const [eventTypeFilter, setEventTypeFilter] = useState('');
 
-    const load = useCallback(async (p: number, tf: string) => {
+    const load = useCallback(async (p: number, etf: string) => {
         setLoading(true);
         setError(null);
         try {
             const res = await getAdminSystemLogs({
                 limit: PAGE_SIZE,
                 offset: p * PAGE_SIZE,
-                type: tf || undefined,
+                event_type: etf || undefined,
             });
             setEvents(res.events);
             setTotal(res.total);
@@ -93,12 +109,12 @@ export default function AdminSystemLogsPage() {
         }
     }, []);
 
-    useEffect(() => { load(page, typeFilter); }, [page, typeFilter, load]);
+    useEffect(() => { load(page, eventTypeFilter); }, [page, eventTypeFilter, load]);
 
     const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
     const handleTypeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-        setTypeFilter(e.target.value);
+        setEventTypeFilter(e.target.value);
         setPage(0);
     };
 
@@ -109,39 +125,29 @@ export default function AdminSystemLogsPage() {
                     <h1 className="text-3xl font-bold">{t('admin.systemLogs.title')}</h1>
                     <p className="text-muted-foreground">{t('admin.systemLogs.description')}</p>
                 </div>
-                <Button variant="outline" size="sm" onClick={() => load(page, typeFilter)} disabled={loading}>
+                <Button variant="outline" size="sm" onClick={() => load(page, eventTypeFilter)} disabled={loading}>
                     <RefreshCw className={`w-4 h-4 mr-1 ${loading ? 'animate-spin' : ''}`} />
                     Yenile
                 </Button>
-            </div>
-
-            {/* Info banner — honest about data source */}
-            <div className="flex items-start gap-2 rounded-lg border border-blue-300 bg-blue-50 dark:bg-blue-950/20 p-3 text-sm text-blue-800 dark:text-blue-300">
-                <FileText className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                <span>
-                    Sistem logları <strong>credit_ledger</strong> tablosundan türetilmektedir — dedicated audit tablosu mevcut değil.{' '}
-                    <strong>Loglanan olaylar:</strong> Ödeme onayı, admin kredi yükleme/düşme.{' '}
-                    <strong>Loglanmayanlar:</strong> Sayfa görüntüleme / sayfalama (RPC doğrudan profiles günceller), zenginleştirme (decrement_credits RPC), lead ekleme (add_leads_to_list_atomic RPC), yeni kayıt.
-                </span>
             </div>
 
             <Card>
                 <CardHeader>
                     <div className="flex items-center justify-between gap-3 flex-wrap">
                         <CardTitle className="flex items-center gap-2">
-                            <FileText className="w-5 h-5" />
+                            <Activity className="w-5 h-5" />
                             {t('admin.systemLogs.title')}
                             <span className="text-xs font-normal text-muted-foreground ml-1">
                                 {total.toLocaleString('tr-TR')} kayıt
                             </span>
                         </CardTitle>
                         <select
-                            value={typeFilter}
+                            value={eventTypeFilter}
                             onChange={handleTypeChange}
                             className="border rounded px-2 py-1 text-sm bg-background text-foreground"
                         >
-                            {KNOWN_TYPES.map(t => (
-                                <option key={t.value} value={t.value}>{t.label}</option>
+                            {EVENT_TYPES.map(et => (
+                                <option key={et.value} value={et.value}>{et.label}</option>
                             ))}
                         </select>
                     </div>
@@ -173,17 +179,13 @@ export default function AdminSystemLogsPage() {
                                     <thead>
                                         <tr className="border-b text-left text-muted-foreground">
                                             <th className="pb-2 pr-3 font-medium">Seviye</th>
-                                            <th className="pb-2 pr-3 font-medium">Tip</th>
-                                            <th className="pb-2 pr-3 font-medium">
-                                                {t('admin.systemLogs.table.actor')}
-                                            </th>
-                                            <th className="pb-2 pr-3 font-medium">
-                                                {t('admin.systemLogs.table.action')}
-                                            </th>
-                                            <th className="pb-2 pr-3 font-medium text-right">Kredi</th>
-                                            <th className="pb-2 font-medium">
-                                                {t('admin.systemLogs.table.createdAt')}
-                                            </th>
+                                            <th className="pb-2 pr-3 font-medium">Kaynak</th>
+                                            <th className="pb-2 pr-3 font-medium">Olay Tipi</th>
+                                            <th className="pb-2 pr-3 font-medium">{t('admin.systemLogs.table.actor')}</th>
+                                            <th className="pb-2 pr-3 font-medium">Konu (Subject)</th>
+                                            <th className="pb-2 pr-3 font-medium">{t('admin.systemLogs.table.action')}</th>
+                                            <th className="pb-2 pr-3 font-medium text-right">Kredi Δ</th>
+                                            <th className="pb-2 font-medium">{t('admin.systemLogs.table.createdAt')}</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y">
@@ -192,28 +194,23 @@ export default function AdminSystemLogsPage() {
                                                 <td className="py-2 pr-3">
                                                     <LevelBadge level={ev.level} />
                                                 </td>
-                                                <td className="py-2 pr-3 text-xs font-mono text-muted-foreground whitespace-nowrap">
-                                                    {ev.type}
+                                                <td className="py-2 pr-3 text-xs text-muted-foreground whitespace-nowrap">
+                                                    {ev.source}
                                                 </td>
-                                                <td className="py-2 pr-3 max-w-[10rem]">
-                                                    {ev.actor_name || ev.actor_email ? (
-                                                        <div>
-                                                            {ev.actor_name && (
-                                                                <p className="font-medium truncate">{ev.actor_name}</p>
-                                                            )}
-                                                            {ev.actor_email && (
-                                                                <p className="text-xs text-muted-foreground truncate">{ev.actor_email}</p>
-                                                            )}
-                                                        </div>
-                                                    ) : (
-                                                        <span className="text-muted-foreground text-xs">—</span>
-                                                    )}
+                                                <td className="py-2 pr-3 text-xs font-mono text-muted-foreground whitespace-nowrap">
+                                                    {ev.event_type}
+                                                </td>
+                                                <td className="py-2 pr-3 max-w-[9rem]">
+                                                    <UserCell name={ev.actor_name} email={ev.actor_email} />
+                                                </td>
+                                                <td className="py-2 pr-3 max-w-[9rem]">
+                                                    <UserCell name={ev.subject_name} email={ev.subject_email} />
                                                 </td>
                                                 <td className="py-2 pr-3 text-xs text-muted-foreground max-w-[16rem]">
-                                                    <span className="line-clamp-2">{ev.description || '—'}</span>
+                                                    <span className="line-clamp-2">{ev.message}</span>
                                                 </td>
                                                 <td className="py-2 pr-3 text-right">
-                                                    <AmountBadge amount={ev.amount} />
+                                                    <CreditDeltaBadge delta={ev.credit_delta} />
                                                 </td>
                                                 <td className="py-2 text-xs text-muted-foreground whitespace-nowrap">
                                                     {new Date(ev.created_at).toLocaleString('tr-TR', {

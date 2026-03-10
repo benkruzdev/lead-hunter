@@ -1,6 +1,7 @@
 import express from 'express';
 import { supabaseAdmin } from '../config/supabase.js';
 import { requireAuth, requireAdmin } from '../middleware/auth.js';
+import { logEvent } from '../utils/eventLogger.js';
 
 const router = express.Router();
 
@@ -932,7 +933,7 @@ router.post('/payments/:orderId/complete', requireAuth, requireAdmin, async (req
             });
         }
 
-        // Step 4: Log in credit_ledger (non-fatal)
+        // Step 4: Log in credit_ledger (non-fatal, legacy)
         const { error: ledgerError } = await supabaseAdmin
             .from('credit_ledger')
             .insert({
@@ -946,6 +947,25 @@ router.post('/payments/:orderId/complete', requireAuth, requireAdmin, async (req
         if (ledgerError) {
             console.error('[Admin] Ledger write error (non-fatal):', ledgerError);
         }
+
+        // Step 5: Write to system_events
+        await logEvent(supabaseAdmin, {
+            level: 'success',
+            source: 'admin',
+            event_type: 'order_complete',
+            actor_user_id: adminId,
+            subject_user_id: order.user_id,
+            target_type: 'order',
+            target_id: orderId,
+            message: `Manuel sipariş onaylandı (${orderId}) — admin: ${adminId}`,
+            credit_delta: order.credits,
+            metadata: {
+                order_id: orderId,
+                amount: order.amount,
+                currency: order.currency,
+                new_balance: newBalance,
+            },
+        });
 
         console.log(`[Admin] Order ${orderId} completed by admin ${adminId}: +${order.credits} credits → user ${order.user_id}`);
 
@@ -1297,7 +1317,7 @@ router.post('/credits/adjust', requireAuth, requireAdmin, async (req, res) => {
             return res.status(500).json({ error: 'Failed to update credits', message: updateError.message });
         }
 
-        // Write to credit_ledger
+        // Write to credit_ledger (legacy, keep for backward compat)
         const ledgerDesc = description || (parsedAmount > 0 ? 'Admin credit grant' : 'Admin credit deduction');
         const { error: ledgerError } = await supabaseAdmin
             .from('credit_ledger')
@@ -1313,6 +1333,24 @@ router.post('/credits/adjust', requireAuth, requireAdmin, async (req, res) => {
             // Non-fatal: credits are already updated
             console.error('[Admin] Ledger write error (non-fatal):', ledgerError);
         }
+
+        // Write to system_events
+        const eventType = parsedAmount > 0 ? 'admin_grant' : 'admin_deduction';
+        await logEvent(supabaseAdmin, {
+            level: 'warn',
+            source: 'admin',
+            event_type: eventType,
+            actor_user_id: adminId,
+            subject_user_id: user_id,
+            target_type: 'user',
+            target_id: user_id,
+            message: ledgerDesc,
+            credit_delta: parsedAmount,
+            metadata: {
+                previous_balance: profile.credits || 0,
+                new_balance: newBalance,
+            },
+        });
 
         console.log(`[Admin] Credits adjusted for ${user_id}: ${parsedAmount > 0 ? '+' : ''}${parsedAmount} by admin ${adminId}`);
 
@@ -1384,6 +1422,8 @@ router.patch('/system-settings', requireAuth, requireAdmin, async (req, res) => 
             updates.new_user_credits = val;
         }
 
+        const adminIdForSettings = req.user?.id || null;
+
         const { data, error } = await supabaseAdmin
             .from('system_settings')
             .update(updates)
@@ -1396,6 +1436,17 @@ router.patch('/system-settings', requireAuth, requireAdmin, async (req, res) => 
             return res.status(500).json({ error: 'Database error', message: error.message });
         }
 
+        await logEvent(supabaseAdmin, {
+            level: 'warn',
+            source: 'admin',
+            event_type: 'system_settings_updated',
+            actor_user_id: adminIdForSettings,
+            message: 'Sistem ayarları güncellendi',
+            target_type: 'system',
+            target_id: 'system_settings',
+            metadata: { updated_fields: Object.keys(req.body) },
+        });
+
         res.json({ success: true, settings: data });
     } catch (err) {
         console.error('[Admin] Update system settings error:', err);
@@ -1405,37 +1456,31 @@ router.patch('/system-settings', requireAuth, requireAdmin, async (req, res) => 
 
 /**
  * GET /api/${ADMIN_ROUTE_SECRET}/admin/system-logs
- * System event log derived from credit_ledger (admin only).
- *
- * NOTE: There is no dedicated audit/log table in the schema.
- * credit_ledger is the most complete event record available:
- *   - order_complete   → payment confirmed by admin
- *   - admin_grant      → manual credit addition by admin
- *   - admin_deduction  → manual credit removal by admin
- *   - page_view        → user paid for a search page
- *   - enrichment       → user triggered lead enrichment
- *   - (any other type written by the system)
+ * System event log from system_events table (admin only).
  *
  * Query params:
- *   limit   (default 50, max 200)
- *   offset  (default 0)
- *   type    (optional — filter by credit_ledger.type exact match)
+ *   limit      (default 50, max 200)
+ *   offset     (default 0)
+ *   event_type (optional — filter by system_events.event_type exact match)
  */
 router.get('/system-logs', requireAuth, requireAdmin, async (req, res) => {
     try {
-        const { limit = 50, offset = 0, type = '' } = req.query;
+        const { limit = 50, offset = 0, event_type = '' } = req.query;
         const parsedLimit = Math.min(parseInt(limit) || 50, 200);
         const parsedOffset = parseInt(offset) || 0;
 
-        // ── Fetch credit_ledger events ──────────────────────────────────────────
+        // ── Fetch system_events ─────────────────────────────────────────────────
         let logsQuery = supabaseAdmin
-            .from('credit_ledger')
-            .select('id, user_id, amount, type, description, created_at', { count: 'exact' })
+            .from('system_events')
+            .select(
+                'id, level, source, event_type, actor_user_id, subject_user_id, target_type, target_id, message, credit_delta, metadata, created_at',
+                { count: 'exact' }
+            )
             .order('created_at', { ascending: false })
             .range(parsedOffset, parsedOffset + parsedLimit - 1);
 
-        if (type) {
-            logsQuery = logsQuery.eq('type', type);
+        if (event_type) {
+            logsQuery = logsQuery.eq('event_type', event_type);
         }
 
         const { data: logs, count, error: logsError } = await logsQuery;
@@ -1445,12 +1490,13 @@ router.get('/system-logs', requireAuth, requireAdmin, async (req, res) => {
             return res.status(500).json({ error: 'Database error', message: logsError.message });
         }
 
-        // ── Enrich with user info ───────────────────────────────────────────────
-        const userIds = [...new Set((logs || []).map(l => l.user_id).filter(Boolean))];
+        // ── Collect user IDs to enrich ──────────────────────────────────────────
+        const actorIds = (logs || []).map(l => l.actor_user_id).filter(Boolean);
+        const subjectIds = (logs || []).map(l => l.subject_user_id).filter(Boolean);
+        const userIds = [...new Set([...actorIds, ...subjectIds])];
         const profileMap = {};
 
         if (userIds.length > 0) {
-            // Try with email column first
             const { data: profilesWithEmail, error: emailErr } = await supabaseAdmin
                 .from('profiles')
                 .select('id, full_name, email')
@@ -1483,25 +1529,22 @@ router.get('/system-logs', requireAuth, requireAdmin, async (req, res) => {
             }
         }
 
-        // ── Derive level from type / amount ─────────────────────────────────────
-        // info  → normal user activity (page_view, enrichment, new_user, etc.)
-        // warn  → admin manual actions (admin_grant, admin_deduction)
-        // success → positive completions (order_complete)
-        const levelFor = (type, amount) => {
-            if (type === 'order_complete') return 'success';
-            if (type === 'admin_grant' || type === 'admin_deduction') return 'warn';
-            return 'info';
-        };
-
         const events = (logs || []).map(l => ({
             id: l.id,
-            type: l.type,
-            description: l.description || null,
-            amount: l.amount,
-            actor_id: l.user_id || null,
-            actor_name: profileMap[l.user_id]?.full_name || null,
-            actor_email: profileMap[l.user_id]?.email || null,
-            level: levelFor(l.type, l.amount),
+            level: l.level,
+            source: l.source,
+            event_type: l.event_type,
+            actor_user_id: l.actor_user_id || null,
+            actor_name: l.actor_user_id ? (profileMap[l.actor_user_id]?.full_name || null) : null,
+            actor_email: l.actor_user_id ? (profileMap[l.actor_user_id]?.email || null) : null,
+            subject_user_id: l.subject_user_id || null,
+            subject_name: l.subject_user_id ? (profileMap[l.subject_user_id]?.full_name || null) : null,
+            subject_email: l.subject_user_id ? (profileMap[l.subject_user_id]?.email || null) : null,
+            target_type: l.target_type,
+            target_id: l.target_id,
+            message: l.message,
+            credit_delta: l.credit_delta,
+            metadata: l.metadata,
             created_at: l.created_at,
         }));
 

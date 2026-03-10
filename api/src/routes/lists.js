@@ -3,6 +3,7 @@ import { requireAuth } from '../middleware/auth.js';
 import { supabaseAdmin } from '../config/supabase.js';
 import { calculateLeadScore } from '../utils/leadScore.js';
 import { enrichWebsite } from '../utils/enrichment.js';
+import { logEvent } from '../utils/eventLogger.js';
 
 const router = express.Router();
 
@@ -306,6 +307,26 @@ router.post('/:listId/items', requireAuth, async (req, res) => {
             }
         }
 
+        // Log lead_added_to_list event (non-fatal, skip dry runs)
+        if (!dryRun && data?.addedCount > 0) {
+            await logEvent(supabaseAdmin, {
+                level: 'info',
+                source: 'lists',
+                event_type: 'lead_added_to_list',
+                actor_user_id: userId,
+                target_type: 'lead_list',
+                target_id: listId,
+                message: `${data.addedCount} lead listeye eklendi`,
+                credit_delta: data.creditCost != null ? -data.creditCost : null,
+                metadata: {
+                    list_id: listId,
+                    added_count: data.addedCount,
+                    skipped_count: data.skippedCount,
+                    credit_cost: data.creditCost,
+                },
+            });
+        }
+
         res.json(data);
     } catch (err) {
         console.error('[Lists] Error:', err);
@@ -536,6 +557,25 @@ router.post('/:listId/items/:itemId/enrich', requireAuth, async (req, res) => {
 
             console.log('[Enrichment] Success:', { email, socialLinkCount });
 
+            // Log enrichment_success event (non-fatal)
+            await logEvent(supabaseAdmin, {
+                level: 'info',
+                source: 'lists',
+                event_type: 'enrichment_success',
+                actor_user_id: userId,
+                target_type: 'lead',
+                target_id: itemId,
+                message: `Lead zenginleştirildi: ${item.website}`,
+                credit_delta: -ENRICHMENT_CREDIT_COST,
+                metadata: {
+                    list_id: listId,
+                    item_id: itemId,
+                    website: item.website,
+                    has_email: !!email,
+                    social_link_count: socialLinkCount,
+                },
+            });
+
             return res.json({
                 status: 'success',
                 email,
@@ -554,6 +594,19 @@ router.post('/:listId/items/:itemId/enrich', requireAuth, async (req, res) => {
                 .eq('id', itemId);
 
             console.log('[Enrichment] No data found for:', item.website);
+
+            // Log enrichment_failed event (non-fatal)
+            await logEvent(supabaseAdmin, {
+                level: 'info',
+                source: 'lists',
+                event_type: 'enrichment_failed',
+                actor_user_id: userId,
+                target_type: 'lead',
+                target_id: itemId,
+                message: `Lead zenginleştirme başarısız: ${item.website}`,
+                credit_delta: 0,
+                metadata: { list_id: listId, item_id: itemId, website: item.website },
+            });
 
             return res.json({
                 status: 'failed',

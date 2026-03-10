@@ -1,6 +1,7 @@
 import express from 'express';
 import { requireAuth } from '../middleware/auth.js';
 import { supabaseAdmin } from '../config/supabase.js';
+import { logEvent } from '../utils/eventLogger.js';
 
 const router = express.Router();
 
@@ -314,6 +315,19 @@ router.post('/', requireAuth, async (req, res) => {
 
         console.log('[Search] Session created:', session.id, 'total:', totalResults);
 
+        // Log search_started event (non-fatal)
+        await logEvent(supabaseAdmin, {
+            level: 'info',
+            source: 'search',
+            event_type: 'search_started',
+            actor_user_id: userId,
+            target_type: 'search_session',
+            target_id: session.id,
+            message: `Arama başlatıldı: ${province}${district ? ' / ' + district : ''} — ${category}`,
+            credit_delta: 0,
+            metadata: { province, district, category, keyword, total_results: totalResults },
+        });
+
         res.json({
             sessionId: session.id,
             results: page1Results,
@@ -405,6 +419,19 @@ router.get('/:sessionId/page/:pageNumber', requireAuth, async (req, res) => {
                 .eq('id', sessionId);
 
             console.log('[Search] Credits deducted and page marked:', page);
+
+            // Log page_view_paid event (non-fatal)
+            await logEvent(supabaseAdmin, {
+                level: 'info',
+                source: 'search',
+                event_type: 'page_view_paid',
+                actor_user_id: userId,
+                target_type: 'search_session',
+                target_id: sessionId,
+                message: `Ödeyerek sayfa görüntülendi: sayfa ${page}`,
+                credit_delta: -creditCost,
+                metadata: { session_id: sessionId, page, credits_per_page: creditsPerPage },
+            });
         }
 
         // Fetch results for this page from stored place_ids

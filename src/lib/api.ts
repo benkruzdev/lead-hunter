@@ -490,23 +490,30 @@ export async function getAdminCreditsLedger(params?: {
 }
 
 /**
- * Get system event log derived from credit_ledger (admin only)
+ * Get system event log from system_events table (admin only)
  * GET /api/${ADMIN_SECRET}/admin/system-logs
  */
 export async function getAdminSystemLogs(params?: {
     limit?: number;
     offset?: number;
-    type?: string;
+    event_type?: string;
 }): Promise<{
     events: Array<{
         id: string;
-        type: string;
-        description: string | null;
-        amount: number;
-        actor_id: string | null;
+        level: 'info' | 'warn' | 'error' | 'success';
+        source: string;
+        event_type: string;
+        actor_user_id: string | null;
         actor_name: string | null;
         actor_email: string | null;
-        level: 'info' | 'warn' | 'success';
+        subject_user_id: string | null;
+        subject_name: string | null;
+        subject_email: string | null;
+        target_type: string | null;
+        target_id: string | null;
+        message: string;
+        credit_delta: number | null;
+        metadata: Record<string, unknown>;
         created_at: string;
     }>;
     total: number;
@@ -515,7 +522,7 @@ export async function getAdminSystemLogs(params?: {
     const q = new URLSearchParams();
     if (params?.limit) q.set('limit', String(params.limit));
     if (params?.offset) q.set('offset', String(params.offset));
-    if (params?.type) q.set('type', params.type);
+    if (params?.event_type) q.set('event_type', params.event_type);
     return apiRequest(`/api/${ADMIN_SECRET}/admin/system-logs?${q.toString()}`);
 }
 

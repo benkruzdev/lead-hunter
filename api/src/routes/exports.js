@@ -2,6 +2,7 @@ import express from 'express';
 import { requireAuth } from '../middleware/auth.js';
 import { supabaseAdmin } from '../config/supabase.js';
 import { generateCSV, generateXLSX } from '../utils/exportUtils.js';
+import { logEvent } from '../utils/eventLogger.js';
 
 const router = express.Router();
 
@@ -144,6 +145,25 @@ router.post('/', requireAuth, async (req, res) => {
             console.error('[Exports] Failed to generate signed URL:', signedUrlError);
             return res.status(500).json({ error: 'Failed to generate download URL' });
         }
+
+        // Log export_created event (non-fatal)
+        await logEvent(supabaseAdmin, {
+            level: 'info',
+            source: 'exports',
+            event_type: 'export_created',
+            actor_user_id: userId,
+            target_type: 'export',
+            target_id: exportRecord.id,
+            message: `Dışa aktarma oluşturuldu: ${fileName} (${items.length} lead, ${format})`,
+            credit_delta: null,
+            metadata: {
+                export_id: exportRecord.id,
+                list_id: listId,
+                list_name: list.name,
+                format,
+                lead_count: items.length,
+            },
+        });
 
         res.json({
             exportId: exportRecord.id,
