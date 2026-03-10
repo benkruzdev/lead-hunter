@@ -957,3 +957,65 @@ export async function deleteUserAccount(): Promise<{ success: boolean }> {
         method: 'POST',
     });
 }
+
+// ============================================================================
+// PAYMENT PROVIDERS API
+// ============================================================================
+
+export interface PaymentProvider {
+    id: number;
+    provider_code: 'paytr' | 'iyzico' | 'shopier' | 'stripe';
+    display_name: string;
+    enabled: boolean;
+    mode: 'test' | 'live';
+    region: 'tr' | 'global';
+    supported_currencies: string[];
+    merchant_id: string | null;
+    api_key: string | null;
+    /** Masked to '••••••••' on admin endpoint; absent on public endpoint. */
+    secret_key: string | null;
+    public_key: string | null;
+    /** Masked to '••••••••' on admin endpoint; absent on public endpoint. */
+    webhook_secret: string | null;
+    extra_config: Record<string, unknown>;
+    sort_order: number;
+    created_at: string;
+    updated_at: string;
+}
+
+export type PaymentProviderUpdate = Partial<Omit<PaymentProvider, 'id' | 'provider_code' | 'region' | 'created_at' | 'updated_at'>>;
+
+/**
+ * Get all payment providers with masked secrets (admin only).
+ * GET /api/${ADMIN_SECRET}/admin/payment-providers
+ */
+export async function getAdminPaymentProviders(): Promise<{ providers: PaymentProvider[] }> {
+    if (!ADMIN_SECRET) throw new Error('VITE_ADMIN_ROUTE_SECRET is not configured.');
+    return apiRequest(`/api/${ADMIN_SECRET}/admin/payment-providers`);
+}
+
+/**
+ * Create or update a payment provider config (admin only).
+ * PUT /api/${ADMIN_SECRET}/admin/payment-providers/:code
+ * Region is enforced server-side and cannot be overridden.
+ */
+export async function upsertAdminPaymentProvider(
+    code: 'paytr' | 'iyzico' | 'shopier' | 'stripe',
+    data: PaymentProviderUpdate
+): Promise<{ success: boolean; provider: PaymentProvider }> {
+    if (!ADMIN_SECRET) throw new Error('VITE_ADMIN_ROUTE_SECRET is not configured.');
+    return apiRequest(`/api/${ADMIN_SECRET}/admin/payment-providers/${code}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+    });
+}
+
+/**
+ * Get enabled payment providers for checkout (public — no auth required).
+ * Secrets are stripped server-side.
+ * GET /api/billing/payment-providers?region=tr|global
+ */
+export async function getCheckoutProviders(region?: 'tr' | 'global'): Promise<{ providers: Omit<PaymentProvider, 'secret_key' | 'webhook_secret'>[] }> {
+    const q = region ? `?region=${region}` : '';
+    return apiRequest(`/api/billing/payment-providers${q}`);
+}

@@ -1,6 +1,7 @@
 import express from 'express';
 import { requireAuth } from '../middleware/auth.js';
 import { supabaseAdmin } from '../config/supabase.js';
+import { listProviders, stripSecrets } from '../utils/paymentProviders.js';
 
 const router = express.Router();
 
@@ -212,4 +213,33 @@ router.post('/orders/:orderId/complete', requireAuth, async (req, res) => {
     }
 });
 
+/**
+ * GET /api/billing/payment-providers
+ * Public list of enabled payment providers intended for checkout UI.
+ * Query params:
+ *   ?region=tr|global  — filter by region (optional)
+ *
+ * Secret fields (secret_key, webhook_secret) are ALWAYS stripped from this response.
+ * Only enabled=true providers are returned.
+ */
+router.get('/payment-providers', async (req, res) => {
+    try {
+        const { region } = req.query;
+
+        const providers = await listProviders(supabaseAdmin, {
+            enabledOnly: true,
+            region: region || undefined,
+        });
+
+        // Strip secrets — this endpoint is public (no auth required)
+        const safe = providers.map(stripSecrets);
+
+        res.json({ providers: safe });
+    } catch (err) {
+        console.error('[Billing] payment-providers error:', err);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
 export default router;
+

@@ -2,6 +2,7 @@ import express from 'express';
 import { supabaseAdmin } from '../config/supabase.js';
 import { requireAuth, requireAdmin } from '../middleware/auth.js';
 import { logEvent } from '../utils/eventLogger.js';
+import { listProviders, upsertProvider, maskSecret } from '../utils/paymentProviders.js';
 
 const router = express.Router();
 
@@ -1552,6 +1553,71 @@ router.get('/system-logs', requireAuth, requireAdmin, async (req, res) => {
     } catch (err) {
         console.error('[Admin] System logs error:', err);
         res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+/**
+ * GET /api/${ADMIN_ROUTE_SECRET}/admin/payment-providers
+ * List all payment providers with full config (admin only).
+ * Secret fields (secret_key, webhook_secret) are masked for display.
+ */
+router.get('/payment-providers', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        const providers = await listProviders(supabaseAdmin);
+        // Mask secrets for admin display — raw values stay in DB only
+        const masked = providers.map(p => ({
+            ...p,
+            secret_key: maskSecret(p.secret_key),
+            webhook_secret: maskSecret(p.webhook_secret),
+        }));
+        res.json({ providers: masked });
+    } catch (err) {
+        console.error('[Admin] payment-providers GET error:', err);
+        res.status(500).json({ error: 'Internal server error', message: err.message });
+    }
+});
+
+/**
+ * PUT /api/${ADMIN_ROUTE_SECRET}/admin/payment-providers/:code
+ * Create or update a payment provider configuration (admin only).
+ *
+ * Secret fields (secret_key, webhook_secret) are written to DB only when
+ * the request body contains a non-masked, non-empty value.
+ * Sending '••••••••' (the mask placeholder) is treated as "no change".
+ */
+router.put('/payment-providers/:code', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        const { code } = req.params;
+
+        const VALID_CODES = ['paytr', 'iyzico', 'shopier', 'stripe'];
+        if (!VALID_CODES.includes(code)) {
+            return res.status(400).json({ error: 'Invalid provider_code' });
+        }
+
+        // Strip masked placeholder — those fields should not overwrite stored secrets
+        const MASK_PLACEHOLDER = '••••••••';
+        const body = { ...req.body };
+        if (body.secret_key === MASK_PLACEHOLDER) delete body.secret_key;
+        if (body.webhook_secret === MASK_PLACEHOLDER) delete body.webhook_secret;
+
+        // Region is immutable via this endpoint — enforced by product rule
+        const REGION_MAP = { paytr: 'tr', iyzico: 'tr', shopier: 'tr', stripe: 'global' };
+        body.region = REGION_MAP[code];
+
+        const provider = await upsertProvider(supabaseAdmin, code, body);
+
+        // Return with masked secrets
+        res.json({
+            success: true,
+            provider: {
+                ...provider,
+                secret_key: maskSecret(provider.secret_key),
+                webhook_secret: maskSecret(provider.webhook_secret),
+            },
+        });
+    } catch (err) {
+        console.error('[Admin] payment-providers PUT error:', err);
+        res.status(500).json({ error: 'Internal server error', message: err.message });
     }
 });
 
