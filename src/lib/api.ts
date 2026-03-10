@@ -1019,3 +1019,80 @@ export async function getCheckoutProviders(region?: 'tr' | 'global'): Promise<{ 
     const q = region ? `?region=${region}` : '';
     return apiRequest(`/api/billing/payment-providers${q}`);
 }
+
+// ============================================================================
+// ADMIN PACKAGE MANAGEMENT API
+// ============================================================================
+
+export interface AdminCreditPackage {
+    id: string;
+    name: string;
+    display_name_tr: string;
+    display_name_en: string;
+    credits: number;
+    price_try: number;
+    price_usd: number;
+    is_active: boolean;
+    sort_order: number;
+    description: string | null;
+    features: string[] | null;
+    created_at: string;
+}
+
+/**
+ * List all credit packages (admin only — includes inactive).
+ * GET /api/${ADMIN_SECRET}/admin/packages
+ */
+export async function getAdminPackages(): Promise<{ packages: AdminCreditPackage[] }> {
+    if (!ADMIN_SECRET) throw new Error('VITE_ADMIN_ROUTE_SECRET is not configured.');
+    return apiRequest(`/api/${ADMIN_SECRET}/admin/packages`);
+}
+
+/**
+ * Create a new credit package (admin only).
+ * POST /api/${ADMIN_SECRET}/admin/packages
+ */
+export async function createAdminPackage(data: {
+    name: string;
+    display_name_tr: string;
+    display_name_en: string;
+    credits: number;
+    price_try: number;
+    price_usd: number;
+    is_active?: boolean;
+    sort_order?: number;
+    description?: string | null;
+    features?: string[] | null;
+}): Promise<{ success: boolean; package: AdminCreditPackage }> {
+    if (!ADMIN_SECRET) throw new Error('VITE_ADMIN_ROUTE_SECRET is not configured.');
+    return apiRequest(`/api/${ADMIN_SECRET}/admin/packages`, {
+        method: 'POST',
+        body: JSON.stringify(data),
+    });
+}
+
+/**
+ * Update a credit package (admin only).
+ * PATCH /api/${ADMIN_SECRET}/admin/packages/:id
+ */
+export async function updateAdminPackage(
+    id: string,
+    data: Partial<Omit<AdminCreditPackage, 'id' | 'created_at'>>
+): Promise<{ success: boolean; package: AdminCreditPackage }> {
+    if (!ADMIN_SECRET) throw new Error('VITE_ADMIN_ROUTE_SECRET is not configured.');
+    return apiRequest(`/api/${ADMIN_SECRET}/admin/packages/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+    });
+}
+
+/**
+ * Delete a credit package (admin only — blocked if orders reference it).
+ * DELETE /api/${ADMIN_SECRET}/admin/packages/:id
+ */
+export async function deleteAdminPackage(id: string): Promise<{ success: boolean }> {
+    if (!ADMIN_SECRET) throw new Error('VITE_ADMIN_ROUTE_SECRET is not configured.');
+    return apiRequest(`/api/${ADMIN_SECRET}/admin/packages/${id}`, {
+        method: 'DELETE',
+    });
+}

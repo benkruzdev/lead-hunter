@@ -1621,5 +1621,189 @@ router.put('/payment-providers/:code', requireAuth, requireAdmin, async (req, re
     }
 });
 
+/**
+ * GET /api/${ADMIN_ROUTE_SECRET}/admin/packages
+ * List all credit packages including inactive (admin only).
+ */
+router.get('/packages', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        // Try full select including optional columns (description, features).
+        // If those columns don't exist yet (pending DB migration), fall back
+        // to the core columns so the endpoint never 500s before migration.
+        let { data, error } = await supabaseAdmin
+            .from('credit_packages')
+            .select('id, name, display_name_tr, display_name_en, credits, price_try, price_usd, is_active, sort_order, description, features, created_at')
+            .order('sort_order', { ascending: true });
+
+        if (error && (error.message.includes('description') || error.message.includes('features'))) {
+            // Columns not yet migrated — fall back to core columns
+            const fallback = await supabaseAdmin
+                .from('credit_packages')
+                .select('id, name, display_name_tr, display_name_en, credits, price_try, price_usd, is_active, sort_order, created_at')
+                .order('sort_order', { ascending: true });
+            if (fallback.error) {
+                console.error('[Admin] Packages GET error:', fallback.error);
+                return res.status(500).json({ error: 'Database error', message: fallback.error.message });
+            }
+            // Normalise: add null placeholders for missing columns
+            data = (fallback.data || []).map(p => ({ ...p, description: null, features: null }));
+            error = null;
+        }
+
+        if (error) {
+            console.error('[Admin] Packages GET error:', error);
+            return res.status(500).json({ error: 'Database error', message: error.message });
+        }
+        res.json({ packages: data || [] });
+    } catch (err) {
+        console.error('[Admin] Packages GET error:', err);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+/**
+ * POST /api/${ADMIN_ROUTE_SECRET}/admin/packages
+ * Create a new credit package (admin only).
+ */
+router.post('/packages', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        const { name, display_name_tr, display_name_en, credits, price_try, price_usd, is_active, sort_order, description, features } = req.body;
+
+        if (!name || !display_name_tr || !display_name_en || credits === undefined || price_try === undefined || price_usd === undefined) {
+            return res.status(400).json({ error: 'name, display_name_tr, display_name_en, credits, price_try, price_usd are required' });
+        }
+
+        const parsedCredits = parseInt(credits);
+        const parsedPriceTry = parseFloat(price_try);
+        const parsedPriceUsd = parseFloat(price_usd);
+
+        if (isNaN(parsedCredits) || parsedCredits < 0) return res.status(400).json({ error: 'credits must be a non-negative integer' });
+        if (isNaN(parsedPriceTry) || parsedPriceTry < 0) return res.status(400).json({ error: 'price_try must be a non-negative number' });
+        if (isNaN(parsedPriceUsd) || parsedPriceUsd < 0) return res.status(400).json({ error: 'price_usd must be a non-negative number' });
+
+        const row = {
+            name: name.trim(),
+            display_name_tr: display_name_tr.trim(),
+            display_name_en: display_name_en.trim(),
+            credits: parsedCredits,
+            price_try: parsedPriceTry,
+            price_usd: parsedPriceUsd,
+            is_active: is_active !== undefined ? Boolean(is_active) : true,
+            sort_order: parseInt(sort_order) || 0,
+        };
+        if (description !== undefined) row.description = description || null;
+        if (features !== undefined) row.features = Array.isArray(features) ? features : null;
+
+        const { data, error } = await supabaseAdmin
+            .from('credit_packages')
+            .insert(row)
+            .select()
+            .single();
+
+        if (error) {
+            if (error.code === '23505') return res.status(409).json({ error: 'A package with that name already exists' });
+            console.error('[Admin] Packages POST error:', error);
+            return res.status(500).json({ error: 'Database error', message: error.message });
+        }
+        res.status(201).json({ success: true, package: data });
+    } catch (err) {
+        console.error('[Admin] Packages POST error:', err);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+/**
+ * PATCH /api/${ADMIN_ROUTE_SECRET}/admin/packages/:id
+ * Update a credit package (admin only).
+ */
+router.patch('/packages/:id', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { name, display_name_tr, display_name_en, credits, price_try, price_usd, is_active, sort_order, description, features } = req.body;
+
+        const updates = {};
+        if (name !== undefined) updates.name = name.trim();
+        if (display_name_tr !== undefined) updates.display_name_tr = display_name_tr.trim();
+        if (display_name_en !== undefined) updates.display_name_en = display_name_en.trim();
+        if (credits !== undefined) {
+            const v = parseInt(credits);
+            if (isNaN(v) || v < 0) return res.status(400).json({ error: 'credits must be a non-negative integer' });
+            updates.credits = v;
+        }
+        if (price_try !== undefined) {
+            const v = parseFloat(price_try);
+            if (isNaN(v) || v < 0) return res.status(400).json({ error: 'price_try must be non-negative' });
+            updates.price_try = v;
+        }
+        if (price_usd !== undefined) {
+            const v = parseFloat(price_usd);
+            if (isNaN(v) || v < 0) return res.status(400).json({ error: 'price_usd must be non-negative' });
+            updates.price_usd = v;
+        }
+        if (is_active !== undefined) updates.is_active = Boolean(is_active);
+        if (sort_order !== undefined) updates.sort_order = parseInt(sort_order) || 0;
+        if (description !== undefined) updates.description = description || null;
+        if (features !== undefined) updates.features = Array.isArray(features) ? features : null;
+
+        if (Object.keys(updates).length === 0) return res.status(400).json({ error: 'No fields to update' });
+
+        const { data, error } = await supabaseAdmin
+            .from('credit_packages')
+            .update(updates)
+            .eq('id', id)
+            .select()
+            .single();
+
+        if (error) {
+            if (error.code === 'PGRST116') return res.status(404).json({ error: 'Package not found' });
+            if (error.code === '23505') return res.status(409).json({ error: 'A package with that name already exists' });
+            console.error('[Admin] Packages PATCH error:', error);
+            return res.status(500).json({ error: 'Database error', message: error.message });
+        }
+        res.json({ success: true, package: data });
+    } catch (err) {
+        console.error('[Admin] Packages PATCH error:', err);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+/**
+ * DELETE /api/${ADMIN_ROUTE_SECRET}/admin/packages/:id
+ * Delete a credit package — blocked if any orders reference it (admin only).
+ * Prefer PATCH is_active=false when orders exist.
+ */
+router.delete('/packages/:id', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const { count: orderCount } = await supabaseAdmin
+            .from('orders')
+            .select('id', { count: 'exact', head: true })
+            .eq('package_id', id);
+
+        if (orderCount > 0) {
+            return res.status(409).json({
+                error: 'Cannot delete — this package has existing orders. Set is_active=false instead.',
+                order_count: orderCount,
+            });
+        }
+
+        const { error } = await supabaseAdmin
+            .from('credit_packages')
+            .delete()
+            .eq('id', id);
+
+        if (error) {
+            if (error.code === 'PGRST116') return res.status(404).json({ error: 'Package not found' });
+            console.error('[Admin] Packages DELETE error:', error);
+            return res.status(500).json({ error: 'Database error', message: error.message });
+        }
+        res.json({ success: true });
+    } catch (err) {
+        console.error('[Admin] Packages DELETE error:', err);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
 export default router;
 

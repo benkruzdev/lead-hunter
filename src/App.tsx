@@ -37,6 +37,7 @@ import AdminSmtpSettingsPage from "./pages/admin/AdminSmtpSettingsPage";
 import AdminSystemSettingsPage from "./pages/admin/AdminSystemSettingsPage";
 import AdminConfigPage from "./pages/admin/AdminConfigPage";
 import AdminPaymentProvidersPage from "./pages/admin/AdminPaymentProvidersPage";
+import AdminPackagesPage from "./pages/admin/AdminPackagesPage";
 import NotFound from "./pages/NotFound";
 
 
@@ -100,6 +101,7 @@ const AppContent = () => {
                     <Route path="system-settings" element={<AdminSystemSettingsPage />} />
                     <Route path="config" element={<AdminConfigPage />} />
                     <Route path="payment-providers" element={<AdminPaymentProvidersPage />} />
+                    <Route path="packages" element={<AdminPackagesPage />} />
                   </Route>
                 </Route>
               </Route>
