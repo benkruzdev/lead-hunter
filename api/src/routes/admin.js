@@ -600,14 +600,18 @@ router.post('/credits/adjust', requireAuth, requireAdmin, async (req, res) => {
             return res.status(400).json({ error: 'amount must be a non-zero integer' });
         }
 
-        // Check user exists
+        // Check user exists — do NOT select 'email'; that column may not exist in profiles
         const { data: profile, error: profileError } = await supabaseAdmin
             .from('profiles')
-            .select('id, full_name, email, credits')
+            .select('id, full_name, credits')
             .eq('id', user_id)
             .single();
 
-        if (profileError || !profile) {
+        if (profileError) {
+            console.error('[Admin] Credits adjust profile fetch error:', profileError);
+            return res.status(500).json({ error: 'Database error', message: profileError.message });
+        }
+        if (!profile) {
             return res.status(404).json({ error: 'User not found' });
         }
 

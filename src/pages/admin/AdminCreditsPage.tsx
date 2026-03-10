@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { CreditCard, Loader2, AlertCircle, Plus, Minus, RefreshCw, ChevronLeft, ChevronRight } from "lucide-react";
+import { CreditCard, Loader2, AlertCircle, Plus, Minus, RefreshCw, ChevronLeft, ChevronRight, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { getAdminCreditsLedger, adjustAdminUserCredits, getAdminUsers } from "@/lib/api";
 import { useTranslation } from "react-i18next";
@@ -21,6 +21,13 @@ interface Transaction {
     created_at: string;
 }
 
+interface UserOption {
+    id: string;
+    full_name: string | null;
+    email: string;
+    credits: number;
+}
+
 export default function AdminCreditsPage() {
     const { t } = useTranslation();
     const { toast } = useToast();
@@ -33,13 +40,15 @@ export default function AdminCreditsPage() {
     const [ledgerError, setLedgerError] = useState<string | null>(null);
 
     // ── Manual adjust state ───────────────────────────────────────────
-    const [adjustUserId, setAdjustUserId] = useState("");
+    // Store the full selected user object — avoids fragile users.find() after debounce overwrites list
+    const [selectedUser, setSelectedUser] = useState<UserOption | null>(null);
     const [adjustUserSearch, setAdjustUserSearch] = useState("");
     const [adjustAmount, setAdjustAmount] = useState("");
     const [adjustDesc, setAdjustDesc] = useState("");
     const [adjusting, setAdjusting] = useState(false);
-    const [users, setUsers] = useState<Array<{ id: string; full_name: string | null; email: string; credits: number }>>([]);
-    const [usersLoading, setUsersLoading] = useState(false);
+    const [searchResults, setSearchResults] = useState<UserOption[]>([]);
+    const [searchLoading, setSearchLoading] = useState(false);
+    const [showDropdown, setShowDropdown] = useState(false);
 
     // ── Load ledger ───────────────────────────────────────────────────
     const loadLedger = useCallback(async (page: number) => {
@@ -58,37 +67,67 @@ export default function AdminCreditsPage() {
 
     useEffect(() => { loadLedger(txPage); }, [txPage, loadLedger]);
 
-    // ── Load users for search ─────────────────────────────────────────
+    // ── Debounced user search ─────────────────────────────────────────
     useEffect(() => {
+        // Don't search if a user is already selected (search box shows their label)
+        if (selectedUser) return;
+        if (!adjustUserSearch.trim()) {
+            setSearchResults([]);
+            setShowDropdown(false);
+            return;
+        }
         const timer = setTimeout(async () => {
-            setUsersLoading(true);
+            setSearchLoading(true);
             try {
-                const result = await getAdminUsers({ query: adjustUserSearch, limit: 20, offset: 0 });
-                setUsers((result.users || []).map((u: any) => ({
+                const result = await getAdminUsers({ query: adjustUserSearch.trim(), limit: 20, offset: 0 });
+                setSearchResults((result.users || []).map((u: any) => ({
                     id: u.id,
                     full_name: u.full_name || null,
                     email: u.email || "",
                     credits: u.credits || 0,
                 })));
+                setShowDropdown(true);
             } catch {
-                setUsers([]);
+                setSearchResults([]);
+                setShowDropdown(false);
             } finally {
-                setUsersLoading(false);
+                setSearchLoading(false);
             }
         }, 300);
         return () => clearTimeout(timer);
-    }, [adjustUserSearch]);
+    }, [adjustUserSearch, selectedUser]);
+
+    // ── Select a user from dropdown ───────────────────────────────────
+    const selectUser = (u: UserOption) => {
+        setSelectedUser(u);
+        setAdjustUserSearch("");
+        setSearchResults([]);
+        setShowDropdown(false);
+    };
+
+    const clearSelection = () => {
+        setSelectedUser(null);
+        setAdjustUserSearch("");
+        setSearchResults([]);
+        setShowDropdown(false);
+    };
 
     // ── Adjust submit ─────────────────────────────────────────────────
     const handleAdjust = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!adjustUserId) { toast({ title: "Kullanıcı seçin", variant: "destructive" }); return; }
+        if (!selectedUser) { toast({ title: "Kullanıcı seçin", variant: "destructive" }); return; }
         const amt = parseInt(adjustAmount);
         if (!amt) { toast({ title: "Geçerli bir miktar girin", variant: "destructive" }); return; }
         setAdjusting(true);
         try {
-            const result = await adjustAdminUserCredits({ user_id: adjustUserId, amount: amt, description: adjustDesc || undefined });
+            const result = await adjustAdminUserCredits({
+                user_id: selectedUser.id,  // always profiles.id, never email
+                amount: amt,
+                description: adjustDesc || undefined,
+            });
             toast({ title: `Kredi güncellendi: ${result.previous_balance} → ${result.new_balance}` });
+            // Refresh selected user's displayed balance
+            setSelectedUser(prev => prev ? { ...prev, credits: result.new_balance } : null);
             setAdjustAmount("");
             setAdjustDesc("");
             loadLedger(0);
@@ -100,7 +139,6 @@ export default function AdminCreditsPage() {
         }
     };
 
-    const selectedUser = users.find(u => u.id === adjustUserId);
     const totalPages = Math.ceil(totalTx / PAGE_SIZE);
 
     return (
@@ -121,40 +159,71 @@ export default function AdminCreditsPage() {
                 </CardHeader>
                 <CardContent>
                     <form onSubmit={handleAdjust} className="space-y-4 max-w-lg">
-                        {/* User search */}
+
+                        {/* ── User picker ── */}
                         <div className="space-y-2">
                             <Label>Kullanıcı</Label>
-                            <Input
-                                placeholder="Email veya isim ile ara…"
-                                value={adjustUserSearch}
-                                onChange={e => { setAdjustUserSearch(e.target.value); setAdjustUserId(""); }}
-                            />
-                            {usersLoading && <p className="text-xs text-muted-foreground">Aranıyor…</p>}
-                            {!usersLoading && adjustUserSearch && users.length > 0 && !adjustUserId && (
-                                <div className="border rounded-md divide-y max-h-48 overflow-y-auto">
-                                    {users.map(u => (
-                                        <button
-                                            key={u.id}
-                                            type="button"
-                                            className="w-full text-left px-3 py-2 hover:bg-muted text-sm"
-                                            onClick={() => { setAdjustUserId(u.id); setAdjustUserSearch(u.email); }}
-                                        >
-                                            <span className="font-medium">{u.full_name || u.email}</span>
-                                            <span className="text-muted-foreground ml-2">{u.email}</span>
-                                            <span className="float-right text-xs text-primary">{u.credits} kredi</span>
-                                        </button>
-                                    ))}
+
+                            {/* Show selected user chip OR search input */}
+                            {selectedUser ? (
+                                <div className="flex items-center gap-2 px-3 py-2 border rounded-md bg-muted/40">
+                                    <div className="flex-1 min-w-0">
+                                        <span className="font-medium text-sm">
+                                            {selectedUser.full_name || selectedUser.email}
+                                        </span>
+                                        {selectedUser.full_name && (
+                                            <span className="ml-2 text-xs text-muted-foreground">{selectedUser.email}</span>
+                                        )}
+                                        <span className="ml-2 text-xs text-primary font-semibold">{selectedUser.credits} kredi</span>
+                                    </div>
+                                    <button type="button" onClick={clearSelection}
+                                        className="text-muted-foreground hover:text-foreground flex-shrink-0">
+                                        <X className="w-4 h-4" />
+                                    </button>
                                 </div>
-                            )}
-                            {selectedUser && (
-                                <p className="text-xs text-muted-foreground">
-                                    Seçili: <span className="font-medium text-foreground">{selectedUser.full_name || selectedUser.email}</span>
-                                    {" — "}mevcut bakiye: <span className="font-medium text-primary">{selectedUser.credits}</span>
-                                </p>
+                            ) : (
+                                <div className="relative">
+                                    <Input
+                                        placeholder="Email veya isim ile ara…"
+                                        value={adjustUserSearch}
+                                        onChange={e => setAdjustUserSearch(e.target.value)}
+                                        autoComplete="off"
+                                    />
+                                    {searchLoading && (
+                                        <div className="absolute right-2 top-2.5">
+                                            <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+                                        </div>
+                                    )}
+                                    {showDropdown && searchResults.length > 0 && (
+                                        <div className="absolute z-10 w-full mt-1 border rounded-md bg-background shadow-md divide-y max-h-52 overflow-y-auto">
+                                            {searchResults.map(u => (
+                                                <button
+                                                    key={u.id}
+                                                    type="button"
+                                                    className="w-full text-left px-3 py-2 hover:bg-muted text-sm flex items-center justify-between gap-2"
+                                                    onClick={() => selectUser(u)}
+                                                >
+                                                    <span>
+                                                        <span className="font-medium">{u.full_name || u.email}</span>
+                                                        {u.full_name && (
+                                                            <span className="ml-2 text-muted-foreground text-xs">{u.email}</span>
+                                                        )}
+                                                    </span>
+                                                    <span className="text-xs text-primary flex-shrink-0">{u.credits} kredi</span>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
+                                    {showDropdown && !searchLoading && searchResults.length === 0 && adjustUserSearch.trim() && (
+                                        <div className="absolute z-10 w-full mt-1 border rounded-md bg-background shadow-md px-3 py-3 text-sm text-muted-foreground">
+                                            Kullanıcı bulunamadı
+                                        </div>
+                                    )}
+                                </div>
                             )}
                         </div>
 
-                        {/* Amount with +/- helpers */}
+                        {/* ── Amount ── */}
                         <div className="space-y-2">
                             <Label htmlFor="adjust-amount">Miktar (+ ekle / − düş)</Label>
                             <div className="flex gap-2">
@@ -177,6 +246,7 @@ export default function AdminCreditsPage() {
                             </div>
                         </div>
 
+                        {/* ── Description ── */}
                         <div className="space-y-2">
                             <Label htmlFor="adjust-desc">Açıklama (opsiyonel)</Label>
                             <Input
@@ -187,7 +257,7 @@ export default function AdminCreditsPage() {
                             />
                         </div>
 
-                        <Button type="submit" disabled={adjusting || !adjustUserId}>
+                        <Button type="submit" disabled={adjusting || !selectedUser}>
                             {adjusting && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
                             Uygula
                         </Button>
@@ -246,7 +316,9 @@ export default function AdminCreditsPage() {
                                             <tr key={tx.id} className="hover:bg-muted/40">
                                                 <td className="py-2 pr-4">
                                                     <div className="font-medium">{tx.user_name || "—"}</div>
-                                                    <div className="text-xs text-muted-foreground">{tx.user_email || tx.user_id.slice(0, 8) + "…"}</div>
+                                                    <div className="text-xs text-muted-foreground">
+                                                        {tx.user_email || tx.user_id.slice(0, 8) + "…"}
+                                                    </div>
                                                 </td>
                                                 <td className="py-2 pr-4">
                                                     <span className={`font-semibold ${tx.amount > 0 ? "text-green-600" : "text-red-500"}`}>
@@ -268,7 +340,6 @@ export default function AdminCreditsPage() {
                                 </table>
                             </div>
 
-                            {/* Pagination */}
                             {totalPages > 1 && (
                                 <div className="flex items-center justify-between mt-4 pt-4 border-t">
                                     <p className="text-xs text-muted-foreground">
