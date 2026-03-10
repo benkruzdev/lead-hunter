@@ -34,7 +34,6 @@ import {
   Loader2,
   AlertCircle,
   Mail,
-  Share2,
   ChevronDown,
   ChevronUp,
   Copy,
@@ -61,20 +60,34 @@ import { ExportTemplateDialog } from "@/components/app/ExportTemplateDialog";
 import { templates, mapItemToRecord, generateCSV, downloadCSV } from "@/lib/exportTemplates";
 
 // ─── Contact status helper ─────────────────────────────────────────────────
-type ContactStatusKey = "phoneAndWebsite" | "hasPhone" | "hasWebsite" | "needsEnrichment";
+// ── İletişim: mevcut veriyi yansıtır (phone / website) ────────────────────
+type ContactStatusKey = "phoneAndWebsite" | "hasPhone" | "hasWebsite" | "noContactData";
 
 function getContactStatus(item: SearchResult): ContactStatusKey {
   if (item.phone && item.website) return "phoneAndWebsite";
   if (item.phone) return "hasPhone";
   if (item.website) return "hasWebsite";
-  return "needsEnrichment";
+  return "noContactData";
 }
 
 const contactStatusConfig: Record<ContactStatusKey, { label: string; className: string }> = {
   phoneAndWebsite: { label: "Telefon + Website", className: "bg-emerald-50 text-emerald-700 border-emerald-200" },
-  hasPhone:        { label: "Telefon Var",       className: "bg-blue-50 text-blue-700 border-blue-200" },
-  hasWebsite:      { label: "Website Var",        className: "bg-indigo-50 text-indigo-700 border-indigo-200" },
-  needsEnrichment: { label: "Zenginleştirme Gerekli", className: "bg-orange-50 text-orange-700 border-orange-200" },
+  hasPhone:        { label: "Telefon Var",        className: "bg-blue-50 text-blue-700 border-blue-200" },
+  hasWebsite:      { label: "Website Var",         className: "bg-indigo-50 text-indigo-700 border-indigo-200" },
+  noContactData:   { label: "İletişim Verisi Yok", className: "bg-gray-100 text-gray-500 border-gray-200" },
+};
+
+// ── Ek İletişim: e-posta/sosyal zenginleştirme potansiyelini yansıtır ──────
+// Website varlığı = dış veri kaynağı mevcut = zenginleştirme mümkün
+type EnrichmentPotentialKey = "canEnrich" | "noEnrichmentSource";
+
+function getEnrichmentPotential(item: SearchResult): EnrichmentPotentialKey {
+  return item.website ? "canEnrich" : "noEnrichmentSource";
+}
+
+const enrichmentPotentialConfig: Record<EnrichmentPotentialKey, { label: string; className: string }> = {
+  canEnrich:           { label: "Zenginleştirme Mümkün", className: "bg-violet-50 text-violet-700 border-violet-200" },
+  noEnrichmentSource:  { label: "Ek Veri Kaynağı Yok",   className: "bg-gray-100 text-gray-400 border-gray-200" },
 };
 
 // ─── Business signal badges (max 2) ─────────────────────────────────────────
@@ -626,6 +639,7 @@ export default function SearchPage() {
                   <th className="text-left p-4 font-medium text-muted-foreground">Puan</th>
                   <th className="text-left p-4 font-medium text-muted-foreground">Yorum</th>
                   <th className="text-left p-4 font-medium text-muted-foreground">İletişim</th>
+                  <th className="text-left p-4 font-medium text-muted-foreground">Ek İletişim</th>
                   <th className="text-left p-4 font-medium text-muted-foreground">Website</th>
                   <th className="text-left p-4 font-medium text-muted-foreground w-24">İşlemler</th>
                 </tr>
@@ -634,6 +648,7 @@ export default function SearchPage() {
                 {results.map(item => {
                   const badges = getBusinessBadges(item);
                   const contactStatus = contactStatusConfig[getContactStatus(item)];
+                  const enrichmentPotential = enrichmentPotentialConfig[getEnrichmentPotential(item)];
                   const websiteDisplay = item.website
                     ? item.website.replace(/^https?:\/\//, "").replace(/\/$/, "").slice(0, 24)
                     : null;
@@ -689,12 +704,17 @@ export default function SearchPage() {
                         {typeof item.reviews === "number" ? item.reviews.toLocaleString() : "—"}
                       </td>
 
-                      {/* Contact status */}
+                      {/* Contact status — mevcut veri */}
                       <td className="p-4">
-                        <span
-                          className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium ${contactStatus.className}`}
-                        >
+                        <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium ${contactStatus.className}`}>
                           {contactStatus.label}
+                        </span>
+                      </td>
+
+                      {/* Enrichment potential — e-posta/sosyal */}
+                      <td className="p-4">
+                        <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium ${enrichmentPotential.className}`}>
+                          {enrichmentPotential.label}
                         </span>
                       </td>
 
@@ -855,9 +875,7 @@ export default function SearchPage() {
                       {detailItem.phone ? (
                         <p className="text-sm font-medium">{detailItem.phone}</p>
                       ) : (
-                        <p className="text-sm text-muted-foreground italic">
-                          Zenginleştirme sonrası alınabilir
-                        </p>
+                        <p className="text-sm text-muted-foreground">Veri bulunamadı</p>
                       )}
                     </div>
                   </div>
@@ -877,32 +895,21 @@ export default function SearchPage() {
                           {detailItem.website.replace(/^https?:\/\//, "")}
                         </a>
                       ) : (
-                        <p className="text-sm text-muted-foreground italic">
-                          Zenginleştirme sonrası alınabilir
-                        </p>
+                        <p className="text-sm text-muted-foreground">Veri bulunamadı</p>
                       )}
                     </div>
                   </div>
 
-                  {/* Email */}
+                  {/* E-posta + Sosyal: enrichment potansiyeli */}
                   <div className="flex items-start gap-2">
                     <Mail className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
                     <div>
-                      <p className="text-xs text-muted-foreground mb-0.5">E-posta</p>
-                      <p className="text-sm text-muted-foreground italic">
-                        Zenginleştirme sonrası alınabilir
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Social */}
-                  <div className="flex items-start gap-2">
-                    <Share2 className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
-                    <div>
-                      <p className="text-xs text-muted-foreground mb-0.5">Sosyal Profiller</p>
-                      <p className="text-sm text-muted-foreground italic">
-                        Zenginleştirme sonrası alınabilir
-                      </p>
+                      <p className="text-xs text-muted-foreground mb-0.5">E-posta ve Sosyal Profiller</p>
+                      {detailItem.website ? (
+                        <p className="text-sm text-violet-700">Zenginleştirme ile alınabilir</p>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">Ek veri kaynağı yok</p>
+                      )}
                     </div>
                   </div>
                 </div>
