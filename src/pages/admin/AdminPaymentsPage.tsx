@@ -8,6 +8,7 @@ import {
 import {
     Wallet, Loader2, AlertCircle, RefreshCw, ChevronLeft, ChevronRight,
     CheckCircle2, XCircle, Eye, Building2, CreditCard, ChevronDown, ChevronUp,
+    Copy, Check,
 } from "lucide-react";
 import { getAdminPayments, completeAdminOrder, rejectAdminOrder, getAdminOrderEvents } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
@@ -34,24 +35,31 @@ const METHOD_MAP: Record<string, { label: string; icon: React.ReactNode }> = {
 };
 
 const EVENT_LEVEL_CLS: Record<string, string> = {
-    info:    "bg-blue-50 text-blue-700 dark:bg-blue-950/30 dark:text-blue-400",
-    warn:    "bg-yellow-50 text-yellow-700 dark:bg-yellow-950/30 dark:text-yellow-400",
-    error:   "bg-red-50 text-red-700 dark:bg-red-950/30 dark:text-red-400",
-    success: "bg-green-50 text-green-700 dark:bg-green-950/30 dark:text-green-400",
+    info:    "bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-400",
+    warn:    "bg-yellow-100 text-yellow-700 dark:bg-yellow-950/40 dark:text-yellow-400",
+    error:   "bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-400",
+    success: "bg-green-100 text-green-700 dark:bg-green-950/40 dark:text-green-400",
+};
+
+const EVENT_DOT_CLS: Record<string, string> = {
+    info:    "bg-blue-400",
+    warn:    "bg-yellow-400",
+    error:   "bg-red-500",
+    success: "bg-green-500",
 };
 
 const EVENT_TYPE_LABELS: Record<string, string> = {
-    payment_init_started:               "Başlatıldı",
-    payment_init_failed:                "Başlatma Hatası",
-    payment_redirect_created:           "Yönlendirme Hazırlandı",
-    payment_callback_received:          "Callback Alındı",
+    payment_init_started:                 "Başlatıldı",
+    payment_init_failed:                  "Başlatma Hatası",
+    payment_redirect_created:             "Yönlendirme Hazırlandı",
+    payment_callback_received:            "Callback Alındı",
     payment_callback_verification_failed: "Doğrulama Başarısız",
-    payment_completed:                  "Ödeme Tamamlandı",
-    payment_failed:                     "Ödeme Başarısız",
-    payment_cancelled:                  "Ödeme İptal",
-    payment_webhook_error:              "Webhook Hatası",
-    order_complete:                     "Sipariş Tamamlandı",
-    order_rejected:                     "Sipariş Reddedildi",
+    payment_completed:                    "Ödeme Tamamlandı",
+    payment_failed:                       "Ödeme Başarısız",
+    payment_cancelled:                    "Ödeme İptal",
+    payment_webhook_error:                "Webhook Hatası",
+    order_complete:                       "Sipariş Tamamlandı",
+    order_rejected:                       "Sipariş Reddedildi",
 };
 
 // ---------------------------------------------------------------------------
@@ -81,13 +89,36 @@ function MethodBadge({ method }: { method: string }) {
 }
 
 // ---------------------------------------------------------------------------
+// Copy button
+// ---------------------------------------------------------------------------
+function CopyButton({ value, label = "Kopyala" }: { value: string; label?: string }) {
+    const [copied, setCopied] = useState(false);
+    const handleCopy = () => {
+        navigator.clipboard.writeText(value).then(() => {
+            setCopied(true);
+            setTimeout(() => setCopied(false), 1800);
+        });
+    };
+    return (
+        <Button variant="outline" size="sm" className="h-7 px-2 text-xs gap-1" onClick={handleCopy}>
+            {copied ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />}
+            {copied ? "Kopyalandı" : label}
+        </Button>
+    );
+}
+
+// ---------------------------------------------------------------------------
 // Section helper
 // ---------------------------------------------------------------------------
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({ title, children, destructive = false }: { title: string; children: React.ReactNode; destructive?: boolean }) {
     return (
         <div className="space-y-1.5">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{title}</p>
-            <div className="rounded-lg border bg-muted/30 p-3 space-y-1.5 text-sm">{children}</div>
+            <p className={`text-xs font-semibold uppercase tracking-wide ${destructive ? "text-red-500" : "text-muted-foreground"}`}>
+                {title}
+            </p>
+            <div className={`rounded-lg border p-3 space-y-1.5 text-sm ${destructive ? "border-red-200 bg-red-50/50 dark:border-red-900/40 dark:bg-red-950/20" : "bg-muted/30"}`}>
+                {children}
+            </div>
         </div>
     );
 }
@@ -103,7 +134,7 @@ function Row({ label, value }: { label: string; value: React.ReactNode }) {
 }
 
 // ---------------------------------------------------------------------------
-// Event row with expandable metadata
+// Timeline event item
 // ---------------------------------------------------------------------------
 interface PaymentEvent {
     id: string;
@@ -115,42 +146,53 @@ interface PaymentEvent {
     created_at: string;
 }
 
-function EventRow({ event }: { event: PaymentEvent }) {
+function TimelineEvent({ event, isLast }: { event: PaymentEvent; isLast: boolean }) {
     const [open, setOpen] = useState(false);
+    const dotCls = EVENT_DOT_CLS[event.level] ?? "bg-gray-400";
     const lvlCls = EVENT_LEVEL_CLS[event.level] ?? "bg-muted text-muted-foreground";
     const hasMetadata = event.metadata && Object.keys(event.metadata).length > 0;
+    const label = EVENT_TYPE_LABELS[event.event_type] ?? event.event_type;
 
     return (
-        <div className="border rounded-lg overflow-hidden">
-            <button
-                className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-muted/40 transition-colors"
-                onClick={() => hasMetadata && setOpen(o => !o)}
-            >
-                <span className={`shrink-0 px-1.5 py-0.5 rounded text-xs font-medium ${lvlCls}`}>
-                    {event.level}
-                </span>
-                <span className="text-xs font-medium text-muted-foreground shrink-0">
-                    {EVENT_TYPE_LABELS[event.event_type] ?? event.event_type}
-                </span>
-                <span className="flex-1 text-xs text-muted-foreground truncate text-left">
-                    {event.message}
-                </span>
-                <span className="text-xs text-muted-foreground shrink-0 whitespace-nowrap">
-                    {new Date(event.created_at).toLocaleString("tr-TR")}
-                </span>
+        <div className="flex gap-3">
+            {/* Timeline rail */}
+            <div className="flex flex-col items-center">
+                <div className={`w-2.5 h-2.5 rounded-full mt-1 shrink-0 ${dotCls}`} />
+                {!isLast && <div className="w-px flex-1 bg-border mt-1" />}
+            </div>
+
+            {/* Content */}
+            <div className={`flex-1 pb-${isLast ? "0" : "3"}`}>
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <div className="flex items-center gap-2">
+                        <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${lvlCls}`}>
+                            {event.level}
+                        </span>
+                        <span className="text-sm font-medium">{label}</span>
+                        {event.source && (
+                            <span className="text-xs text-muted-foreground">({event.source})</span>
+                        )}
+                    </div>
+                    <span className="text-xs text-muted-foreground whitespace-nowrap">
+                        {new Date(event.created_at).toLocaleString("tr-TR")}
+                    </span>
+                </div>
+                <p className="text-xs text-muted-foreground mt-0.5">{event.message}</p>
                 {hasMetadata && (
-                    open
-                        ? <ChevronUp className="w-3 h-3 shrink-0 text-muted-foreground" />
-                        : <ChevronDown className="w-3 h-3 shrink-0 text-muted-foreground" />
+                    <button
+                        className="text-xs text-blue-500 hover:underline mt-1 flex items-center gap-0.5"
+                        onClick={() => setOpen(o => !o)}
+                    >
+                        {open ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                        {open ? "Detayları Gizle" : "Detayları Göster"}
+                    </button>
                 )}
-            </button>
-            {open && hasMetadata && (
-                <div className="border-t bg-muted/20 px-3 py-2">
-                    <pre className="text-xs text-muted-foreground overflow-x-auto whitespace-pre-wrap break-all">
+                {open && hasMetadata && (
+                    <pre className="mt-1.5 rounded bg-muted/60 border p-2 text-xs overflow-x-auto whitespace-pre-wrap break-all max-h-48 overflow-y-auto">
                         {JSON.stringify(event.metadata, null, 2)}
                     </pre>
-                </div>
-            )}
+                )}
+            </div>
         </div>
     );
 }
@@ -196,8 +238,10 @@ function OrderDetailModal({
     rejecting: string | null;
 }) {
     const isPending = order.status === "pending";
+    const isFailed = order.status === "failed";
     const isBankTransfer = order.payment_method === "bank_transfer" || order.payment_method === "manual";
     const isGateway = !isBankTransfer;
+    const hasFailureInfo = !!(order.failure_reason || order.failure_code);
 
     const [events, setEvents] = useState<PaymentEvent[]>([]);
     const [eventsLoading, setEventsLoading] = useState(false);
@@ -220,21 +264,17 @@ function OrderDetailModal({
                         <span className="font-mono text-sm text-muted-foreground">
                             {shortId(order.id)}
                         </span>
+                        <StatusBadge status={order.status} />
                     </DialogTitle>
-                    <DialogDescription asChild>
-                        <div className="flex items-center gap-2">
-                            <StatusBadge status={order.status} />
-                            {order.failure_reason && (
-                                <span className="text-xs text-red-600 font-medium truncate max-w-xs">
-                                    {order.failure_reason}
-                                </span>
-                            )}
-                        </div>
-                    </DialogDescription>
+                    {isFailed && order.failure_reason && (
+                        <DialogDescription className="text-red-500 text-xs font-medium">
+                            {order.failure_reason}
+                        </DialogDescription>
+                    )}
                 </DialogHeader>
 
-                <div className="space-y-4 py-2">
-                    {/* Sipariş Bilgisi */}
+                <div className="space-y-4 py-1">
+                    {/* 1 — Sipariş Bilgisi */}
                     <Section title="Sipariş Bilgisi">
                         <Row label="Sipariş No"
                             value={<span className="font-mono text-xs break-all">{order.id}</span>}
@@ -247,8 +287,29 @@ function OrderDetailModal({
                                 value={new Date(order.last_payment_event_at).toLocaleString("tr-TR")}
                             />
                         )}
-                        <Row label="Durum" value={<StatusBadge status={order.status} />} />
-                        <Row label="Ödeme Yöntemi" value={<MethodBadge method={order.payment_method} />} />
+                    </Section>
+
+                    {/* 2 — Müşteri */}
+                    <Section title="Müşteri">
+                        <Row label="Ad Soyad" value={order.user_name || "—"} />
+                        <Row label="E-posta" value={order.user_email || "—"} />
+                        <Row label="User ID"
+                            value={<span className="font-mono text-xs">{order.user_id}</span>}
+                        />
+                    </Section>
+
+                    {/* 3 — Paket */}
+                    <Section title="Paket">
+                        <Row label="Paket" value={order.package_name || "—"} />
+                        <Row label="Kredi" value={`${order.credits.toLocaleString()} kredi`} />
+                        <Row label="Tutar"
+                            value={`${order.amount?.toLocaleString("tr-TR")} ${order.currency}`}
+                        />
+                    </Section>
+
+                    {/* 4 — Ödeme Bilgisi */}
+                    <Section title="Ödeme Bilgisi">
+                        <Row label="Yöntem" value={<MethodBadge method={order.payment_method} />} />
                         {order.provider_reference && (
                             <Row label="Provider Ref"
                                 value={<span className="font-mono text-xs break-all">{order.provider_reference}</span>}
@@ -259,77 +320,75 @@ function OrderDetailModal({
                                 value={
                                     <a href={order.checkout_url} target="_blank" rel="noopener noreferrer"
                                         className="text-blue-500 underline text-xs break-all">
-                                        {order.checkout_url.slice(0, 60)}{order.checkout_url.length > 60 ? "…" : ""}
+                                        {order.checkout_url.length > 60
+                                            ? order.checkout_url.slice(0, 60) + "…"
+                                            : order.checkout_url}
                                     </a>
                                 }
                             />
                         )}
-                    </Section>
-
-                    {/* Hata Bilgisi */}
-                    {(order.failure_reason || order.failure_code) && (
-                        <Section title="Hata Bilgisi">
-                            {order.failure_reason && (
-                                <Row label="Hata Nedeni" value={
-                                    <span className="text-red-600 text-xs font-normal">{order.failure_reason}</span>
-                                } />
-                            )}
-                            {order.failure_code && (
-                                <Row label="Hata Kodu" value={
-                                    <span className="font-mono text-xs">{order.failure_code}</span>
-                                } />
-                            )}
-                        </Section>
-                    )}
-
-                    {/* Müşteri Bilgisi */}
-                    <Section title="Müşteri">
-                        <Row label="Ad Soyad" value={order.user_name || "—"} />
-                        <Row label="E-posta" value={order.user_email || "—"} />
-                        <Row label="User ID"
-                            value={<span className="font-mono text-xs">{order.user_id}</span>}
-                        />
-                    </Section>
-
-                    {/* Paket Bilgisi */}
-                    <Section title="Paket">
-                        <Row label="Paket" value={order.package_name || "—"} />
-                        <Row label="Kredi" value={`${order.credits.toLocaleString()} kredi`} />
-                        <Row label="Tutar"
-                            value={`${order.amount?.toLocaleString("tr-TR")} ${order.currency}`}
-                        />
-                    </Section>
-
-                    {/* Havale özelinde ek bilgi */}
-                    {isBankTransfer && (
-                        <Section title="Havale / IBAN Ödemesi">
-                            <div className="text-xs text-muted-foreground leading-relaxed">
-                                Bu sipariş IBAN / Havale yöntemiyle oluşturulmuştur.
+                        {isBankTransfer && (
+                            <div className="text-xs text-muted-foreground leading-relaxed pt-1">
+                                IBAN / Havale yöntemiyle oluşturulmuştur.
                                 Ödeme dekontu geldiğinde aşağıdan onaylayabilirsiniz.
                             </div>
+                        )}
+                    </Section>
+
+                    {/* 5 — Hata Bilgisi (yalnızca varsa) */}
+                    {hasFailureInfo && (
+                        <Section title="⚠ Hata Bilgisi" destructive>
+                            <Row label="Hata Nedeni"
+                                value={
+                                    <span className="text-red-600 dark:text-red-400 font-normal text-xs">
+                                        {order.failure_reason || "—"}
+                                    </span>
+                                }
+                            />
+                            {order.failure_code && (
+                                <Row label="Hata Kodu"
+                                    value={<span className="font-mono text-xs">{order.failure_code}</span>}
+                                />
+                            )}
+                            {order.provider_reference && (
+                                <Row label="Provider Ref"
+                                    value={<span className="font-mono text-xs">{order.provider_reference}</span>}
+                                />
+                            )}
+                            {order.last_payment_event_at && (
+                                <Row label="Son Olay Zamanı"
+                                    value={new Date(order.last_payment_event_at).toLocaleString("tr-TR")}
+                                />
+                            )}
                         </Section>
                     )}
 
-                    {/* Ödeme Olayları — sadece gateway siparişlerinde */}
+                    {/* 6 — Ödeme Olayları — yalnızca gateway siparişlerinde */}
                     {isGateway && (
-                        <div className="space-y-1.5">
+                        <div className="space-y-2">
                             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
                                 Ödeme Olayları
                             </p>
                             {eventsLoading && (
-                                <div className="flex items-center gap-2 text-xs text-muted-foreground py-3">
+                                <div className="flex items-center gap-2 text-xs text-muted-foreground py-2">
                                     <Loader2 className="w-3 h-3 animate-spin" />
                                     Yükleniyor…
                                 </div>
                             )}
                             {!eventsLoading && events.length === 0 && (
-                                <p className="text-xs text-muted-foreground py-2">
+                                <p className="text-xs text-muted-foreground py-2 italic">
                                     Henüz kayıt yok.
                                 </p>
                             )}
                             {!eventsLoading && events.length > 0 && (
-                                <div className="space-y-1">
-                                    {events.map(e => <EventRow key={e.id} event={e} />)}
+                                <div className="pl-1">
+                                    {[...events].reverse().map((e, i) => (
+                                        <TimelineEvent
+                                            key={e.id}
+                                            event={e}
+                                            isLast={i === events.length - 1}
+                                        />
+                                    ))}
                                 </div>
                             )}
                         </div>
@@ -338,32 +397,37 @@ function OrderDetailModal({
 
                 {/* Admin actions */}
                 {isPending && (
-                    <DialogFooter className="flex-col sm:flex-row gap-2">
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            className="text-red-600 border-red-300 hover:bg-red-50 dark:hover:bg-red-950"
-                            disabled={rejecting === order.id || completing === order.id}
-                            onClick={() => onReject(order.id)}
-                        >
-                            {rejecting === order.id
-                                ? <Loader2 className="w-3 h-3 animate-spin mr-1" />
-                                : <XCircle className="w-3 h-3 mr-1" />
-                            }
-                            Reddet
-                        </Button>
-                        <Button
-                            size="sm"
-                            className="text-white bg-green-600 hover:bg-green-700"
-                            disabled={completing === order.id || rejecting === order.id}
-                            onClick={() => onComplete(order.id)}
-                        >
-                            {completing === order.id
-                                ? <Loader2 className="w-3 h-3 animate-spin mr-1" />
-                                : <CheckCircle2 className="w-3 h-3 mr-1" />
-                            }
-                            Onayla
-                        </Button>
+                    <DialogFooter className="flex-col sm:flex-row gap-2 pt-2">
+                        {isBankTransfer && (
+                            <CopyButton value={order.id} label="Sipariş No Kopyala" />
+                        )}
+                        <div className="flex gap-2 sm:ml-auto">
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className="text-red-600 border-red-300 hover:bg-red-50 dark:hover:bg-red-950"
+                                disabled={rejecting === order.id || completing === order.id}
+                                onClick={() => onReject(order.id)}
+                            >
+                                {rejecting === order.id
+                                    ? <Loader2 className="w-3 h-3 animate-spin mr-1" />
+                                    : <XCircle className="w-3 h-3 mr-1" />
+                                }
+                                Reddet
+                            </Button>
+                            <Button
+                                size="sm"
+                                className="text-white bg-green-600 hover:bg-green-700"
+                                disabled={completing === order.id || rejecting === order.id}
+                                onClick={() => onComplete(order.id)}
+                            >
+                                {completing === order.id
+                                    ? <Loader2 className="w-3 h-3 animate-spin mr-1" />
+                                    : <CheckCircle2 className="w-3 h-3 mr-1" />
+                                }
+                                Onayla
+                            </Button>
+                        </div>
                     </DialogFooter>
                 )}
             </DialogContent>
@@ -531,8 +595,7 @@ export default function AdminPaymentsPage() {
                                                 className="hover:bg-muted/40 cursor-pointer"
                                                 onClick={() => setSelectedOrder(order)}
                                             >
-                                                {/* Sipariş No */}
-                                                <td className="py-2 pr-3">
+                                                <td className="py-2.5 pr-3">
                                                     <span
                                                         className="font-mono text-xs text-muted-foreground hover:text-foreground transition-colors"
                                                         title={order.id}
@@ -540,8 +603,7 @@ export default function AdminPaymentsPage() {
                                                         {shortId(order.id)}
                                                     </span>
                                                 </td>
-                                                {/* Kullanıcı */}
-                                                <td className="py-2 pr-3">
+                                                <td className="py-2.5 pr-3">
                                                     <div className="font-medium text-sm leading-tight">
                                                         {order.user_name || "—"}
                                                     </div>
@@ -549,35 +611,32 @@ export default function AdminPaymentsPage() {
                                                         {order.user_email || order.user_id.slice(0, 8) + "…"}
                                                     </div>
                                                 </td>
-                                                {/* Paket */}
-                                                <td className="py-2 pr-3 max-w-[120px] truncate text-sm">
+                                                <td className="py-2.5 pr-3 max-w-[120px] truncate text-sm">
                                                     {order.package_name || "—"}
                                                 </td>
-                                                {/* Tutar */}
-                                                <td className="py-2 pr-3 font-medium whitespace-nowrap text-sm">
+                                                <td className="py-2.5 pr-3 font-medium whitespace-nowrap text-sm">
                                                     {order.amount?.toLocaleString("tr-TR")} {order.currency}
                                                 </td>
-                                                {/* Yöntem */}
-                                                <td className="py-2 pr-3">
+                                                <td className="py-2.5 pr-3">
                                                     <MethodBadge method={order.payment_method} />
                                                 </td>
-                                                {/* Durum + failure hint */}
-                                                <td className="py-2 pr-3">
-                                                    <div className="space-y-0.5">
-                                                        <StatusBadge status={order.status} />
-                                                        {order.failure_reason && (
-                                                            <div className="text-xs text-red-500 truncate max-w-[140px]" title={order.failure_reason}>
-                                                                {order.failure_reason.slice(0, 40)}{order.failure_reason.length > 40 ? "…" : ""}
-                                                            </div>
-                                                        )}
-                                                    </div>
+                                                <td className="py-2.5 pr-3">
+                                                    <StatusBadge status={order.status} />
+                                                    {order.failure_reason && (
+                                                        <div
+                                                            className="text-xs text-red-500 mt-0.5 truncate max-w-[160px]"
+                                                            title={order.failure_reason}
+                                                        >
+                                                            {order.failure_reason.length > 42
+                                                                ? order.failure_reason.slice(0, 42) + "…"
+                                                                : order.failure_reason}
+                                                        </div>
+                                                    )}
                                                 </td>
-                                                {/* Tarih */}
-                                                <td className="py-2 pr-3 text-xs text-muted-foreground whitespace-nowrap">
+                                                <td className="py-2.5 pr-3 text-xs text-muted-foreground whitespace-nowrap">
                                                     {new Date(order.created_at).toLocaleString("tr-TR")}
                                                 </td>
-                                                {/* Aksiyon */}
-                                                <td className="py-2" onClick={e => e.stopPropagation()}>
+                                                <td className="py-2.5" onClick={e => e.stopPropagation()}>
                                                     <Button
                                                         size="sm"
                                                         variant="ghost"
