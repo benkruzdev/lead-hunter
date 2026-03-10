@@ -362,10 +362,15 @@ export async function getAdminPayments(params?: {
         user_email: string | null;
         package_name: string | null;
         payment_method: string;
+        provider_reference: string | null;
+        checkout_url: string | null;
         amount: number;
         currency: string;
         credits: number;
         status: string;
+        failure_reason: string | null;
+        failure_code: string | null;
+        last_payment_event_at: string | null;
         created_at: string;
     }>;
     total: number;
@@ -377,6 +382,25 @@ export async function getAdminPayments(params?: {
     if (params?.query) q.set('query', params.query);
     if (params?.status) q.set('status', params.status);
     return apiRequest(`/api/${ADMIN_SECRET}/admin/payments?${q.toString()}`);
+}
+
+/**
+ * Get payment lifecycle events for a specific order (admin only)
+ * GET /api/${ADMIN_SECRET}/admin/payments/:orderId/events
+ */
+export async function getAdminOrderEvents(orderId: string): Promise<{
+    events: Array<{
+        id: string;
+        level: string;
+        source: string;
+        event_type: string;
+        message: string;
+        metadata: Record<string, unknown>;
+        created_at: string;
+    }>;
+}> {
+    if (!ADMIN_SECRET) throw new Error('VITE_ADMIN_ROUTE_SECRET is not configured.');
+    return apiRequest(`/api/${ADMIN_SECRET}/admin/payments/${orderId}/events`);
 }
 
 /**

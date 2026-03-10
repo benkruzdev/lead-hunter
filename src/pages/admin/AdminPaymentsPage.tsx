@@ -7,9 +7,9 @@ import {
 } from "@/components/ui/dialog";
 import {
     Wallet, Loader2, AlertCircle, RefreshCw, ChevronLeft, ChevronRight,
-    CheckCircle2, XCircle, Eye, Building2, CreditCard,
+    CheckCircle2, XCircle, Eye, Building2, CreditCard, ChevronDown, ChevronUp,
 } from "lucide-react";
-import { getAdminPayments, completeAdminOrder, rejectAdminOrder } from "@/lib/api";
+import { getAdminPayments, completeAdminOrder, rejectAdminOrder, getAdminOrderEvents } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 
 const PAGE_SIZE = 50;
@@ -31,6 +31,27 @@ const METHOD_MAP: Record<string, { label: string; icon: React.ReactNode }> = {
     iyzico:        { label: "iyzico",        icon: <CreditCard className="w-3 h-3" /> },
     shopier:       { label: "Shopier",       icon: <CreditCard className="w-3 h-3" /> },
     stripe:        { label: "Stripe",        icon: <CreditCard className="w-3 h-3" /> },
+};
+
+const EVENT_LEVEL_CLS: Record<string, string> = {
+    info:    "bg-blue-50 text-blue-700 dark:bg-blue-950/30 dark:text-blue-400",
+    warn:    "bg-yellow-50 text-yellow-700 dark:bg-yellow-950/30 dark:text-yellow-400",
+    error:   "bg-red-50 text-red-700 dark:bg-red-950/30 dark:text-red-400",
+    success: "bg-green-50 text-green-700 dark:bg-green-950/30 dark:text-green-400",
+};
+
+const EVENT_TYPE_LABELS: Record<string, string> = {
+    payment_init_started:               "Başlatıldı",
+    payment_init_failed:                "Başlatma Hatası",
+    payment_redirect_created:           "Yönlendirme Hazırlandı",
+    payment_callback_received:          "Callback Alındı",
+    payment_callback_verification_failed: "Doğrulama Başarısız",
+    payment_completed:                  "Ödeme Tamamlandı",
+    payment_failed:                     "Ödeme Başarısız",
+    payment_cancelled:                  "Ödeme İptal",
+    payment_webhook_error:              "Webhook Hatası",
+    order_complete:                     "Sipariş Tamamlandı",
+    order_rejected:                     "Sipariş Reddedildi",
 };
 
 // ---------------------------------------------------------------------------
@@ -60,7 +81,7 @@ function MethodBadge({ method }: { method: string }) {
 }
 
 // ---------------------------------------------------------------------------
-// Detail Section helper
+// Section helper
 // ---------------------------------------------------------------------------
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
     return (
@@ -82,6 +103,59 @@ function Row({ label, value }: { label: string; value: React.ReactNode }) {
 }
 
 // ---------------------------------------------------------------------------
+// Event row with expandable metadata
+// ---------------------------------------------------------------------------
+interface PaymentEvent {
+    id: string;
+    level: string;
+    source: string;
+    event_type: string;
+    message: string;
+    metadata: Record<string, unknown>;
+    created_at: string;
+}
+
+function EventRow({ event }: { event: PaymentEvent }) {
+    const [open, setOpen] = useState(false);
+    const lvlCls = EVENT_LEVEL_CLS[event.level] ?? "bg-muted text-muted-foreground";
+    const hasMetadata = event.metadata && Object.keys(event.metadata).length > 0;
+
+    return (
+        <div className="border rounded-lg overflow-hidden">
+            <button
+                className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-muted/40 transition-colors"
+                onClick={() => hasMetadata && setOpen(o => !o)}
+            >
+                <span className={`shrink-0 px-1.5 py-0.5 rounded text-xs font-medium ${lvlCls}`}>
+                    {event.level}
+                </span>
+                <span className="text-xs font-medium text-muted-foreground shrink-0">
+                    {EVENT_TYPE_LABELS[event.event_type] ?? event.event_type}
+                </span>
+                <span className="flex-1 text-xs text-muted-foreground truncate text-left">
+                    {event.message}
+                </span>
+                <span className="text-xs text-muted-foreground shrink-0 whitespace-nowrap">
+                    {new Date(event.created_at).toLocaleString("tr-TR")}
+                </span>
+                {hasMetadata && (
+                    open
+                        ? <ChevronUp className="w-3 h-3 shrink-0 text-muted-foreground" />
+                        : <ChevronDown className="w-3 h-3 shrink-0 text-muted-foreground" />
+                )}
+            </button>
+            {open && hasMetadata && (
+                <div className="border-t bg-muted/20 px-3 py-2">
+                    <pre className="text-xs text-muted-foreground overflow-x-auto whitespace-pre-wrap break-all">
+                        {JSON.stringify(event.metadata, null, 2)}
+                    </pre>
+                </div>
+            )}
+        </div>
+    );
+}
+
+// ---------------------------------------------------------------------------
 // Order interface
 // ---------------------------------------------------------------------------
 interface Order {
@@ -91,10 +165,15 @@ interface Order {
     user_email: string | null;
     package_name: string | null;
     payment_method: string;
+    provider_reference: string | null;
+    checkout_url: string | null;
     amount: number;
     currency: string;
     credits: number;
     status: string;
+    failure_reason: string | null;
+    failure_code: string | null;
+    last_payment_event_at: string | null;
     created_at: string;
 }
 
@@ -118,10 +197,23 @@ function OrderDetailModal({
 }) {
     const isPending = order.status === "pending";
     const isBankTransfer = order.payment_method === "bank_transfer" || order.payment_method === "manual";
+    const isGateway = !isBankTransfer;
+
+    const [events, setEvents] = useState<PaymentEvent[]>([]);
+    const [eventsLoading, setEventsLoading] = useState(false);
+
+    useEffect(() => {
+        if (!isGateway) return;
+        setEventsLoading(true);
+        getAdminOrderEvents(order.id)
+            .then(r => setEvents(r.events))
+            .catch(() => setEvents([]))
+            .finally(() => setEventsLoading(false));
+    }, [order.id, isGateway]);
 
     return (
         <Dialog open onOpenChange={onClose}>
-            <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2 text-base">
                         Sipariş Detayı
@@ -129,8 +221,15 @@ function OrderDetailModal({
                             {shortId(order.id)}
                         </span>
                     </DialogTitle>
-                    <DialogDescription>
-                        <StatusBadge status={order.status} />
+                    <DialogDescription asChild>
+                        <div className="flex items-center gap-2">
+                            <StatusBadge status={order.status} />
+                            {order.failure_reason && (
+                                <span className="text-xs text-red-600 font-medium truncate max-w-xs">
+                                    {order.failure_reason}
+                                </span>
+                            )}
+                        </div>
                     </DialogDescription>
                 </DialogHeader>
 
@@ -138,16 +237,50 @@ function OrderDetailModal({
                     {/* Sipariş Bilgisi */}
                     <Section title="Sipariş Bilgisi">
                         <Row label="Sipariş No"
-                            value={
-                                <span className="font-mono text-xs break-all">{order.id}</span>
-                            }
+                            value={<span className="font-mono text-xs break-all">{order.id}</span>}
                         />
                         <Row label="Oluşturulma"
                             value={new Date(order.created_at).toLocaleString("tr-TR")}
                         />
+                        {order.last_payment_event_at && (
+                            <Row label="Son Olay"
+                                value={new Date(order.last_payment_event_at).toLocaleString("tr-TR")}
+                            />
+                        )}
                         <Row label="Durum" value={<StatusBadge status={order.status} />} />
                         <Row label="Ödeme Yöntemi" value={<MethodBadge method={order.payment_method} />} />
+                        {order.provider_reference && (
+                            <Row label="Provider Ref"
+                                value={<span className="font-mono text-xs break-all">{order.provider_reference}</span>}
+                            />
+                        )}
+                        {order.checkout_url && (
+                            <Row label="Checkout URL"
+                                value={
+                                    <a href={order.checkout_url} target="_blank" rel="noopener noreferrer"
+                                        className="text-blue-500 underline text-xs break-all">
+                                        {order.checkout_url.slice(0, 60)}{order.checkout_url.length > 60 ? "…" : ""}
+                                    </a>
+                                }
+                            />
+                        )}
                     </Section>
+
+                    {/* Hata Bilgisi */}
+                    {(order.failure_reason || order.failure_code) && (
+                        <Section title="Hata Bilgisi">
+                            {order.failure_reason && (
+                                <Row label="Hata Nedeni" value={
+                                    <span className="text-red-600 text-xs font-normal">{order.failure_reason}</span>
+                                } />
+                            )}
+                            {order.failure_code && (
+                                <Row label="Hata Kodu" value={
+                                    <span className="font-mono text-xs">{order.failure_code}</span>
+                                } />
+                            )}
+                        </Section>
+                    )}
 
                     {/* Müşteri Bilgisi */}
                     <Section title="Müşteri">
@@ -172,10 +305,34 @@ function OrderDetailModal({
                         <Section title="Havale / IBAN Ödemesi">
                             <div className="text-xs text-muted-foreground leading-relaxed">
                                 Bu sipariş IBAN / Havale yöntemiyle oluşturulmuştur.
-                                Kullanıcı ödemeyi banka havalesiyle gerçekleştirmeyi kabul etmiştir.
                                 Ödeme dekontu geldiğinde aşağıdan onaylayabilirsiniz.
                             </div>
                         </Section>
+                    )}
+
+                    {/* Ödeme Olayları — sadece gateway siparişlerinde */}
+                    {isGateway && (
+                        <div className="space-y-1.5">
+                            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                                Ödeme Olayları
+                            </p>
+                            {eventsLoading && (
+                                <div className="flex items-center gap-2 text-xs text-muted-foreground py-3">
+                                    <Loader2 className="w-3 h-3 animate-spin" />
+                                    Yükleniyor…
+                                </div>
+                            )}
+                            {!eventsLoading && events.length === 0 && (
+                                <p className="text-xs text-muted-foreground py-2">
+                                    Henüz kayıt yok.
+                                </p>
+                            )}
+                            {!eventsLoading && events.length > 0 && (
+                                <div className="space-y-1">
+                                    {events.map(e => <EventRow key={e.id} event={e} />)}
+                                </div>
+                            )}
+                        </div>
                     )}
                 </div>
 
@@ -404,9 +561,16 @@ export default function AdminPaymentsPage() {
                                                 <td className="py-2 pr-3">
                                                     <MethodBadge method={order.payment_method} />
                                                 </td>
-                                                {/* Durum */}
+                                                {/* Durum + failure hint */}
                                                 <td className="py-2 pr-3">
-                                                    <StatusBadge status={order.status} />
+                                                    <div className="space-y-0.5">
+                                                        <StatusBadge status={order.status} />
+                                                        {order.failure_reason && (
+                                                            <div className="text-xs text-red-500 truncate max-w-[140px]" title={order.failure_reason}>
+                                                                {order.failure_reason.slice(0, 40)}{order.failure_reason.length > 40 ? "…" : ""}
+                                                            </div>
+                                                        )}
+                                                    </div>
                                                 </td>
                                                 {/* Tarih */}
                                                 <td className="py-2 pr-3 text-xs text-muted-foreground whitespace-nowrap">

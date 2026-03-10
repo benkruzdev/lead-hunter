@@ -786,7 +786,7 @@ router.get('/payments', requireAuth, requireAdmin, async (req, res) => {
         let ordersQuery = supabaseAdmin
             .from('orders')
             .select(
-                'id, user_id, package_id, payment_method, amount, currency, credits, status, created_at, credit_packages(display_name_tr)',
+                'id, user_id, package_id, payment_method, amount, currency, credits, status, provider_reference, checkout_url, failure_reason, failure_code, last_payment_event_at, created_at, credit_packages(display_name_tr)',
                 { count: 'exact' }
             )
             .order('created_at', { ascending: false })
@@ -851,10 +851,15 @@ router.get('/payments', requireAuth, requireAdmin, async (req, res) => {
             user_email: profileMap[o.user_id]?.email || null,
             package_name: o.credit_packages?.display_name_tr || null,
             payment_method: o.payment_method,
+            provider_reference: o.provider_reference || null,
+            checkout_url: o.checkout_url || null,
             amount: o.amount,
             currency: o.currency,
             credits: o.credits,
             status: o.status,
+            failure_reason: o.failure_reason || null,
+            failure_code: o.failure_code || null,
+            last_payment_event_at: o.last_payment_event_at || null,
             created_at: o.created_at,
         }));
 
@@ -983,6 +988,35 @@ router.post('/payments/:orderId/complete', requireAuth, requireAdmin, async (req
     }
 });
 
+
+/**
+ * GET /api/${ADMIN_ROUTE_SECRET}/admin/payments/:orderId/events
+ * Return the last 20 payment lifecycle events for a specific order (admin only).
+ * Reads from system_events where target_id = orderId.
+ */
+router.get('/payments/:orderId/events', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        const { orderId } = req.params;
+
+        const { data: events, error } = await supabaseAdmin
+            .from('system_events')
+            .select('id, level, source, event_type, message, metadata, created_at')
+            .eq('target_type', 'order')
+            .eq('target_id', orderId)
+            .order('created_at', { ascending: false })
+            .limit(20);
+
+        if (error) {
+            console.error('[Admin] Order events error:', error);
+            return res.status(500).json({ error: 'Database error', message: error.message });
+        }
+
+        res.json({ events: events || [] });
+    } catch (err) {
+        console.error('[Admin] Order events error:', err);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
 
 /**
  * POST /api/${ADMIN_ROUTE_SECRET}/admin/payments/:orderId/reject

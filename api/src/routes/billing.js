@@ -3,6 +3,7 @@ import { requireAuth } from '../middleware/auth.js';
 import { supabaseAdmin } from '../config/supabase.js';
 import { listProviders, getProvider, stripSecrets } from '../utils/paymentProviders.js';
 import { completeOrder, failOrder } from '../utils/orderCompletion.js';
+import { logEvent } from '../utils/eventLogger.js';
 import { initPayTR, verifyPayTRCallback, paytrOidToOrderId } from '../services/paytrService.js';
 import { initIyzico, retrieveIyzicoPayment } from '../services/iyzicoService.js';
 import { initShopier, verifyShopierCallback } from '../services/shopierService.js';
@@ -28,6 +29,46 @@ function getBaseUrl(req) {
 const TR_PROVIDERS   = ['paytr', 'iyzico', 'shopier'];
 const GLOBAL_PROVIDERS = ['stripe'];
 const ALL_PROVIDERS  = [...TR_PROVIDERS, ...GLOBAL_PROVIDERS];
+
+/**
+ * Thin wrapper to write a payment lifecycle event non-fatally.
+ * Accepts a pre-set context object so callers don't repeat themselves.
+ */
+function logPayEvent(supabase, eventType, level, message, context = {}, extraMeta = {}) {
+    const {
+        orderId = null, userId = null, providerCode = null,
+        paymentMethod = null, amount = null, currency = null,
+    } = context;
+
+    return logEvent(supabase, {
+        level,
+        source: providerCode || 'billing',
+        event_type: eventType,
+        subject_user_id: userId,
+        target_type: 'order',
+        target_id: orderId,
+        message,
+        credit_delta: null,
+        metadata: {
+            order_id: orderId,
+            provider_code: providerCode,
+            payment_method: paymentMethod,
+            amount,
+            currency,
+            ...extraMeta,
+        },
+    }).catch(err => console.warn(`[Billing] logPayEvent ${eventType} failed (non-fatal):`, err.message));
+}
+
+/** Mark order failure_reason + last_payment_event_at without flipping status (for non-pending errors). */
+async function patchOrderFailureNote(supabase, orderId, reason, failureCode = null) {
+    const patch = {
+        failure_reason: (reason || '').slice(0, 500),
+        last_payment_event_at: new Date().toISOString(),
+    };
+    if (failureCode) patch.failure_code = failureCode.slice(0, 100);
+    await supabase.from('orders').update(patch).eq('id', orderId).catch(() => {});
+}
 
 // ---------------------------------------------------------------------------
 // GET /api/billing/packages
@@ -82,6 +123,7 @@ router.get('/orders', requireAuth, async (req, res) => {
                 status,
                 checkout_url,
                 provider_reference,
+                failure_reason,
                 created_at,
                 credit_packages!inner(display_name_tr, display_name_en)
             `)
@@ -107,6 +149,7 @@ router.get('/orders', requireAuth, async (req, res) => {
             paymentMethod: order.payment_method,
             checkoutUrl: order.checkout_url || null,
             providerReference: order.provider_reference || null,
+            failureReason: order.failure_reason || null,
             createdAt: order.created_at,
         }));
 
@@ -230,6 +273,21 @@ router.post('/orders', requireAuth, async (req, res) => {
             });
         }
 
+        // Build context object for lifecycle events.
+        const evtCtx = {
+            orderId: order.id,
+            userId,
+            providerCode: paymentMethod,
+            paymentMethod: storedMethod,
+            amount,
+            currency,
+        };
+
+        // Log payment_init_started (non-fatal).
+        logPayEvent(supabaseAdmin, 'payment_init_started', 'info',
+            `Ödeme başlatılıyor — ${paymentMethod} — sipariş: ${order.id}`,
+            evtCtx, { stage: 'init' });
+
         // ---- Provider-level gateway init ----
         const provConfig = await getProvider(supabaseAdmin, paymentMethod);
         if (!provConfig || !provConfig.enabled) {
@@ -252,77 +310,160 @@ router.post('/orders', requireAuth, async (req, res) => {
 
         // ---- PayTR ----
         if (paymentMethod === 'paytr') {
-            const callbackUrl = `${baseUrl}/api/billing/callback/paytr`;
-            const result = await initPayTR(provConfig, orderCtx, callbackUrl);
+            try {
+                const callbackUrl = `${baseUrl}/api/billing/callback/paytr`;
+                const result = await initPayTR(provConfig, orderCtx, callbackUrl);
 
-            await supabaseAdmin.from('orders').update({
-                provider_reference: result.providerReference,
-                checkout_url: result.iframeUrl,
-            }).eq('id', order.id);
+                await supabaseAdmin.from('orders').update({
+                    provider_reference: result.providerReference,
+                    checkout_url: result.iframeUrl,
+                    last_payment_event_at: new Date().toISOString(),
+                }).eq('id', order.id);
 
-            return res.json({
-                orderId: order.id,
-                paymentMethod: 'card',
-                resolvedProvider: paymentMethod,
-                iframeUrl: result.iframeUrl,
-                token: result.token,
-            });
+                logPayEvent(supabaseAdmin, 'payment_redirect_created', 'info',
+                    `PayTR iframe token oluşturuldu — sipariş: ${order.id}`,
+                    evtCtx, {
+                        provider_reference: result.providerReference,
+                        iframe_url: result.iframeUrl,
+                        stage: 'redirect_created',
+                    });
+
+                return res.json({
+                    orderId: order.id,
+                    paymentMethod: 'card',
+                    resolvedProvider: paymentMethod,
+                    iframeUrl: result.iframeUrl,
+                    token: result.token,
+                });
+            } catch (initErr) {
+                console.error('[Billing/PayTR] Init error:', initErr.message);
+                await failOrder(supabaseAdmin, order.id, `PayTR init error: ${initErr.message}`, {
+                    providerCode: 'paytr',
+                    meta: { stage: 'init', error_message: initErr.message },
+                });
+                logPayEvent(supabaseAdmin, 'payment_init_failed', 'error',
+                    `PayTR başlatma hatası — ${initErr.message}`,
+                    evtCtx, { stage: 'init', error_message: initErr.message });
+                return res.status(502).json({ error: `Payment init failed: ${initErr.message}` });
+            }
         }
 
         // ---- iyzico ----
         if (paymentMethod === 'iyzico') {
-            const callbackUrl = `${baseUrl}/api/billing/callback/iyzico`;
-            const result = await initIyzico(provConfig, orderCtx, callbackUrl);
+            try {
+                const callbackUrl = `${baseUrl}/api/billing/callback/iyzico`;
+                const result = await initIyzico(provConfig, orderCtx, callbackUrl);
 
-            await supabaseAdmin.from('orders').update({
-                provider_reference: result.providerReference,
-            }).eq('id', order.id);
+                await supabaseAdmin.from('orders').update({
+                    provider_reference: result.providerReference,
+                    last_payment_event_at: new Date().toISOString(),
+                }).eq('id', order.id);
 
-            return res.json({
-                orderId: order.id,
-                paymentMethod: 'card',
-                resolvedProvider: paymentMethod,
-                token: result.token,
-                checkoutFormContent: result.checkoutFormContent,
-                paymentPageUrl: result.paymentPageUrl,
-            });
+                logPayEvent(supabaseAdmin, 'payment_redirect_created', 'info',
+                    `iyzico checkout form oluşturuldu — sipariş: ${order.id}`,
+                    evtCtx, {
+                        provider_reference: result.providerReference,
+                        stage: 'redirect_created',
+                    });
+
+                return res.json({
+                    orderId: order.id,
+                    paymentMethod: 'card',
+                    resolvedProvider: paymentMethod,
+                    token: result.token,
+                    checkoutFormContent: result.checkoutFormContent,
+                    paymentPageUrl: result.paymentPageUrl,
+                });
+            } catch (initErr) {
+                console.error('[Billing/iyzico] Init error:', initErr.message);
+                await failOrder(supabaseAdmin, order.id, `iyzico init error: ${initErr.message}`, {
+                    providerCode: 'iyzico',
+                    meta: { stage: 'init', error_message: initErr.message },
+                });
+                logPayEvent(supabaseAdmin, 'payment_init_failed', 'error',
+                    `iyzico başlatma hatası — ${initErr.message}`,
+                    evtCtx, { stage: 'init', error_message: initErr.message });
+                return res.status(502).json({ error: `Payment init failed: ${initErr.message}` });
+            }
         }
 
         // ---- Shopier ----
         if (paymentMethod === 'shopier') {
-            const result = initShopier(provConfig, orderCtx);
+            try {
+                const result = initShopier(provConfig, orderCtx);
 
-            await supabaseAdmin.from('orders').update({
-                provider_reference: result.providerReference,
-                checkout_url: result.redirectUrl,
-            }).eq('id', order.id);
+                await supabaseAdmin.from('orders').update({
+                    provider_reference: result.providerReference,
+                    checkout_url: result.redirectUrl,
+                    last_payment_event_at: new Date().toISOString(),
+                }).eq('id', order.id);
 
-            return res.json({
-                orderId: order.id,
-                paymentMethod: 'card',
-                resolvedProvider: paymentMethod,
-                redirectUrl: result.redirectUrl,
-            });
+                logPayEvent(supabaseAdmin, 'payment_redirect_created', 'info',
+                    `Shopier ödeme linki oluşturuldu — sipariş: ${order.id}`,
+                    evtCtx, {
+                        provider_reference: result.providerReference,
+                        redirect_url: result.redirectUrl,
+                        stage: 'redirect_created',
+                    });
+
+                return res.json({
+                    orderId: order.id,
+                    paymentMethod: 'card',
+                    resolvedProvider: paymentMethod,
+                    redirectUrl: result.redirectUrl,
+                });
+            } catch (initErr) {
+                console.error('[Billing/Shopier] Init error:', initErr.message);
+                await failOrder(supabaseAdmin, order.id, `Shopier init error: ${initErr.message}`, {
+                    providerCode: 'shopier',
+                    meta: { stage: 'init', error_message: initErr.message },
+                });
+                logPayEvent(supabaseAdmin, 'payment_init_failed', 'error',
+                    `Shopier başlatma hatası — ${initErr.message}`,
+                    evtCtx, { stage: 'init', error_message: initErr.message });
+                return res.status(502).json({ error: `Payment init failed: ${initErr.message}` });
+            }
         }
 
         // ---- Stripe ----
         if (paymentMethod === 'stripe') {
-            const successUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/app/billing?payment=success&order=${order.id}`;
-            const cancelUrl  = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/app/billing?payment=cancelled&order=${order.id}`;
-            const result = await initStripe(provConfig, orderCtx, successUrl, cancelUrl);
+            try {
+                const successUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/app/billing?payment=success&order=${order.id}`;
+                const cancelUrl  = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/app/billing?payment=cancelled&order=${order.id}`;
+                const result = await initStripe(provConfig, orderCtx, successUrl, cancelUrl);
 
-            await supabaseAdmin.from('orders').update({
-                provider_reference: result.providerReference,
-                checkout_url: result.sessionUrl,
-            }).eq('id', order.id);
+                await supabaseAdmin.from('orders').update({
+                    provider_reference: result.providerReference,
+                    checkout_url: result.sessionUrl,
+                    last_payment_event_at: new Date().toISOString(),
+                }).eq('id', order.id);
 
-            return res.json({
-                orderId: order.id,
-                paymentMethod: 'card',
-                resolvedProvider: paymentMethod,
-                sessionId: result.sessionId,
-                sessionUrl: result.sessionUrl,
-            });
+                logPayEvent(supabaseAdmin, 'payment_redirect_created', 'info',
+                    `Stripe Checkout Session oluşturuldu — sipariş: ${order.id}`,
+                    evtCtx, {
+                        provider_reference: result.providerReference,
+                        session_id: result.sessionId,
+                        stage: 'redirect_created',
+                    });
+
+                return res.json({
+                    orderId: order.id,
+                    paymentMethod: 'card',
+                    resolvedProvider: paymentMethod,
+                    sessionId: result.sessionId,
+                    sessionUrl: result.sessionUrl,
+                });
+            } catch (initErr) {
+                console.error('[Billing/Stripe] Init error:', initErr.message);
+                await failOrder(supabaseAdmin, order.id, `Stripe init error: ${initErr.message}`, {
+                    providerCode: 'stripe',
+                    meta: { stage: 'init', error_message: initErr.message },
+                });
+                logPayEvent(supabaseAdmin, 'payment_init_failed', 'error',
+                    `Stripe başlatma hatası — ${initErr.message}`,
+                    evtCtx, { stage: 'init', error_message: initErr.message });
+                return res.status(502).json({ error: `Payment init failed: ${initErr.message}` });
+            }
         }
 
         return res.status(400).json({ error: 'Unhandled payment method' });
@@ -364,33 +505,74 @@ router.post('/orders/:orderId/complete', requireAuth, async (req, res) => {
 // This is a public endpoint — NO requireAuth.
 // ---------------------------------------------------------------------------
 router.post('/callback/paytr', express.urlencoded({ extended: false }), async (req, res) => {
-    try {
-        const body = req.body;
-        const { merchant_oid, status } = body;
+    const body = req.body;
+    const { merchant_oid, status, total_amount, fail_reason_msg } = body;
+    const orderId = merchant_oid ? paytrOidToOrderId(merchant_oid) : null;
 
+    try {
         const provConfig = await getProvider(supabaseAdmin, 'paytr');
         if (!provConfig) {
             console.error('[Billing/PayTR] Provider config not found');
             return res.send('FAIL');
         }
 
+        const evtCtx = {
+            orderId,
+            providerCode: 'paytr',
+            paymentMethod: 'paytr',
+        };
+
+        // Log callback received.
+        logPayEvent(supabaseAdmin, 'payment_callback_received', 'info',
+            `PayTR callback alındı — merchant_oid: ${merchant_oid}`,
+            evtCtx, {
+                merchant_oid,
+                raw_status: status,
+                total_amount,
+                stage: 'callback_received',
+            });
+
         // Verify HMAC signature.
         if (!verifyPayTRCallback(provConfig, body)) {
             console.warn('[Billing/PayTR] Hash mismatch — possible replay / tampered callback');
+            if (orderId) {
+                logPayEvent(supabaseAdmin, 'payment_callback_verification_failed', 'error',
+                    `PayTR callback imza doğrulaması başarısız`,
+                    evtCtx, { stage: 'callback_verify', merchant_oid });
+                await patchOrderFailureNote(supabaseAdmin, orderId, 'PayTR: callback hash mismatch');
+            }
             return res.send('FAIL');
         }
 
-        const orderId = paytrOidToOrderId(merchant_oid);
-
         if (status === 'success') {
-            await completeOrder(supabaseAdmin, orderId, 'paytr-callback', { merchant_oid });
+            await completeOrder(supabaseAdmin, orderId, 'paytr-callback', {
+                merchant_oid,
+                provider_code: 'paytr',
+                total_amount,
+            });
         } else {
-            await failOrder(supabaseAdmin, orderId, `PayTR status: ${status}`);
+            const reason = `PayTR status: ${status}${fail_reason_msg ? ` — ${fail_reason_msg}` : ''}`;
+            await failOrder(supabaseAdmin, orderId, reason, {
+                providerCode: 'paytr',
+                meta: {
+                    merchant_oid,
+                    raw_status: status,
+                    fail_reason_msg: fail_reason_msg || null,
+                    stage: 'callback_complete',
+                },
+            });
         }
 
         res.send('OK');
     } catch (err) {
         console.error('[Billing/PayTR] Callback error:', err);
+        if (orderId) {
+            logPayEvent(supabaseAdmin, 'payment_webhook_error', 'error',
+                `PayTR callback işleme hatası: ${err.message}`,
+                { orderId, providerCode: 'paytr', paymentMethod: 'paytr' },
+                { stage: 'callback_complete', error_message: err.message });
+            await patchOrderFailureNote(supabaseAdmin, orderId, `PayTR callback error: ${err.message}`);
+        }
         res.send('FAIL');
     }
 });
@@ -402,35 +584,64 @@ router.post('/callback/paytr', express.urlencoded({ extended: false }), async (r
 // This is a public endpoint — NO requireAuth.
 // ---------------------------------------------------------------------------
 router.post('/callback/iyzico', express.urlencoded({ extended: false }), async (req, res) => {
+    const { token, conversationId, status } = req.body;
+    const frontendBase = process.env.FRONTEND_URL || 'http://localhost:5173';
+
+    if (!token) {
+        return res.redirect(`${frontendBase}/app/billing?payment=error`);
+    }
+
+    let orderId = conversationId || null;
+    const evtCtx = { orderId, providerCode: 'iyzico', paymentMethod: 'iyzico' };
+
     try {
-        const { token, conversationId, status } = req.body;
-        const frontendBase = process.env.FRONTEND_URL || 'http://localhost:5173';
-
-        if (!token) {
-            return res.redirect(`${frontendBase}/app/billing?payment=error`);
-        }
-
         const provConfig = await getProvider(supabaseAdmin, 'iyzico');
         if (!provConfig) {
             return res.redirect(`${frontendBase}/app/billing?payment=error`);
         }
 
+        logPayEvent(supabaseAdmin, 'payment_callback_received', 'info',
+            `iyzico callback alındı — token: ${token?.slice(0, 12)}…`,
+            evtCtx, { token_prefix: token?.slice(0, 12), raw_status: status, stage: 'callback_received' });
+
         // Retrieve real payment status from iyzico API.
         const detail = await retrieveIyzicoPayment(provConfig, token);
 
         // conversationId is the order UUID we sent in init.
-        const orderId = detail.conversationId || conversationId;
+        orderId = detail.conversationId || conversationId;
+        evtCtx.orderId = orderId;
 
         if (detail.status === 'success') {
-            await completeOrder(supabaseAdmin, orderId, 'iyzico-callback', { token, paymentId: detail.paymentId });
+            await completeOrder(supabaseAdmin, orderId, 'iyzico-callback', {
+                token,
+                paymentId: detail.paymentId,
+                provider_code: 'iyzico',
+            });
             return res.redirect(`${frontendBase}/app/billing?payment=success&order=${orderId}`);
         } else {
-            await failOrder(supabaseAdmin, orderId, `iyzico status: ${detail.status}`);
+            const providerStatus = detail.raw?.paymentStatus || detail.status;
+            const errorMsg = detail.raw?.errorMessage || detail.raw?.errorCode || providerStatus;
+            await failOrder(supabaseAdmin, orderId, `iyzico: ${errorMsg}`, {
+                providerCode: 'iyzico',
+                failureCode: detail.raw?.errorCode ? String(detail.raw.errorCode) : null,
+                meta: {
+                    token,
+                    payment_status: providerStatus,
+                    error_message: detail.raw?.errorMessage,
+                    error_code: detail.raw?.errorCode,
+                    stage: 'callback_complete',
+                },
+            });
             return res.redirect(`${frontendBase}/app/billing?payment=failed&order=${orderId}`);
         }
     } catch (err) {
         console.error('[Billing/iyzico] Callback error:', err);
-        const frontendBase = process.env.FRONTEND_URL || 'http://localhost:5173';
+        if (orderId) {
+            logPayEvent(supabaseAdmin, 'payment_webhook_error', 'error',
+                `iyzico callback işleme hatası: ${err.message}`,
+                evtCtx, { stage: 'callback_complete', error_message: err.message });
+            await patchOrderFailureNote(supabaseAdmin, orderId, `iyzico callback error: ${err.message}`);
+        }
         res.redirect(`${frontendBase}/app/billing?payment=error`);
     }
 });
@@ -441,32 +652,50 @@ router.post('/callback/iyzico', express.urlencoded({ extended: false }), async (
 // This is a public endpoint — NO requireAuth.
 // ---------------------------------------------------------------------------
 router.post('/callback/shopier', express.urlencoded({ extended: false }), async (req, res) => {
-    try {
-        const body = req.body;
-        const { platform_order_id, status } = body;
+    const body = req.body;
+    const { platform_order_id, status } = body;
+    const orderId = platform_order_id || null;
+    const evtCtx = { orderId, providerCode: 'shopier', paymentMethod: 'shopier' };
 
+    try {
         const provConfig = await getProvider(supabaseAdmin, 'shopier');
         if (!provConfig) {
             console.error('[Billing/Shopier] Provider config not found');
             return res.status(500).send('FAIL');
         }
 
+        logPayEvent(supabaseAdmin, 'payment_callback_received', 'info',
+            `Shopier callback alındı — order: ${orderId}`,
+            evtCtx, { raw_status: status, stage: 'callback_received' });
+
         if (!verifyShopierCallback(provConfig, body)) {
             console.warn('[Billing/Shopier] Signature mismatch — ignoring callback');
+            logPayEvent(supabaseAdmin, 'payment_callback_verification_failed', 'error',
+                `Shopier callback imza doğrulaması başarısız`,
+                evtCtx, { stage: 'callback_verify' });
+            if (orderId) await patchOrderFailureNote(supabaseAdmin, orderId, 'Shopier: callback signature mismatch');
             return res.status(400).send('INVALID_SIGNATURE');
         }
 
-        const orderId = platform_order_id;
-
         if (status === '1' || status === 'success') {
-            await completeOrder(supabaseAdmin, orderId, 'shopier-callback', { platform_order_id });
+            await completeOrder(supabaseAdmin, orderId, 'shopier-callback', {
+                platform_order_id,
+                provider_code: 'shopier',
+            });
         } else {
-            await failOrder(supabaseAdmin, orderId, `Shopier status: ${status}`);
+            await failOrder(supabaseAdmin, orderId, `Shopier status: ${status}`, {
+                providerCode: 'shopier',
+                meta: { platform_order_id, raw_status: status, stage: 'callback_complete' },
+            });
         }
 
         res.send('OK');
     } catch (err) {
         console.error('[Billing/Shopier] Callback error:', err);
+        logPayEvent(supabaseAdmin, 'payment_webhook_error', 'error',
+            `Shopier callback işleme hatası: ${err.message}`,
+            evtCtx, { stage: 'callback_complete', error_message: err.message });
+        if (orderId) await patchOrderFailureNote(supabaseAdmin, orderId, `Shopier callback error: ${err.message}`);
         res.status(500).send('FAIL');
     }
 });
@@ -482,9 +711,11 @@ router.post(
     '/webhook/stripe',
     express.raw({ type: 'application/json' }),
     async (req, res) => {
-        try {
-            const sig = req.headers['stripe-signature'];
+        const sig = req.headers['stripe-signature'];
+        let orderId = null;
+        const evtCtx = { providerCode: 'stripe', paymentMethod: 'stripe' };
 
+        try {
             const provConfig = await getProvider(supabaseAdmin, 'stripe');
             if (!provConfig) {
                 console.error('[Billing/Stripe] Provider config not found');
@@ -496,28 +727,63 @@ router.post(
                 event = await verifyStripeWebhook(provConfig, req.body, sig);
             } catch (err) {
                 console.warn('[Billing/Stripe] Webhook signature verification failed:', err.message);
+                logPayEvent(supabaseAdmin, 'payment_callback_verification_failed', 'error',
+                    `Stripe webhook imza doğrulaması başarısız: ${err.message}`,
+                    evtCtx, { stage: 'webhook_verify', error_message: err.message });
                 return res.status(400).json({ error: `Webhook signature invalid: ${err.message}` });
             }
 
             if (event.type === 'checkout.session.completed') {
                 const session = event.data.object;
-                const orderId = session.metadata?.order_id;
+                orderId = session.metadata?.order_id;
+                evtCtx.orderId = orderId;
 
                 if (!orderId) {
                     console.warn('[Billing/Stripe] Webhook: no order_id in session metadata');
+                    logPayEvent(supabaseAdmin, 'payment_webhook_error', 'warn',
+                        'Stripe webhook: session metadata içinde order_id yok',
+                        evtCtx, { stripe_session_id: session.id, stage: 'webhook_verify' });
                     return res.json({ received: true });
                 }
+
+                logPayEvent(supabaseAdmin, 'payment_callback_received', 'info',
+                    `Stripe checkout.session.completed alındı — sipariş: ${orderId}`,
+                    evtCtx, {
+                        stripe_session_id: session.id,
+                        payment_intent: session.payment_intent,
+                        stage: 'webhook_received',
+                    });
 
                 await completeOrder(supabaseAdmin, orderId, 'stripe-webhook', {
                     stripe_session_id: session.id,
                     payment_intent: session.payment_intent,
+                    provider_code: 'stripe',
                 });
+            } else if (event.type === 'checkout.session.expired' || event.type === 'payment_intent.payment_failed') {
+                const session = event.data.object;
+                orderId = session.metadata?.order_id;
+                evtCtx.orderId = orderId;
+
+                if (orderId) {
+                    const reason = event.type === 'checkout.session.expired'
+                        ? 'Stripe: Checkout session expired'
+                        : `Stripe: Payment failed — ${session.last_payment_error?.message || 'Unknown'}`;
+                    await failOrder(supabaseAdmin, orderId, reason, {
+                        providerCode: 'stripe',
+                        meta: { stripe_event_type: event.type, stage: 'webhook_received' },
+                    });
+                }
             }
-            // All other event types are acknowledged but ignored in this turn.
+            // All other event types are acknowledged but ignored.
 
             res.json({ received: true });
         } catch (err) {
             console.error('[Billing/Stripe] Webhook error:', err);
+            logPayEvent(supabaseAdmin, 'payment_webhook_error', 'error',
+                `Stripe webhook işleme hatası: ${err.message}`,
+                { ...evtCtx, orderId },
+                { stage: 'webhook_complete', error_message: err.message });
+            if (orderId) await patchOrderFailureNote(supabaseAdmin, orderId, `Stripe webhook error: ${err.message}`);
             res.status(500).json({ error: 'Internal server error' });
         }
     }

@@ -84,7 +84,29 @@ export async function completeOrder(supabase, orderId, actorLabel = 'payment-cal
         console.warn('[orderCompletion] Ledger write failed (non-fatal):', ledgerErr.message);
     }
 
-    // Step 5: System event (non-fatal).
+    // Step 5: System event — payment_completed + order_complete (non-fatal).
+    const evtMeta = {
+        order_id: orderId,
+        provider_code: order.payment_method,
+        payment_method: order.payment_method,
+        amount: order.amount,
+        currency: order.currency,
+        new_balance: newBalance,
+        ...meta,
+    };
+
+    await logEvent(supabase, {
+        level: 'success',
+        source: actorLabel,
+        event_type: 'payment_completed',
+        subject_user_id: order.user_id,
+        target_type: 'order',
+        target_id: orderId,
+        message: `Ödeme tamamlandı — ${order.payment_method} — sipariş: ${orderId}`,
+        credit_delta: order.credits,
+        metadata: evtMeta,
+    }).catch(e => console.warn('[orderCompletion] logEvent payment_completed failed (non-fatal):', e.message));
+
     await logEvent(supabase, {
         level: 'success',
         source: actorLabel,
@@ -94,14 +116,8 @@ export async function completeOrder(supabase, orderId, actorLabel = 'payment-cal
         target_id: orderId,
         message: `Sipariş tamamlandı (${order.payment_method}) — ${orderId}`,
         credit_delta: order.credits,
-        metadata: {
-            order_id: orderId,
-            amount: order.amount,
-            currency: order.currency,
-            new_balance: newBalance,
-            ...meta,
-        },
-    }).catch(e => console.warn('[orderCompletion] logEvent failed (non-fatal):', e.message));
+        metadata: evtMeta,
+    }).catch(e => console.warn('[orderCompletion] logEvent order_complete failed (non-fatal):', e.message));
 
     console.log(`[orderCompletion] Order ${orderId} completed: +${order.credits} credits → user ${order.user_id}`);
 
@@ -114,23 +130,67 @@ export async function completeOrder(supabase, orderId, actorLabel = 'payment-cal
 }
 
 /**
- * Fail a pending order (mark as failed).
- * Used when the payment gateway explicitly signals failure.
+ * Fail a pending order (mark as failed) with an optional reason.
+ * Stores failure_reason in orders table and logs a payment_failed event.
+ * No credits are touched.
  *
  * @param {object} supabase
  * @param {string} orderId
- * @param {string} reason
+ * @param {string} reason     Short human-readable failure reason
+ * @param {object} [opts]
+ * @param {string} [opts.failureCode]     Short machine-readable code (e.g. provider error code)
+ * @param {string} [opts.providerCode]    e.g. 'paytr', 'iyzico'
+ * @param {object} [opts.meta]            extra metadata for logEvent
  */
-export async function failOrder(supabase, orderId, reason = 'Payment failed') {
-    const { error } = await supabase
+export async function failOrder(supabase, orderId, reason = 'Payment failed', opts = {}) {
+    const { failureCode = null, providerCode = null, meta = {} } = opts;
+
+    const updatePayload = {
+        status: 'failed',
+        failure_reason: reason.slice(0, 500),
+    };
+    if (failureCode) updatePayload.failure_code = failureCode.slice(0, 100);
+    if (updatePayload.failure_reason) updatePayload.last_payment_event_at = new Date().toISOString();
+
+    const { data: updated, error } = await supabase
         .from('orders')
-        .update({ status: 'failed' })
+        .update(updatePayload)
         .eq('id', orderId)
-        .eq('status', 'pending');  // Only fail if still pending — do not overwrite completed.
+        .eq('status', 'pending')  // Only fail if still pending — do not overwrite completed.
+        .select('id, user_id, payment_method, amount, currency');
 
     if (error) {
         console.error(`[orderCompletion] failOrder error for ${orderId}:`, error.message);
-    } else {
-        console.log(`[orderCompletion] Order ${orderId} marked failed: ${reason}`);
+        return;
     }
+
+    if (!updated || updated.length === 0) {
+        console.warn(`[orderCompletion] failOrder: order ${orderId} not in pending state — skipping.`);
+        return;
+    }
+
+    const order = updated[0];
+    console.log(`[orderCompletion] Order ${orderId} marked failed: ${reason}`);
+
+    // Log payment_failed event (non-fatal).
+    await logEvent(supabase, {
+        level: 'error',
+        source: providerCode || 'payment',
+        event_type: 'payment_failed',
+        subject_user_id: order.user_id,
+        target_type: 'order',
+        target_id: orderId,
+        message: `Ödeme başarısız — ${order.payment_method}: ${reason}`,
+        credit_delta: null,
+        metadata: {
+            order_id: orderId,
+            provider_code: providerCode || order.payment_method,
+            payment_method: order.payment_method,
+            amount: order.amount,
+            currency: order.currency,
+            failure_reason: reason,
+            failure_code: failureCode,
+            ...meta,
+        },
+    }).catch(e => console.warn('[orderCompletion] logEvent payment_failed failed (non-fatal):', e.message));
 }
