@@ -396,6 +396,21 @@ export async function completeAdminOrder(orderId: string): Promise<{
 }
 
 /**
+ * Reject a pending order (admin only)
+ * POST /api/${ADMIN_SECRET}/admin/payments/:orderId/reject
+ */
+export async function rejectAdminOrder(orderId: string): Promise<{
+    success: boolean;
+    order_id: string;
+    user_id: string;
+}> {
+    if (!ADMIN_SECRET) throw new Error('VITE_ADMIN_ROUTE_SECRET is not configured.');
+    return apiRequest(`/api/${ADMIN_SECRET}/admin/payments/${orderId}/reject`, {
+        method: 'POST',
+    });
+}
+
+/**
  * Get admin export records (admin only)
  * GET /api/${ADMIN_SECRET}/admin/exports
  */

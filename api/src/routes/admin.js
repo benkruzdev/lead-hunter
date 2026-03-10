@@ -985,6 +985,72 @@ router.post('/payments/:orderId/complete', requireAuth, requireAdmin, async (req
 
 
 /**
+ * POST /api/${ADMIN_ROUTE_SECRET}/admin/payments/:orderId/reject
+ * Reject a pending order (admin only). Sets status pending → failed.
+ *
+ * Idempotency guard: the update is filtered by eq('status','pending'),
+ * so a second call matches 0 rows and returns 400 without side-effects.
+ * No credits are touched (none were ever dispensed for a pending order).
+ */
+router.post('/payments/:orderId/reject', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        const { orderId } = req.params;
+        const adminId = req.user.id;
+
+        // Atomically flip pending → failed (idempotent guard)
+        const { data: updatedRows, error: flipError } = await supabaseAdmin
+            .from('orders')
+            .update({ status: 'failed' })
+            .eq('id', orderId)
+            .eq('status', 'pending')
+            .select('id, user_id, amount, currency, credits');
+
+        if (flipError) {
+            console.error('[Admin] Order reject flip error:', flipError);
+            return res.status(500).json({ error: 'Failed to update order status', message: flipError.message });
+        }
+
+        if (!updatedRows || updatedRows.length === 0) {
+            return res.status(400).json({
+                error: 'Order cannot be rejected',
+                message: 'Order not found or not in pending status.',
+            });
+        }
+
+        const order = updatedRows[0];
+
+        // Log to system_events (non-fatal)
+        await logEvent(supabaseAdmin, {
+            level: 'warn',
+            source: 'admin',
+            event_type: 'order_rejected',
+            actor_user_id: adminId,
+            subject_user_id: order.user_id,
+            target_type: 'order',
+            target_id: orderId,
+            message: `Sipariş reddedildi (${orderId}) — admin: ${adminId}`,
+            credit_delta: 0,
+            metadata: {
+                order_id: orderId,
+                amount: order.amount,
+                currency: order.currency,
+            },
+        }).catch(err => console.error('[Admin] Reject logEvent error (non-fatal):', err));
+
+        console.log(`[Admin] Order ${orderId} rejected by admin ${adminId}`);
+
+        res.json({
+            success: true,
+            order_id: orderId,
+            user_id: order.user_id,
+        });
+    } catch (err) {
+        console.error('[Admin] Reject order error:', err);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+/**
  * GET /api/${ADMIN_ROUTE_SECRET}/admin/exports
  * Paginated export records across all users (admin only)
  * Query params: limit, offset, query (user name/email search)
