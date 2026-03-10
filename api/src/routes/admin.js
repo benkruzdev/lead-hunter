@@ -530,6 +530,160 @@ router.patch('/users/:id', requireAuth, requireAdmin, async (req, res) => {
 });
 
 /**
+ * GET /api/${ADMIN_ROUTE_SECRET}/admin/payments
+ * Paginated order records across all users (admin only)
+ * Query params: limit, offset, status, query (user name/email)
+ */
+router.get('/payments', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        const { limit = 50, offset = 0, query = '', status = '' } = req.query;
+        const parsedLimit = Math.min(parseInt(limit) || 50, 200);
+        const parsedOffset = parseInt(offset) || 0;
+
+        // Resolve matching user_ids from profiles if query given
+        let filteredUserIds = null;
+        if (query) {
+            const { data: matchedProfiles } = await supabaseAdmin
+                .from('profiles')
+                .select('id')
+                .or(`full_name.ilike.%${query}%,email.ilike.%${query}%`)
+                .limit(100);
+            filteredUserIds = (matchedProfiles || []).map(p => p.id);
+        }
+
+        let ordersQuery = supabaseAdmin
+            .from('orders')
+            .select(
+                'id, user_id, package_id, payment_method, amount, currency, credits, status, created_at, credit_packages(display_name_tr)',
+                { count: 'exact' }
+            )
+            .order('created_at', { ascending: false })
+            .range(parsedOffset, parsedOffset + parsedLimit - 1);
+
+        if (status) {
+            ordersQuery = ordersQuery.eq('status', status);
+        }
+
+        if (filteredUserIds !== null) {
+            if (filteredUserIds.length > 0) {
+                ordersQuery = ordersQuery.in('user_id', filteredUserIds);
+            } else {
+                // No user match — return empty result set
+                return res.json({ orders: [], total: 0 });
+            }
+        }
+
+        const { data: orders, count, error } = await ordersQuery;
+
+        if (error) {
+            console.error('[Admin] Payments error:', error);
+            return res.status(500).json({ error: 'Database error', message: error.message });
+        }
+
+        // Enrich with user info
+        const userIds = [...new Set((orders || []).map(o => o.user_id))];
+        const profileMap = {};
+
+        if (userIds.length > 0) {
+            const { data: profilesWithEmail, error: emailErr } = await supabaseAdmin
+                .from('profiles')
+                .select('id, full_name, email')
+                .in('id', userIds);
+
+            if (!emailErr && profilesWithEmail) {
+                profilesWithEmail.forEach(p => { profileMap[p.id] = { full_name: p.full_name, email: p.email }; });
+            } else {
+                const { data: profilesNoEmail } = await supabaseAdmin
+                    .from('profiles')
+                    .select('id, full_name')
+                    .in('id', userIds);
+                (profilesNoEmail || []).forEach(p => { profileMap[p.id] = { full_name: p.full_name, email: null }; });
+            }
+
+            const missingEmailIds = userIds.filter(id => !profileMap[id]?.email);
+            if (missingEmailIds.length > 0) {
+                await Promise.allSettled(missingEmailIds.map(async (id) => {
+                    const { data: authUser } = await supabaseAdmin.auth.admin.getUserById(id);
+                    if (authUser?.user?.email) {
+                        if (profileMap[id]) profileMap[id].email = authUser.user.email;
+                        else profileMap[id] = { full_name: null, email: authUser.user.email };
+                    }
+                }));
+            }
+        }
+
+        const enriched = (orders || []).map(o => ({
+            id: o.id,
+            user_id: o.user_id,
+            user_name: profileMap[o.user_id]?.full_name || null,
+            user_email: profileMap[o.user_id]?.email || null,
+            package_name: o.credit_packages?.display_name_tr || null,
+            payment_method: o.payment_method,
+            amount: o.amount,
+            currency: o.currency,
+            credits: o.credits,
+            status: o.status,
+            created_at: o.created_at,
+        }));
+
+        res.json({ orders: enriched, total: count || 0 });
+    } catch (err) {
+        console.error('[Admin] Payments error:', err);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+/**
+ * POST /api/${ADMIN_ROUTE_SECRET}/admin/payments/:orderId/complete
+ * Complete a pending manual order and add credits to user (admin only)
+ */
+router.post('/payments/:orderId/complete', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        const { orderId } = req.params;
+
+        // Verify order exists and is pending
+        const { data: order, error: orderError } = await supabaseAdmin
+            .from('orders')
+            .select('id, status, user_id, credits, amount')
+            .eq('id', orderId)
+            .single();
+
+        if (orderError || !order) {
+            return res.status(404).json({ error: 'Order not found' });
+        }
+
+        if (order.status !== 'pending') {
+            return res.status(400).json({ error: 'Order is not pending', current_status: order.status });
+        }
+
+        // Call RPC to complete order and add credits atomically
+        const { data, error } = await supabaseAdmin.rpc('complete_order_and_add_credits', {
+            p_order_id: orderId
+        });
+
+        if (error) {
+            console.error('[Admin] Failed to complete order:', error);
+            if (error.message?.includes('ORDER_INVALID')) {
+                return res.status(400).json({ error: error.message });
+            }
+            return res.status(500).json({ error: 'Failed to complete order', message: error.message });
+        }
+
+        console.log(`[Admin] Order ${orderId} completed by admin ${req.user.id}`);
+
+        res.json({
+            success: true,
+            order_id: orderId,
+            user_id: data?.userId || order.user_id,
+            credits_added: data?.creditsAdded || order.credits,
+        });
+    } catch (err) {
+        console.error('[Admin] Complete order error:', err);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+/**
  * GET /api/${ADMIN_ROUTE_SECRET}/admin/exports
  * Paginated export records across all users (admin only)
  * Query params: limit, offset, query (user name/email search)

@@ -294,6 +294,56 @@ export async function updateAdminSystemSettings(data: {
 }
 
 /**
+ * Get admin order/payment records (admin only)
+ * GET /api/${ADMIN_SECRET}/admin/payments
+ */
+export async function getAdminPayments(params?: {
+    limit?: number;
+    offset?: number;
+    query?: string;
+    status?: string;
+}): Promise<{
+    orders: Array<{
+        id: string;
+        user_id: string;
+        user_name: string | null;
+        user_email: string | null;
+        package_name: string | null;
+        payment_method: string;
+        amount: number;
+        currency: string;
+        credits: number;
+        status: string;
+        created_at: string;
+    }>;
+    total: number;
+}> {
+    if (!ADMIN_SECRET) throw new Error('VITE_ADMIN_ROUTE_SECRET is not configured.');
+    const q = new URLSearchParams();
+    if (params?.limit) q.set('limit', String(params.limit));
+    if (params?.offset) q.set('offset', String(params.offset));
+    if (params?.query) q.set('query', params.query);
+    if (params?.status) q.set('status', params.status);
+    return apiRequest(`/api/${ADMIN_SECRET}/admin/payments?${q.toString()}`);
+}
+
+/**
+ * Complete a pending order (admin only)
+ * POST /api/${ADMIN_SECRET}/admin/payments/:orderId/complete
+ */
+export async function completeAdminOrder(orderId: string): Promise<{
+    success: boolean;
+    order_id: string;
+    user_id: string;
+    credits_added: number;
+}> {
+    if (!ADMIN_SECRET) throw new Error('VITE_ADMIN_ROUTE_SECRET is not configured.');
+    return apiRequest(`/api/${ADMIN_SECRET}/admin/payments/${orderId}/complete`, {
+        method: 'POST',
+    });
+}
+
+/**
  * Get admin export records (admin only)
  * GET /api/${ADMIN_SECRET}/admin/exports
  */
