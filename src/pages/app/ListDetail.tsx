@@ -241,7 +241,7 @@ function exportProvince(item: LeadListItem): string {
 }
 
 export const COMPACT_HEADERS = [
-  "Name", "Category", "District", "Province",
+  "Name", "Category", "District", "Province", "Address",
   "Potential Score", "Status",
   "Phone", "Website", "Email", "Social Links",
   "Note", "Tags",
@@ -265,6 +265,7 @@ function buildCompactRow(item: LeadListItem): (string | number)[] {
     getCategory(item),
     exportDistrict(item),
     exportProvince(item),
+    getAddress(item),
     computeScore(item),
     exportStatusLabel(item),
     item.phone ?? "",
@@ -306,7 +307,7 @@ function buildFullRow(item: LeadListItem): (string | number)[] {
   ];
 }
 
-const COMPACT_COL_WIDTHS = [30, 20, 16, 16, 14, 16, 18, 32, 28, 40, 32, 24];
+const COMPACT_COL_WIDTHS = [30, 20, 16, 16, 36, 14, 16, 18, 32, 28, 40, 32, 24];
 const FULL_COL_WIDTHS    = [30, 20, 16, 16, 32, 24, 14, 10, 16, 18, 8, 12, 18, 32, 28, 22, 22, 22, 20, 22, 30, 40, 12, 18, 32, 24, 22, 22];
 
 // ─────────────────────────────────────────────
