@@ -59,6 +59,7 @@ import {
   bulkUpdateListItems,
   bulkDeleteListItems,
   enrichLeadListItem,
+  createExport,
   getSearchCreditCost,
   LeadListItem,
 } from "@/lib/api";
@@ -594,16 +595,16 @@ export default function ListDetail() {
     }
   };
 
-  const handleExport = () => {
+  const handleExport = async () => {
     if (!items.length) return;
     try {
       setIsExporting(true);
       setExportError(null);
 
-      const headers  = exportScope === "full" ? FULL_HEADERS  : COMPACT_HEADERS;
-      const buildRow = exportScope === "full" ? buildFullRow  : buildCompactRow;
+      const headers   = exportScope === "full" ? FULL_HEADERS   : COMPACT_HEADERS;
+      const buildRow  = exportScope === "full" ? buildFullRow   : buildCompactRow;
       const colWidths = exportScope === "full" ? FULL_COL_WIDTHS : COMPACT_COL_WIDTHS;
-      const safeName = (listName ?? "leads").replace(/[^a-z0-9_\-]/gi, "_");
+      const safeName  = (listName ?? "leads").replace(/[^a-z0-9_\-]/gi, "_");
 
       const trigger = (blob: Blob, filename: string) => {
         const url = URL.createObjectURL(blob);
@@ -614,6 +615,7 @@ export default function ListDetail() {
         URL.revokeObjectURL(url);
       };
 
+      // ── Generate + download file ────────────────────────────────────
       if (exportFormat === "csv" || exportFormat === "gsheets") {
         const esc = (v: string | number) => {
           const s = String(v);
@@ -629,8 +631,6 @@ export default function ListDetail() {
         const wb = XLSX.utils.book_new();
         const wsData = [headers, ...items.map(buildRow)];
         const ws = XLSX.utils.aoa_to_sheet(wsData);
-
-        // Bold header row
         const range = XLSX.utils.decode_range(ws["!ref"] ?? "A1");
         for (let c = range.s.c; c <= range.e.c; c++) {
           const addr = XLSX.utils.encode_cell({ r: 0, c });
@@ -640,7 +640,6 @@ export default function ListDetail() {
         ws["!autofilter"] = { ref: ws["!ref"] ?? "A1" };
         ws["!freeze"] = { xSplit: 0, ySplit: 1, topLeftCell: "A2", activePane: "bottomLeft" } as any;
         ws["!cols"] = colWidths.map((wch) => ({ wch }));
-
         XLSX.utils.book_append_sheet(wb, ws, "Leads");
         const buf = XLSX.write(wb, { bookType: "xlsx", type: "array" });
         trigger(
@@ -649,9 +648,34 @@ export default function ListDetail() {
         );
       }
 
+      // File is downloaded — close dialog regardless of what happens next.
       setShowExportDialog(false);
       setExportFormat("csv");
       setExportNote("");
+
+      // ── Backend record ───────────────────────────────────────────────
+      // Awaited so failures are surfaced. A failure here does NOT undo
+      // the already-downloaded file — the user keeps their export.
+      if (listId) {
+        const backendFormat = exportFormat === "gsheets" ? "csv" : exportFormat as "csv" | "xlsx";
+        const fileExt = backendFormat === "xlsx" ? ".xlsx" : ".csv";
+        try {
+          await createExport(
+            listId,
+            backendFormat,
+            exportNote || undefined,
+            exportScope,
+            `${safeName}${fileExt}`,
+            items.length,
+          );
+        } catch (recordErr: any) {
+          console.error("[ListDetail] Backend export record creation failed:", recordErr);
+          toast({
+            variant: "destructive",
+            description: t("exports.recordSaveFailed"),
+          });
+        }
+      }
     } catch (error: any) {
       console.error("[ListDetail] Export failed:", error);
       setExportError(error.message || t("exports.createFailed"));

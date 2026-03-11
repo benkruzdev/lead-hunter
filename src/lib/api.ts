@@ -61,7 +61,10 @@ export async function enrichLeadListItem(listId: string, itemId: string): Promis
 export async function createExport(
     listId: string,
     format: 'csv' | 'xlsx',
-    note?: string
+    note?: string,
+    scope?: 'compact' | 'full',
+    fileName?: string,
+    leadCount?: number,
 ): Promise<{
     exportId: string;
     downloadUrl: string;
@@ -70,7 +73,7 @@ export async function createExport(
 }> {
     return apiRequest(`/api/exports`, {
         method: 'POST',
-        body: JSON.stringify({ listId, format, note }),
+        body: JSON.stringify({ listId, format, note, scope, fileName, leadCount }),
     });
 }
 
@@ -83,6 +86,7 @@ export async function getExports(): Promise<{
         listId: string;
         listName: string;
         format: string;
+        scope?: string;
         fileName: string;
         leadCount: number;
         note: string | null;
