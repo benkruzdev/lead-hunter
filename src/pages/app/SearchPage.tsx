@@ -144,6 +144,18 @@ function getBusinessBadges(item: SearchResult): SignalBadge[] {
   return               [{ label: "Kapalı", className: "bg-gray-100 text-gray-500 border-gray-200" }];
 }
 
+// ── Location formatter (global-ready) ─────────────────────────────────────────
+// district = subregion (e.g. Kadıköy), city = region/province (e.g. İstanbul)
+// Output: "İlçe, Şehir" | "Şehir" | "—"
+function formatLocation(district: string | null | undefined, city: string | null | undefined): string {
+  const d = district?.trim();
+  const c = city?.trim();
+  if (d && c) return `${d}, ${c}`;
+  if (d)      return d;
+  if (c)      return c;
+  return "—";
+}
+
 // ─── Component ───────────────────────────────────────────────────────────────
 export default function SearchPage() {
   const { t } = useTranslation();
@@ -734,8 +746,27 @@ export default function SearchPage() {
                       </td>
 
                       {/* Location */}
-                      <td className="p-4 text-muted-foreground whitespace-nowrap">
-                        {item.district || city || "—"}
+                      <td className="p-4 min-w-[120px] max-w-[180px]">
+                        {(() => {
+                          const d = item.district?.trim();
+                          const c = city?.trim();
+                          const label = formatLocation(d, c);
+                          return (
+                            <span
+                              className="block truncate text-sm text-muted-foreground leading-snug"
+                              title={label}
+                            >
+                              {d && c ? (
+                                <>
+                                  <span className="font-medium text-foreground">{d}</span>
+                                  <span className="block text-xs text-muted-foreground">{c}</span>
+                                </>
+                              ) : (
+                                label
+                              )}
+                            </span>
+                          );
+                        })()}
                       </td>
 
                       {/* Category */}
