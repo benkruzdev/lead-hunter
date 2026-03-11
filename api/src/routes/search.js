@@ -52,20 +52,65 @@ function buildSearchQuery(province, district, category, keyword) {
 }
 
 /**
+ * Extract district (ilçe / subregion) from a Places API (New) place object.
+ *
+ * Priority order:
+ *   1. sublocality_level_1  — neighbourhood / mahalle inside an ilçe (common in city cores)
+ *   2. sublocality          — generic sublocality alias
+ *   3. administrative_area_level_3 — ilçe in most TR urban addresses
+ *   4. administrative_area_level_4 — ilçe in rural/small-settlement TR addresses
+ *   5. formattedAddress string parse  — "... Akyurt/Ankara, Türkiye" → "Akyurt"
+ *      Handles both:
+ *        a) "Balıkhisar, 06750 Akyurt/Ankara, Türkiye"  (slash in a comma segment)
+ *        b) "Akyurt/Ankara, Türkiye"                    (first segment has slash)
+ *
+ * Returns null only when genuinely unavailable.
+ * This function is global-ready: it is not hardcoded to Turkey — it uses address
+ * component types that Google returns for any country, with formattedAddress parsing
+ * as a last-resort heuristic that is harmless for non-TR addresses (they rarely have
+ * the "Name/Province" slash pattern).
+ */
+function extractDistrict(place) {
+    // ── 1–4: address component types ────────────────────────────────────────
+    if (Array.isArray(place.addressComponents)) {
+        const PRIORITY_TYPES = [
+            'sublocality_level_1',
+            'sublocality',
+            'administrative_area_level_3',
+            'administrative_area_level_4',
+        ];
+        for (const type of PRIORITY_TYPES) {
+            const comp = place.addressComponents.find(c => c.types?.includes(type));
+            if (comp?.longText) return comp.longText;
+        }
+    }
+
+    // ── 5: formattedAddress fallback — "District/Province" slash pattern ────
+    const addr = place.formattedAddress;
+    if (addr) {
+        // Split by comma; find the first segment containing a slash (e.g. "Akyurt/Ankara")
+        const segments = addr.split(',');
+        for (const seg of segments) {
+            const trimmed = seg.trim();
+            const slashIdx = trimmed.indexOf('/');
+            if (slashIdx > 0) {
+                // Take whatever is before the slash; strip leading numeric postal code if present
+                // e.g. "06750 Akyurt" → "Akyurt"
+                const beforeSlash = trimmed.slice(0, slashIdx).trim();
+                const withoutPostal = beforeSlash.replace(/^\d+\s+/, '');
+                if (withoutPostal.length > 0) return withoutPostal;
+            }
+        }
+    }
+
+    return null;
+}
+
+/**
  * Map a single Places API (New) place object to our frontend SearchResult shape.
  */
 function mapPlace(place) {
-    // Extract district from addressComponents (sublocality > admin_level_3 > fallback)
-    let district = null;
-    if (Array.isArray(place.addressComponents)) {
-        const sub = place.addressComponents.find(c =>
-            c.types?.includes('sublocality_level_1') || c.types?.includes('sublocality')
-        );
-        const admin3 = place.addressComponents.find(c =>
-            c.types?.includes('administrative_area_level_3')
-        );
-        district = sub?.longText || admin3?.longText || null;
-    }
+    const district = extractDistrict(place);
 
     // Phone: internationalPhoneNumber preferred
     const phone = place.internationalPhoneNumber || place.nationalPhoneNumber || null;
