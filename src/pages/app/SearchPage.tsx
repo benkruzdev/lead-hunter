@@ -39,7 +39,13 @@ import {
   Copy,
   Navigation,
   Zap,
+  Info,
 } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import {
   Sheet,
   SheetContent,
@@ -90,24 +96,54 @@ const enrichmentPotentialConfig: Record<EnrichmentPotentialKey, { label: string;
   noEnrichmentSource:  { label: "Ek Veri Kaynağı Yok",   className: "bg-gray-100 text-gray-400 border-gray-200" },
 };
 
-// ─── Business signal badges (max 2) ─────────────────────────────────────────
+// ── Lead Potansiyeli: deterministik 0-100 skor ────────────────────────────
+// A) Yorum hacmi: max 45
+function reviewScore(reviews: number | null | undefined): number {
+  const r = reviews ?? 0;
+  if (r >= 1000) return 45;
+  if (r >= 250)  return 40;
+  if (r >= 100)  return 30;
+  if (r >= 25)   return 18;
+  if (r >= 1)    return 8;
+  return 0;
+}
+// B) Puan: max 30
+function ratingScore(rating: number | null | undefined): number {
+  const v = rating ?? 0;
+  if (v >= 4.6) return 30;
+  if (v >= 4.3) return 24;
+  if (v >= 4.0) return 18;
+  if (v >= 3.5) return 10;
+  return 0;
+}
+// C) Website: max 15  D) Telefon: max 10
+function computeLeadScore(item: SearchResult): number {
+  return (
+    reviewScore(item.reviews) +
+    ratingScore(item.rating) +
+    (item.website ? 15 : 0) +
+    (item.phone   ? 10 : 0)
+  );
+}
+
+type LeadLevelKey = "high" | "mid" | "low";
+function getLeadLevel(score: number): LeadLevelKey {
+  if (score >= 80) return "high";
+  if (score >= 55) return "mid";
+  return "low";
+}
+const leadLevelConfig: Record<LeadLevelKey, { label: string; className: string }> = {
+  high: { label: "Yüksek", className: "bg-emerald-50 text-emerald-700 border-emerald-200" },
+  mid:  { label: "Orta",   className: "bg-amber-50 text-amber-700 border-amber-200" },
+  low:  { label: "Düşük",  className: "bg-gray-100 text-gray-500 border-gray-200" },
+};
+
+// ── Business signal badge: sadeleştirildi (Açık/Kapalı) ────────────────────
 interface SignalBadge { label: string; className: string }
 
 function getBusinessBadges(item: SearchResult): SignalBadge[] {
-  const badges: SignalBadge[] = [];
-  if (item.isOpen) {
-    badges.push({ label: "Açık", className: "bg-green-50 text-green-700 border-green-200" });
-  } else {
-    badges.push({ label: "Kapalı", className: "bg-gray-100 text-gray-500 border-gray-200" });
-  }
-  if (item.rating >= 4.5) {
-    badges.push({ label: "Yüksek Puan", className: "bg-amber-50 text-amber-700 border-amber-200" });
-  } else if (item.reviews >= 100) {
-    badges.push({ label: "Çok Yorumlu", className: "bg-blue-50 text-blue-700 border-blue-200" });
-  } else if (item.website) {
-    badges.push({ label: "Website Var", className: "bg-indigo-50 text-indigo-700 border-indigo-200" });
-  }
-  return badges.slice(0, 2);
+  if (item.isOpen) return [{ label: "Açık",   className: "bg-green-50 text-green-700 border-green-200" }];
+  return               [{ label: "Kapalı", className: "bg-gray-100 text-gray-500 border-gray-200" }];
 }
 
 // ─── Component ───────────────────────────────────────────────────────────────
@@ -638,6 +674,26 @@ export default function SearchPage() {
                   <th className="text-left p-4 font-medium text-muted-foreground">Kategori</th>
                   <th className="text-left p-4 font-medium text-muted-foreground">Puan</th>
                   <th className="text-left p-4 font-medium text-muted-foreground">Yorum</th>
+                  <th className="text-left p-4 font-medium text-muted-foreground">
+                    <span className="flex items-center gap-1">
+                      Lead Potansiyeli
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Info className="w-3.5 h-3.5 text-muted-foreground/60 cursor-help" />
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="max-w-[220px] text-xs space-y-1">
+                          <p className="font-semibold">Lead Potansiyeli</p>
+                          <p>Görünen sinyallere göre önceliklendirme skoru (0–100). Satış garantisi değildir.</p>
+                          <ul className="mt-1 space-y-0.5 text-muted-foreground">
+                            <li>Yorum hacmi — %45</li>
+                            <li>Puan — %30</li>
+                            <li>Website — %15</li>
+                            <li>Telefon — %10</li>
+                          </ul>
+                        </TooltipContent>
+                      </Tooltip>
+                    </span>
+                  </th>
                   <th className="text-left p-4 font-medium text-muted-foreground">İletişim</th>
                   <th className="text-left p-4 font-medium text-muted-foreground">Ek İletişim</th>
                   <th className="text-left p-4 font-medium text-muted-foreground">Website</th>
@@ -649,6 +705,8 @@ export default function SearchPage() {
                   const badges = getBusinessBadges(item);
                   const contactStatus = contactStatusConfig[getContactStatus(item)];
                   const enrichmentPotential = enrichmentPotentialConfig[getEnrichmentPotential(item)];
+                  const leadScore = computeLeadScore(item);
+                  const leadLevel = leadLevelConfig[getLeadLevel(leadScore)];
                   const websiteDisplay = item.website
                     ? item.website.replace(/^https?:\/\//, "").replace(/\/$/, "").slice(0, 24)
                     : null;
@@ -702,6 +760,29 @@ export default function SearchPage() {
                       {/* Reviews */}
                       <td className="p-4 text-muted-foreground whitespace-nowrap">
                         {typeof item.reviews === "number" ? item.reviews.toLocaleString() : "—"}
+                      </td>
+
+                      {/* Lead Potansiyeli skoru */}
+                      <td className="p-4 whitespace-nowrap">
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium cursor-default ${leadLevel.className}`}>
+                              {leadScore}
+                              <span className="font-normal opacity-70">{leadLevel.label}</span>
+                              <Info className="w-3 h-3 opacity-50" />
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent side="top" className="max-w-[220px] text-xs space-y-1">
+                            <p className="font-semibold">Lead Potansiyeli: {leadScore}/100</p>
+                            <p>Görünen sinyallere göre önceliklendirme skoru. Satış garantisi değildir.</p>
+                            <ul className="mt-1 space-y-0.5 text-muted-foreground">
+                              <li>Yorum hacmi — %45</li>
+                              <li>Puan — %30</li>
+                              <li>Website — %15</li>
+                              <li>Telefon — %10</li>
+                            </ul>
+                          </TooltipContent>
+                        </Tooltip>
                       </td>
 
                       {/* Contact status — mevcut veri */}
