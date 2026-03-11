@@ -11,7 +11,13 @@ import {
     Star,
     BookOpen,
     AlertCircle,
+    Info,
 } from "lucide-react";
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipTrigger,
+} from "@/components/ui/tooltip";
 import {
     Select,
     SelectContent,
@@ -38,53 +44,78 @@ function formatSessionLocation(
     return "—";
 }
 
-// ─── Deterministic usage-signal helper ────────────────────────────────────────
+// ─── Two-axis scoring model ────────────────────────────────────────────────────
 //
-// Signal is derived solely from observable session data — no randomness.
-// Returns a key consumed by i18n for label + one of the badge class sets.
+// Two independent axes derived solely from observable session data:
+//   scopeScore  (0–10) — how wide the search was     → based on total_results
+//   depthScore  (0–10) — how deeply it was explored  → based on viewed_pages.length
 //
+// Both are step functions: deliberately coarse so minor noise does not flip the badge.
+// Badge is determined by the dominant axis first; if both are elevated, a combined
+// variant is awarded. All 6 outcomes are fully deterministic.
+//
+// Badge keys:
+//   deepExploration    — high depth, any scope        (depth-dominant)
+//   wideAndDeep        — high scope + high depth      (both elevated)
+//   broadSearch        — high scope, low-mid depth
+//   broadAndExplored    — high scope + mid depth       (wide + 2 pages)
+//   narrowTarget       — very low scope (niche / tight search)
+//   quickScan          — baseline (mid scope, single-page view)
+
 type SignalKey =
-    | "deeplyExplored"
-    | "broadResultSet"
-    | "narrowSearch"
-    | "standardSearch";
+    | "deepExploration"
+    | "wideAndDeep"
+    | "broadSearch"
+    | "broadAndExplored"
+    | "narrowTarget"
+    | "quickScan";
 
 interface UsageSignal {
     key: SignalKey;
     className: string;
+    scopeScore: number;
+    depthScore: number;
+}
+
+/** Scope score: 0–10 step function based on total_results. */
+function computeScopeScore(total: number): number {
+    if (total > 100) return 10;
+    if (total > 40)  return 7;
+    if (total > 15)  return 5;
+    if (total > 5)   return 3;
+    return 1;
+}
+
+/** Depth score: 0–10 step function based on pages viewed. */
+function computeDepthScore(pages: number): number {
+    if (pages >= 4)  return 10;
+    if (pages === 3) return 8;
+    if (pages === 2) return 5;
+    return 2; // 1 page (minimum — always at least the initial search page)
 }
 
 function getUsageSignal(session: SearchSession): UsageSignal {
-    const pagesViewed = session.viewed_pages.length;
-    const total = session.total_results;
+    const scopeScore = computeScopeScore(session.total_results);
+    const depthScore = computeDepthScore(session.viewed_pages.length);
 
-    // Deeply explored: viewed 3+ pages
-    if (pagesViewed >= 3) {
-        return {
-            key: "deeplyExplored",
-            className: "bg-violet-50 text-violet-700 border-violet-200",
-        };
+    if (depthScore >= 8 && scopeScore >= 7) {
+        return { key: "wideAndDeep",         scopeScore, depthScore, className: "bg-violet-50 text-violet-700 border-violet-200" };
     }
-    // Broad result set: >40 results
-    if (total > 40) {
-        return {
-            key: "broadResultSet",
-            className: "bg-blue-50 text-blue-700 border-blue-200",
-        };
+    if (depthScore >= 8) {
+        return { key: "deepExploration",     scopeScore, depthScore, className: "bg-violet-50 text-violet-700 border-violet-200" };
     }
-    // Narrow / targeted search: ≤10 results
-    if (total <= 10) {
-        return {
-            key: "narrowSearch",
-            className: "bg-amber-50 text-amber-700 border-amber-200",
-        };
+    if (scopeScore >= 7 && depthScore >= 5) {
+        return { key: "broadAndExplored",  scopeScore, depthScore, className: "bg-emerald-50 text-emerald-700 border-emerald-200" };
     }
-    // Default: standard / mid-range search
-    return {
-        key: "standardSearch",
-        className: "bg-emerald-50 text-emerald-700 border-emerald-200",
-    };
+    if (scopeScore >= 7) {
+        return { key: "broadSearch",         scopeScore, depthScore, className: "bg-blue-50 text-blue-700 border-blue-200" };
+    }
+    if (scopeScore <= 1) {
+        return { key: "narrowTarget",        scopeScore, depthScore, className: "bg-amber-50 text-amber-700 border-amber-200" };
+    }
+    return         { key: "quickScan",       scopeScore, depthScore, className: "bg-gray-100 text-gray-500 border-gray-200" };
 }
+
 
 // ─── Sort types ───────────────────────────────────────────────────────────────
 type SortKey = "newest" | "mostExplored";
@@ -239,12 +270,36 @@ export default function SearchHistoryPage() {
                                             <Tag className="w-3.5 h-3.5 shrink-0" />
                                             <span className="truncate">{session.category}</span>
                                         </div>
-                                        {/* Usage signal badge */}
-                                        <span
-                                            className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium leading-none ${signal.className}`}
-                                        >
-                                            {t(`searchHistory.signal.${signal.key}`)}
-                                        </span>
+                                        {/* Usage signal badge with tooltip */}
+                                        <Tooltip>
+                                            <TooltipTrigger asChild>
+                                                <span
+                                                    className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium leading-none cursor-default ${signal.className}`}
+                                                >
+                                                    {t(`searchHistory.signal.${signal.key}`)}
+                                                    <Info className="w-3 h-3 opacity-50" />
+                                                </span>
+                                            </TooltipTrigger>
+                                            <TooltipContent side="top" className="max-w-[240px] text-xs space-y-1.5">
+                                                <p className="font-semibold">
+                                                    {t(`searchHistory.signal.${signal.key}`)}
+                                                </p>
+                                                <p className="text-muted-foreground leading-snug">
+                                                    {t(`searchHistory.signalTooltip.${signal.key}`, {
+                                                        scope: signal.scopeScore,
+                                                        depth: signal.depthScore,
+                                                        results: session.total_results.toLocaleString(),
+                                                        pages: session.viewed_pages.length,
+                                                    })}
+                                                </p>
+                                                <p className="text-muted-foreground/70 text-[10px] leading-snug border-t pt-1">
+                                                    {t("searchHistory.signalScoreLabel", {
+                                                        scope: signal.scopeScore,
+                                                        depth: signal.depthScore,
+                                                    })}
+                                                </p>
+                                            </TooltipContent>
+                                        </Tooltip>
                                     </div>
 
                                     {/* Secondary: keyword (if present) */}
