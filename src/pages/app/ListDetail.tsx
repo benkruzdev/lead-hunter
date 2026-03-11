@@ -334,17 +334,16 @@ export default function ListDetail() {
   };
 
   const handleBulkEnrich = async () => {
-    // If items are selected, use them; otherwise fall back to all enrichment-eligible items.
-    const candidates =
+    // Pool: selected items if any, otherwise all items in the list.
+    const pool =
       selectedItemIds.length > 0
-        ? items.filter(
-            (item) =>
-              selectedItemIds.includes(item.id) && item.enrichment_status == null
-          )
-        : items.filter((item) => item.enrichment_status == null && !!item.website);
+        ? items.filter((item) => selectedItemIds.includes(item.id))
+        : items;
+
+    // From the pool, only process enrichment-eligible items.
+    const candidates = pool.filter(isEnrichmentEligible);
 
     if (candidates.length === 0) {
-      // Nothing eligible — no-op, clear selection if any
       setSelectedItemIds([]);
       return;
     }
@@ -490,13 +489,13 @@ export default function ListDetail() {
     visibleItems.length > 0 &&
     visibleItems.every((i) => selectedItemIds.includes(i.id));
 
-  // How many items are eligible for enrichment from the header button's perspective
+  // Eligible count for the header Enrich button — mirrors handleBulkEnrich pool logic.
   const headerEnrichCount =
     selectedItemIds.length > 0
       ? items.filter(
-          (i) => selectedItemIds.includes(i.id) && i.enrichment_status == null
+          (i) => selectedItemIds.includes(i.id) && isEnrichmentEligible(i)
         ).length
-      : items.filter((i) => i.enrichment_status == null && !!i.website).length;
+      : items.filter(isEnrichmentEligible).length;
 
   // ─────────────────────────────────────────────
   // Render helpers
