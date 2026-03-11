@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import * as XLSX from "xlsx";
 import { useParams, Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
@@ -58,7 +59,6 @@ import {
   bulkUpdateListItems,
   bulkDeleteListItems,
   enrichLeadListItem,
-  createExport,
   getSearchCreditCost,
   LeadListItem,
 } from "@/lib/api";
@@ -427,13 +427,104 @@ export default function ListDetail() {
     }
   };
 
-  const handleExport = async () => {
-    if (!listId) return;
+  const handleExport = () => {
+    if (!items.length) return;
     try {
       setIsExporting(true);
       setExportError(null);
-      const result = await createExport(listId, exportFormat, exportNote || undefined);
-      window.location.href = result.downloadUrl;
+
+      // ── Shared helpers ─────────────────────────────────────────────
+      const statusLabel = (item: LeadListItem): string => {
+        if (item.enrichment_status === "success") return "Details Found";
+        if (item.enrichment_status === "failed") return "No Source";
+        if (hasContactData(item)) return "Partial Data";
+        return "Missing Data";
+      };
+      const socialLabel = (item: LeadListItem): string => {
+        if (!item.social_links) return "";
+        return Object.entries(item.social_links)
+          .filter(([, v]) => v)
+          .map(([k, v]) => `${k}:${v}`)
+          .join(" | ");
+      };
+
+      const HEADERS = [
+        "Name", "Category", "District", "Province",
+        "Potential Score", "Status", "Rating", "Review Count",
+        "Phone", "Website", "Email", "Social Links", "Note", "Tags",
+      ];
+
+      const buildRow = (item: LeadListItem) => ([
+        item.name ?? "",
+        getCategory(item),
+        getDistrict(item),
+        getProvince(item),
+        computeScore(item),                                    // number for XLSX
+        statusLabel(item),
+        item.rating ?? "",
+        item.reviews_count ?? "",
+        item.phone ?? "",
+        item.website ?? "",
+        item.email ?? "",
+        socialLabel(item),
+        item.note ?? "",
+        (item.tags ?? []).join(", "),
+      ]);
+
+      const safeName = (listName ?? "leads").replace(/[^a-z0-9_\-]/gi, "_");
+      const trigger = (blob: Blob, filename: string) => {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filename;
+        a.click();
+        URL.revokeObjectURL(url);
+      };
+
+      if (exportFormat === "csv") {
+        // ── CSV (RFC 4180 + UTF-8 BOM) ─────────────────────────────────
+        const esc = (v: string | number) => {
+          const s = String(v);
+          return /[,"\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+        };
+        const line = (cols: (string | number)[]) => cols.map(esc).join(",");
+        const csv = [line(HEADERS), ...items.map(buildRow).map(line)].join("\r\n");
+        trigger(
+          new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" }),
+          `${safeName}.csv`
+        );
+      } else {
+        // ── XLSX (SheetJS workbook) ───────────────────────────────────
+        const wb = XLSX.utils.book_new();
+        const wsData = [HEADERS, ...items.map(buildRow)];
+        const ws = XLSX.utils.aoa_to_sheet(wsData);
+
+        // Bold header row
+        const range = XLSX.utils.decode_range(ws["!ref"] ?? "A1");
+        for (let c = range.s.c; c <= range.e.c; c++) {
+          const addr = XLSX.utils.encode_cell({ r: 0, c });
+          if (!ws[addr]) continue;
+          ws[addr].s = { font: { bold: true } };
+        }
+
+        // Autofilter on header row
+        ws["!autofilter"] = { ref: ws["!ref"] ?? "A1" };
+
+        // Freeze first row
+        ws["!freeze"] = { xSplit: 0, ySplit: 1, topLeftCell: "A2", activePane: "bottomLeft" } as any;
+
+        // Column widths (chars)
+        const COL_WIDTHS = [30, 20, 16, 16, 14, 16, 8, 12, 18, 32, 28, 40, 32, 24];
+        ws["!cols"] = COL_WIDTHS.map((wch) => ({ wch }));
+
+        XLSX.utils.book_append_sheet(wb, ws, "Leads");
+        const buf = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+        trigger(
+          new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }),
+          `${safeName}.xlsx`
+        );
+      }
+
       setShowExportDialog(false);
       setExportFormat("csv");
       setExportNote("");
