@@ -334,16 +334,22 @@ export default function ListDetail() {
   };
 
   const handleBulkEnrich = async () => {
-    const ids = selectedItemIds
-      .map((id) => items.find((item) => item.id === id))
-      .filter((item) => item && item.enrichment_status == null)
-      .map((item) => item!.id);
+    // If items are selected, use them; otherwise fall back to all enrichment-eligible items.
+    const candidates =
+      selectedItemIds.length > 0
+        ? items.filter(
+            (item) =>
+              selectedItemIds.includes(item.id) && item.enrichment_status == null
+          )
+        : items.filter((item) => item.enrichment_status == null && !!item.website);
 
-    if (ids.length === 0) {
+    if (candidates.length === 0) {
+      // Nothing eligible — no-op, clear selection if any
       setSelectedItemIds([]);
       return;
     }
 
+    const ids = candidates.map((item) => item.id);
     setIsBulkEnriching(true);
     setBulkEnrichProgress({ done: 0, total: ids.length });
     for (let i = 0; i < ids.length; i++) {
@@ -484,6 +490,14 @@ export default function ListDetail() {
     visibleItems.length > 0 &&
     visibleItems.every((i) => selectedItemIds.includes(i.id));
 
+  // How many items are eligible for enrichment from the header button's perspective
+  const headerEnrichCount =
+    selectedItemIds.length > 0
+      ? items.filter(
+          (i) => selectedItemIds.includes(i.id) && i.enrichment_status == null
+        ).length
+      : items.filter((i) => i.enrichment_status == null && !!i.website).length;
+
   // ─────────────────────────────────────────────
   // Render helpers
   // ─────────────────────────────────────────────
@@ -593,14 +607,14 @@ export default function ListDetail() {
               variant="outline"
               size="sm"
               onClick={handleBulkEnrich}
-              disabled={isBulkEnriching}
+              disabled={isBulkEnriching || headerEnrichCount === 0}
             >
               <Zap className="w-4 h-4" />
               {isBulkEnriching && bulkEnrichProgress
                 ? `${bulkEnrichProgress.done}/${bulkEnrichProgress.total}`
                 : selectedItemIds.length > 0
-                ? t("listDetail.enrichSelected", { count: selectedItemIds.length })
-                : t("listDetail.bulkEnrich")}
+                ? t("listDetail.enrichSelected", { count: headerEnrichCount })
+                : t("listDetail.enrichAll", { count: headerEnrichCount })}
             </Button>
             <Button variant="outline" size="sm" onClick={() => setShowExportDialog(true)}>
               <FileDown className="w-4 h-4" />
