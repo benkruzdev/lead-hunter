@@ -164,6 +164,108 @@ function computeMetrics(items: LeadListItem[]) {
 }
 
 // ─────────────────────────────────────────────
+// Export helpers (component-external)
+// ─────────────────────────────────────────────
+
+const KNOWN_PLATFORMS = ["instagram", "facebook", "youtube", "tiktok", "linkedin"] as const;
+
+function exportStatusLabel(item: LeadListItem): string {
+  if (item.enrichment_status === "success") return "Details Found";
+  if (item.enrichment_status === "failed") return "No Source";
+  if (hasContactData(item)) return "Partial Data";
+  return "Missing Data";
+}
+
+function exportSocialCombined(item: LeadListItem): string {
+  if (!item.social_links) return "";
+  return Object.entries(item.social_links)
+    .filter(([, v]) => v)
+    .map(([k, v]) => `${k}:${v}`)
+    .join(" | ");
+}
+
+function exportSocialPlatform(item: LeadListItem, platform: string): string {
+  return (item.social_links as any)?.[platform] ?? "";
+}
+
+function exportOtherSocial(item: LeadListItem): string {
+  if (!item.social_links) return "";
+  return Object.entries(item.social_links)
+    .filter(([k, v]) => v && !KNOWN_PLATFORMS.includes(k as any))
+    .map(([k, v]) => `${k}:${v}`)
+    .join(" | ");
+}
+
+export const COMPACT_HEADERS = [
+  "Name", "Category", "District", "Province",
+  "Potential Score", "Status",
+  "Phone", "Website", "Email", "Social Links",
+  "Note", "Tags",
+];
+
+export const FULL_HEADERS = [
+  "Name", "Category", "District", "Province", "Address", "Hours",
+  "Potential Score", "Score Tier", "Status", "Enrichment Status",
+  "Rating", "Review Count",
+  "Phone", "Website", "Email",
+  "Instagram", "Facebook", "Youtube", "Tiktok", "Linkedin",
+  "Other Social Links", "Social Links Combined",
+  "Has Contact Data", "Enrichment Eligible",
+  "Note", "Tags",
+  "Created At", "Updated At",
+];
+
+function buildCompactRow(item: LeadListItem): (string | number)[] {
+  return [
+    item.name ?? "",
+    getCategory(item),
+    getDistrict(item),
+    getProvince(item),
+    computeScore(item),
+    exportStatusLabel(item),
+    item.phone ?? "",
+    item.website ?? "",
+    item.email ?? "",
+    exportSocialCombined(item),
+    item.note ?? "",
+    (item.tags ?? []).join(", "),
+  ];
+}
+
+function buildFullRow(item: LeadListItem): (string | number)[] {
+  const score = computeScore(item);
+  return [
+    item.name ?? "",
+    getCategory(item),
+    getDistrict(item),
+    getProvince(item),
+    getAddress(item),
+    getHours(item),
+    score,
+    scoreTier(score),
+    exportStatusLabel(item),
+    item.enrichment_status ?? "",
+    item.rating ?? "",
+    item.reviews_count ?? "",
+    item.phone ?? "",
+    item.website ?? "",
+    item.email ?? "",
+    ...KNOWN_PLATFORMS.map((p) => exportSocialPlatform(item, p)),
+    exportOtherSocial(item),
+    exportSocialCombined(item),
+    hasContactData(item) ? "yes" : "no",
+    isEnrichmentEligible(item) ? "yes" : "no",
+    item.note ?? "",
+    (item.tags ?? []).join(", "),
+    item.created_at ?? "",
+    item.updated_at ?? "",
+  ];
+}
+
+const COMPACT_COL_WIDTHS = [30, 20, 16, 16, 14, 16, 18, 32, 28, 40, 32, 24];
+const FULL_COL_WIDTHS    = [30, 20, 16, 16, 32, 24, 14, 10, 16, 18, 8, 12, 18, 32, 28, 22, 22, 22, 20, 22, 30, 40, 12, 18, 32, 24, 22, 22];
+
+// ─────────────────────────────────────────────
 // Component
 // ─────────────────────────────────────────────
 
@@ -221,6 +323,7 @@ export default function ListDetail() {
   // Export state
   const [showExportDialog, setShowExportDialog] = useState(false);
   const [exportFormat, setExportFormat] = useState<"csv" | "xlsx">("csv");
+  const [exportScope, setExportScope] = useState<"compact" | "full">("full");
   const [exportNote, setExportNote] = useState("");
   const [isExporting, setIsExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
@@ -433,45 +536,11 @@ export default function ListDetail() {
       setIsExporting(true);
       setExportError(null);
 
-      // ── Shared helpers ─────────────────────────────────────────────
-      const statusLabel = (item: LeadListItem): string => {
-        if (item.enrichment_status === "success") return "Details Found";
-        if (item.enrichment_status === "failed") return "No Source";
-        if (hasContactData(item)) return "Partial Data";
-        return "Missing Data";
-      };
-      const socialLabel = (item: LeadListItem): string => {
-        if (!item.social_links) return "";
-        return Object.entries(item.social_links)
-          .filter(([, v]) => v)
-          .map(([k, v]) => `${k}:${v}`)
-          .join(" | ");
-      };
-
-      const HEADERS = [
-        "Name", "Category", "District", "Province",
-        "Potential Score", "Status", "Rating", "Review Count",
-        "Phone", "Website", "Email", "Social Links", "Note", "Tags",
-      ];
-
-      const buildRow = (item: LeadListItem) => ([
-        item.name ?? "",
-        getCategory(item),
-        getDistrict(item),
-        getProvince(item),
-        computeScore(item),                                    // number for XLSX
-        statusLabel(item),
-        item.rating ?? "",
-        item.reviews_count ?? "",
-        item.phone ?? "",
-        item.website ?? "",
-        item.email ?? "",
-        socialLabel(item),
-        item.note ?? "",
-        (item.tags ?? []).join(", "),
-      ]);
-
+      const headers  = exportScope === "full" ? FULL_HEADERS  : COMPACT_HEADERS;
+      const buildRow = exportScope === "full" ? buildFullRow  : buildCompactRow;
+      const colWidths = exportScope === "full" ? FULL_COL_WIDTHS : COMPACT_COL_WIDTHS;
       const safeName = (listName ?? "leads").replace(/[^a-z0-9_\-]/gi, "_");
+
       const trigger = (blob: Blob, filename: string) => {
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
@@ -482,21 +551,19 @@ export default function ListDetail() {
       };
 
       if (exportFormat === "csv") {
-        // ── CSV (RFC 4180 + UTF-8 BOM) ─────────────────────────────────
         const esc = (v: string | number) => {
           const s = String(v);
           return /[,"\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
         };
         const line = (cols: (string | number)[]) => cols.map(esc).join(",");
-        const csv = [line(HEADERS), ...items.map(buildRow).map(line)].join("\r\n");
+        const csv = [line(headers), ...items.map(buildRow).map(line)].join("\r\n");
         trigger(
           new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" }),
           `${safeName}.csv`
         );
       } else {
-        // ── XLSX (SheetJS workbook) ───────────────────────────────────
         const wb = XLSX.utils.book_new();
-        const wsData = [HEADERS, ...items.map(buildRow)];
+        const wsData = [headers, ...items.map(buildRow)];
         const ws = XLSX.utils.aoa_to_sheet(wsData);
 
         // Bold header row
@@ -506,16 +573,9 @@ export default function ListDetail() {
           if (!ws[addr]) continue;
           ws[addr].s = { font: { bold: true } };
         }
-
-        // Autofilter on header row
         ws["!autofilter"] = { ref: ws["!ref"] ?? "A1" };
-
-        // Freeze first row
         ws["!freeze"] = { xSplit: 0, ySplit: 1, topLeftCell: "A2", activePane: "bottomLeft" } as any;
-
-        // Column widths (chars)
-        const COL_WIDTHS = [30, 20, 16, 16, 14, 16, 8, 12, 18, 32, 28, 40, 32, 24];
-        ws["!cols"] = COL_WIDTHS.map((wch) => ({ wch }));
+        ws["!cols"] = colWidths.map((wch) => ({ wch }));
 
         XLSX.utils.book_append_sheet(wb, ws, "Leads");
         const buf = XLSX.write(wb, { bookType: "xlsx", type: "array" });
@@ -1431,7 +1491,7 @@ export default function ListDetail() {
           open={showExportDialog}
           onOpenChange={(open) => {
             setShowExportDialog(open);
-            if (!open) { setExportFormat("csv"); setExportNote(""); setExportError(null); }
+            if (!open) { setExportFormat("csv"); setExportScope("full"); setExportNote(""); setExportError(null); }
           }}
         >
           <DialogContent>
@@ -1440,6 +1500,42 @@ export default function ListDetail() {
               <DialogDescription>{t("exports.dialogDescription")}</DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
+              {/* Scope selector */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Export Type</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setExportScope("full")}
+                    className={`rounded-lg border px-3 py-2.5 text-left text-sm transition-colors ${
+                      exportScope === "full"
+                        ? "border-primary bg-primary/5 text-primary"
+                        : "border-border bg-background text-muted-foreground hover:border-muted-foreground"
+                    }`}
+                  >
+                    <div className="font-medium">Full Export</div>
+                    <div className="text-xs mt-0.5 opacity-75">Ekranda görülebilen detay alanlarını da içerir.</div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setExportScope("compact")}
+                    className={`rounded-lg border px-3 py-2.5 text-left text-sm transition-colors ${
+                      exportScope === "compact"
+                        ? "border-primary bg-primary/5 text-primary"
+                        : "border-border bg-background text-muted-foreground hover:border-muted-foreground"
+                    }`}
+                  >
+                    <div className="font-medium">Compact Export</div>
+                    <div className="text-xs mt-0.5 opacity-75">CRM ve paylaşım için sade kolon seti.</div>
+                  </button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {exportScope === "full"
+                    ? `${FULL_HEADERS.length} columns — name, location, score, enrichment, contact, social, notes, tags, timestamps`
+                    : `${COMPACT_HEADERS.length} columns — name, location, score, status, contact, notes, tags`}
+                </p>
+              </div>
+              {/* Format selector */}
               <div className="space-y-2">
                 <label className="text-sm font-medium">{t("exports.format")}</label>
                 <Select
@@ -1461,7 +1557,7 @@ export default function ListDetail() {
                   placeholder={t("exports.note")}
                   value={exportNote}
                   onChange={(e) => setExportNote(e.target.value)}
-                  rows={3}
+                  rows={2}
                 />
               </div>
               {exportError && (
