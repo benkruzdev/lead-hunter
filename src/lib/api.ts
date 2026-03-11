@@ -1194,6 +1194,7 @@ export async function createAdminPackage(data: {
     price_try: number;
     price_usd: number;
     is_active?: boolean;
+    is_featured?: boolean;
     sort_order?: number;
     description?: string | null;
     features?: string[] | null;

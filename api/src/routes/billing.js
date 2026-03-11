@@ -75,11 +75,9 @@ async function patchOrderFailureNote(supabase, orderId, reason, failureCode = nu
 // ---------------------------------------------------------------------------
 router.get('/packages', async (req, res) => {
     try {
-        const lang = req.headers['accept-language']?.startsWith('en') ? 'en' : 'tr';
-
         const { data: packages, error } = await supabaseAdmin
             .from('credit_packages')
-            .select('id, name, display_name_tr, display_name_en, credits, price_try, price_usd, sort_order')
+            .select('id, name, display_name_tr, display_name_en, credits, price_try, price_usd, is_active, is_featured, sort_order, description, features')
             .eq('is_active', true)
             .order('sort_order', { ascending: true });
 
@@ -88,16 +86,11 @@ router.get('/packages', async (req, res) => {
             return res.status(500).json({ error: 'Failed to fetch credit packages' });
         }
 
-        const formattedPackages = packages.map(pkg => ({
-            id: pkg.id,
-            name: pkg.name,
-            displayName: lang === 'en' ? pkg.display_name_en : pkg.display_name_tr,
-            credits: pkg.credits,
-            price: pkg.price_try,
-            currency: 'TRY',
-        }));
-
-        res.json({ packages: formattedPackages });
+        // Return raw snake_case fields so the frontend normalizer can handle
+        // localization, pricing context, and featured badge correctly.
+        // is_featured, description, and features are intentionally included so
+        // the public billing page can render them without inferring from position.
+        res.json({ packages });
     } catch (err) {
         console.error('[Billing] Error:', err);
         res.status(500).json({ error: 'Internal server error' });
