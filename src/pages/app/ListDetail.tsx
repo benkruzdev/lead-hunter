@@ -196,6 +196,50 @@ function exportOtherSocial(item: LeadListItem): string {
     .join(" | ");
 }
 
+/**
+ * Parse district and province from a formatted address string.
+ * Handles the common Turkish pattern: "... 41000 İzmit/Kocaeli, Türkiye"
+ * Returns { district, province } — either or both may be empty string.
+ */
+function parseLocationFromAddress(address: string): { district: string; province: string } {
+  if (!address) return { district: "", province: "" };
+
+  // Match the canonical TR pattern: "PostalCode? District/Province, Türkiye"
+  // e.g. "41000 İzmit/Kocaeli, Türkiye" or "Kadıköy/İstanbul, Türkiye"
+  const slashMatch = address.match(
+    /(?:\d{4,6}\s+)?([\w\u00C0-\u024F\s]+?)\/([\w\u00C0-\u024F\s]+?)(?:,\s*Türkiye)?$/i
+  );
+  if (slashMatch) {
+    const district = slashMatch[1].trim();
+    const province = slashMatch[2].trim();
+    // Sanity: reject obvious non-location tokens
+    if (district && province && province.toLowerCase() !== "türkiye") {
+      return { district, province };
+    }
+  }
+
+  return { district: "", province: "" };
+}
+
+/** District with address-parse fallback. */
+function exportDistrict(item: LeadListItem): string {
+  const r = raw(item);
+  return (
+    r.district ??
+    r.subregion ??
+    parseLocationFromAddress(getAddress(item)).district ??
+    ""
+  );
+}
+
+/** Province with address-parse fallback. */
+function exportProvince(item: LeadListItem): string {
+  const r = raw(item);
+  const direct = r.province ?? r.city;
+  if (direct) return direct;
+  return parseLocationFromAddress(getAddress(item)).province ?? "";
+}
+
 export const COMPACT_HEADERS = [
   "Name", "Category", "District", "Province",
   "Potential Score", "Status",
@@ -219,8 +263,8 @@ function buildCompactRow(item: LeadListItem): (string | number)[] {
   return [
     item.name ?? "",
     getCategory(item),
-    getDistrict(item),
-    getProvince(item),
+    exportDistrict(item),
+    exportProvince(item),
     computeScore(item),
     exportStatusLabel(item),
     item.phone ?? "",
@@ -237,8 +281,8 @@ function buildFullRow(item: LeadListItem): (string | number)[] {
   return [
     item.name ?? "",
     getCategory(item),
-    getDistrict(item),
-    getProvince(item),
+    exportDistrict(item),
+    exportProvince(item),
     getAddress(item),
     getHours(item),
     score,
