@@ -998,10 +998,20 @@ export async function getCreditPackages(): Promise<{
     packages: Array<{
         id: string;
         name: string;
-        displayName: string;
+        // Real backend fields (snake_case from admin source of truth)
+        display_name_tr: string;
+        display_name_en: string;
         credits: number;
-        price: number;
-        currency: string;
+        price_try: number;
+        price_usd: number;
+        description: string | null;
+        features: string[] | null;
+        is_active: boolean;
+        sort_order: number;
+        // Legacy camelCase aliases (may be present in older backend versions)
+        displayName?: string;
+        price?: number;
+        currency?: string;
     }>;
 }> {
     return apiRequest('/api/billing/packages');

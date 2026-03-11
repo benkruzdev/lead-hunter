@@ -310,7 +310,7 @@ export default function AdminPackagesPage() {
                     {/* Backdrop */}
                     <div className="flex-1 bg-black/40" onClick={closeForm} />
                     {/* Panel */}
-                    <div className="w-full max-w-lg bg-background border-l shadow-xl flex flex-col overflow-y-auto">
+                    <div className="w-full max-w-lg bg-background border-l shadow-xl flex flex-col h-full">
                         <div className="flex items-center justify-between px-6 py-4 border-b">
                             <h3 className="font-semibold text-lg">
                                 {editingId ? "Paketi Düzenle" : "Yeni Paket"}
@@ -320,7 +320,7 @@ export default function AdminPackagesPage() {
                             </button>
                         </div>
 
-                        <div className="flex-1 p-6 space-y-5">
+                        <div className="flex-1 overflow-y-auto p-6 space-y-5">
                             {/* Internal name */}
                             <Field label="Dahili Ad (name)" required>
                                 <input
@@ -423,12 +423,12 @@ export default function AdminPackagesPage() {
 
                             {/* Description */}
                             <Field label="Açıklama (opsiyonel)">
-                                <input
-                                    type="text"
+                                <textarea
+                                    rows={2}
                                     value={form.description}
                                     onChange={e => handleField("description", e.target.value)}
                                     placeholder="Küçük ekipler için ideal başlangıç paketi"
-                                    className="field-input"
+                                    className="field-input resize-none"
                                 />
                             </Field>
 
