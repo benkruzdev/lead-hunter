@@ -18,6 +18,7 @@ const EMPTY_FORM = {
     price_usd: "",
     sort_order: "0",
     is_active: true,
+    is_featured: false,
     description: "",
     features: "",   // newline-separated list in textarea
 };
@@ -34,6 +35,7 @@ function packageToForm(pkg: AdminCreditPackage): FormData {
         price_usd: String(pkg.price_usd),
         sort_order: String(pkg.sort_order),
         is_active: pkg.is_active,
+        is_featured: pkg.is_featured ?? false,
         description: pkg.description || "",
         features: (pkg.features || []).join("\n"),
     };
@@ -103,6 +105,7 @@ export default function AdminPackagesPage() {
             price_usd: parseFloat(form.price_usd) || 0,
             sort_order: parseInt(form.sort_order) || 0,
             is_active: form.is_active,
+            is_featured: form.is_featured,
             description: form.description.trim() || null,
             features: form.features.trim()
                 ? form.features.split("\n").map(f => f.trim()).filter(Boolean)
@@ -240,6 +243,11 @@ export default function AdminPackagesPage() {
                                         <div className="text-xs text-muted-foreground">{pkg.display_name_en} · <code className="font-mono">{pkg.name}</code></div>
                                         {pkg.description && (
                                             <div className="text-xs text-muted-foreground mt-0.5 max-w-xs truncate">{pkg.description}</div>
+                                        )}
+                                        {pkg.is_featured && (
+                                            <span className="inline-flex items-center gap-0.5 text-[10px] font-medium text-amber-600 mt-0.5">
+                                                ★ Popüler rozet
+                                            </span>
                                         )}
                                     </td>
                                     <td className="px-4 py-3 text-right font-mono font-medium">{pkg.credits.toLocaleString()}</td>
@@ -405,7 +413,7 @@ export default function AdminPackagesPage() {
                                     />
                                 </Field>
                                 <Field label="Durum">
-                                    <div className="flex items-center gap-3 h-10">
+                                    <div className="flex flex-col gap-2 pt-1">
                                         <button
                                             type="button"
                                             onClick={() => handleField("is_active", !form.is_active)}
@@ -416,6 +424,17 @@ export default function AdminPackagesPage() {
                                                 : <ToggleLeft className="w-6 h-6 text-muted-foreground" />
                                             }
                                             {form.is_active ? "Aktif" : "Pasif"}
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleField("is_featured", !form.is_featured)}
+                                            className="flex items-center gap-2 text-sm"
+                                        >
+                                            {form.is_featured
+                                                ? <ToggleRight className="w-6 h-6 text-amber-500" />
+                                                : <ToggleLeft className="w-6 h-6 text-muted-foreground" />
+                                            }
+                                            Popüler rozet
                                         </button>
                                     </div>
                                 </Field>

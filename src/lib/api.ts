@@ -1007,9 +1007,11 @@ export async function getCreditPackages(): Promise<{
         description: string | null;
         features: string[] | null;
         is_active: boolean;
+        is_featured?: boolean;
         sort_order: number;
         // Legacy camelCase aliases (may be present in older backend versions)
         displayName?: string;
+        isFeatured?: boolean;
         price?: number;
         currency?: string;
     }>;
@@ -1164,6 +1166,7 @@ export interface AdminCreditPackage {
     price_try: number;
     price_usd: number;
     is_active: boolean;
+    is_featured: boolean;
     sort_order: number;
     description: string | null;
     features: string[] | null;

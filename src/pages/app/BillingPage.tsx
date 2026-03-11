@@ -58,7 +58,7 @@ interface NormalizedPackage {
   features: string[];
   isActive: boolean;
   sortOrder: number;
-  isRecommended?: boolean;
+  isFeatured: boolean;  // only true when admin explicitly set is_featured
 }
 
 // ─── Regional decision model ──────────────────────────────────────────────────
@@ -148,6 +148,8 @@ function normalizePackage(raw: any, idx: number): NormalizedPackage {
     features,
     isActive:    raw.is_active ?? true,
     sortOrder:   raw.sort_order ?? idx,
+    // Explicit admin flag — defensive: support both casing, default false if absent
+    isFeatured:  !!(raw.is_featured ?? raw.isFeatured ?? false),
   };
 }
 
@@ -234,9 +236,7 @@ export default function BillingPage() {
       })
       .sort((a, b) => a.sortOrder - b.sortOrder);
 
-    // Mark middle package as recommended
-    if (norm.length === 1) norm[0].isRecommended = true;
-    else if (norm.length >= 2) norm[Math.floor(norm.length / 2)].isRecommended = true;
+    // No implicit badge — isFeatured is read directly from raw data in normalizePackage.
 
     return norm;
   }, [rawPackages, lang, isLoadingPackages, isLoadingProviders]);
@@ -346,13 +346,13 @@ export default function BillingPage() {
               <div
                 key={pkg.id}
                 className={`relative flex flex-col rounded-2xl border p-6 transition-shadow ${
-                  pkg.isRecommended
+                  pkg.isFeatured
                     ? 'border-primary ring-1 ring-primary/20 shadow-[0_4px_20px_hsl(var(--primary)/0.1)] bg-primary/[0.02]'
                     : 'bg-card hover:shadow-sm'
                 }`}
               >
-                {/* Recommended pill */}
-                {pkg.isRecommended && (
+                {/* Featured badge — only when admin has set is_featured */}
+                {pkg.isFeatured && (
                   <div className="absolute -top-3 left-5">
                     <span className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-primary text-primary-foreground text-[11px] font-semibold shadow-sm">
                       <Zap className="w-2.5 h-2.5" />
@@ -399,7 +399,7 @@ export default function BillingPage() {
                 <div className="mt-auto pt-2">
                   <Button
                     className="w-full gap-2 text-sm"
-                    variant={pkg.isRecommended ? 'default' : 'outline'}
+                    variant={pkg.isFeatured ? 'default' : 'outline'}
                     onClick={() => handleBuyClick(pkg)}
                     disabled={!region.canUseCard && !region.bankTransferEnabled}
                   >
