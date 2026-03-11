@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { performSearch, getSearchPage, getSearchSession, getSearchCreditCost, SearchResult, getLeadLists, addLeadsToList, createLeadList, LeadList } from "@/lib/api";
@@ -34,8 +34,6 @@ import {
   Loader2,
   AlertCircle,
   Mail,
-  ChevronDown,
-  ChevronUp,
   Copy,
   Navigation,
   Zap,
@@ -169,7 +167,6 @@ export default function SearchPage() {
   const [minReviews, setMinReviews] = useState("");
 
   // ── UI state ──
-  const [showAdvanced, setShowAdvanced] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   const [results, setResults] = useState<SearchResult[]>([]);
@@ -199,11 +196,14 @@ export default function SearchPage() {
 
   const { toast } = useToast();
   const [pendingDistrict, setPendingDistrict] = useState<string | null>(null);
-  const [creditsPerPage, setCreditsPerPage] = useState(10);
+  const [creditsPerPage, setCreditsPerPage]             = useState(10);
   const [creditsPerEnrichment, setCreditsPerEnrichment] = useState(1);
 
   // ── Export template dialog state ──
   const [showExportTemplateDialog, setShowExportTemplateDialog] = useState(false);
+
+  // ── Ref for auto-scroll to results after page change ──
+  const resultsRef = useRef<HTMLDivElement>(null);
 
   const resultsPerPage = 20;
   const totalPages = Math.max(1, Math.ceil(totalResults / resultsPerPage));
@@ -364,6 +364,8 @@ export default function SearchPage() {
       if (response.creditCost > 0) {
         await refreshProfile();
       }
+      // Scroll to results top after successful page load
+      resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     } catch (error: any) {
       console.error("[SearchPage] Page change failed:", error);
       if (error.status === 402) {
@@ -483,21 +485,28 @@ export default function SearchPage() {
             </Select>
           </div>
 
-          {/* District / Subregion */}
+          {/* District / İlçe */}
           <div className="space-y-2">
             <Label className="flex items-center gap-2 text-sm font-medium">
               <MapPin className="w-4 h-4 text-muted-foreground" />
-              {t("searchPage.district")}
+              <span>
+                {t("searchPage.district")}
+                {city && (
+                  <span className="ml-1.5 text-[11px] font-normal text-muted-foreground">(İlçe — isteğe bağlı)</span>
+                )}
+              </span>
             </Label>
             <Select value={district} onValueChange={setDistrict} disabled={!city}>
               <SelectTrigger data-onboarding="district-select" id="district-select">
-                <SelectValue placeholder={city ? t("searchPage.selectDistrict") : "Önce şehir seçin"} />
+                <SelectValue placeholder={
+                  city
+                    ? `${city} ilçesi seçin (isteğe bağlı)`
+                    : "Önce şehir / il seçin"
+                } />
               </SelectTrigger>
               <SelectContent>
                 {availableDistricts.map(d => (
-                  <SelectItem key={d} value={d}>
-                    {d}
-                  </SelectItem>
+                  <SelectItem key={d} value={d}>{d}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -520,74 +529,58 @@ export default function SearchPage() {
           </div>
         </div>
 
-        {/* Advanced filters toggle */}
-        <div>
-          <button
-            type="button"
-            onClick={() => setShowAdvanced(v => !v)}
-            className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
-          >
-            {showAdvanced ? (
-              <><ChevronUp className="w-4 h-4" /> Gelişmiş filtreleri gizle</>
-            ) : (
-              <><ChevronDown className="w-4 h-4" /> Gelişmiş filtreler</>
-            )}
-          </button>
+        {/* Advanced filters — always visible inline */}
+        <div className="grid sm:grid-cols-3 gap-4 pt-2 border-t">
+          {/* Keyword */}
+          <div className="space-y-2">
+            <Label className="flex items-center gap-2 text-sm font-medium">
+              <Search className="w-4 h-4 text-muted-foreground" />
+              {t("searchPage.keyword")}
+            </Label>
+            <Input
+              id="keyword-input"
+              type="text"
+              placeholder={t("searchPage.keywordPlaceholder")}
+              value={keyword}
+              onChange={e => setKeyword(e.target.value)}
+            />
+          </div>
 
-          {showAdvanced && (
-            <div className="grid sm:grid-cols-3 gap-4 mt-4 pt-4 border-t">
-              {/* Keyword */}
-              <div className="space-y-2">
-                <Label className="flex items-center gap-2 text-sm font-medium">
-                  <Search className="w-4 h-4 text-muted-foreground" />
-                  {t("searchPage.keyword")}
-                </Label>
-                <Input
-                  id="keyword-input"
-                  type="text"
-                  placeholder={t("searchPage.keywordPlaceholder")}
-                  value={keyword}
-                  onChange={e => setKeyword(e.target.value)}
-                />
-              </div>
+          {/* Min rating */}
+          <div className="space-y-2">
+            <Label className="flex items-center gap-2 text-sm font-medium">
+              <Star className="w-4 h-4 text-muted-foreground" />
+              {t("searchPage.minRating")}: {minRating[0].toFixed(1)}
+            </Label>
+            <Slider
+              id="min-rating-slider"
+              value={minRating}
+              onValueChange={setMinRating}
+              min={0}
+              max={5}
+              step={0.1}
+              className="py-2"
+            />
+          </div>
 
-              {/* Min rating */}
-              <div className="space-y-2">
-                <Label className="flex items-center gap-2 text-sm font-medium">
-                  <Star className="w-4 h-4 text-muted-foreground" />
-                  {t("searchPage.minRating")}: {minRating[0].toFixed(1)}
-                </Label>
-                <Slider
-                  id="min-rating-slider"
-                  value={minRating}
-                  onValueChange={setMinRating}
-                  min={0}
-                  max={5}
-                  step={0.1}
-                  className="py-2"
-                />
-              </div>
-
-              {/* Min reviews */}
-              <div className="space-y-2">
-                <Label className="flex items-center gap-2 text-sm font-medium">
-                  <MessageSquare className="w-4 h-4 text-muted-foreground" />
-                  {t("searchPage.minReviews")}
-                </Label>
-                <Input
-                  id="min-reviews-input"
-                  type="number"
-                  min="0"
-                  placeholder={t("searchPage.minReviewsPlaceholder")}
-                  value={minReviews}
-                  onChange={e => {
-                    const value = Number(e.target.value);
-                    setMinReviews(value < 0 ? "0" : e.target.value);
-                  }}
-                />
-              </div>
-            </div>
-          )}
+          {/* Min reviews */}
+          <div className="space-y-2">
+            <Label className="flex items-center gap-2 text-sm font-medium">
+              <MessageSquare className="w-4 h-4 text-muted-foreground" />
+              {t("searchPage.minReviews")}
+            </Label>
+            <Input
+              id="min-reviews-input"
+              type="number"
+              min="0"
+              placeholder={t("searchPage.minReviewsPlaceholder")}
+              value={minReviews}
+              onChange={e => {
+                const value = Number(e.target.value);
+                setMinReviews(value < 0 ? "0" : e.target.value);
+              }}
+            />
+          </div>
         </div>
 
         {/* Search button */}
@@ -614,22 +607,23 @@ export default function SearchPage() {
       </div>
 
       {/* ── Results ── */}
-      {isSearching ? (
-        <div className="bg-card rounded-xl border shadow-soft p-6">
-          <div className="space-y-4">
-            {[1, 2, 3, 4].map(i => (
-              <div key={i} className="flex items-center gap-4 p-4 bg-muted/50 rounded-lg skeleton-loading">
-                <div className="w-5 h-5 bg-muted rounded" />
-                <div className="flex-1 space-y-2">
-                  <div className="h-4 bg-muted rounded w-1/3" />
-                  <div className="h-3 bg-muted rounded w-1/2" />
+      <div ref={resultsRef} className="scroll-mt-4">
+        {isSearching ? (
+          <div className="bg-card rounded-xl border shadow-soft p-6">
+            <div className="space-y-4">
+              {[1, 2, 3, 4].map(i => (
+                <div key={i} className="flex items-center gap-4 p-4 bg-muted/50 rounded-lg skeleton-loading">
+                  <div className="w-5 h-5 bg-muted rounded" />
+                  <div className="flex-1 space-y-2">
+                    <div className="h-4 bg-muted rounded w-1/3" />
+                    <div className="h-3 bg-muted rounded w-1/2" />
+                  </div>
+                  <div className="h-6 bg-muted rounded w-16" />
                 </div>
-                <div className="h-6 bg-muted rounded w-16" />
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
-        </div>
-      ) : hasSearched ? (
+        ) : hasSearched ? (
         <div className="bg-card rounded-xl border shadow-soft overflow-hidden">
           {/* Results header */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-3 border-b bg-muted/20">
@@ -1300,6 +1294,7 @@ export default function SearchPage() {
       {showOnboarding && profile && !profile.onboarding_completed && (
         <OnboardingTour onComplete={handleOnboardingComplete} />
       )}
+      </div>{/* /resultsRef */}
     </div>
   );
 }
