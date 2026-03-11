@@ -167,7 +167,10 @@ function computeMetrics(items: LeadListItem[]) {
 // Export helpers (component-external)
 // ─────────────────────────────────────────────
 
+// Platforms handled as dedicated columns in full export.
 const KNOWN_PLATFORMS = ["instagram", "facebook", "youtube", "tiktok", "linkedin"] as const;
+// X/Twitter: both key variants are coalesced into a single 'X' column.
+const X_KEYS = new Set(["x", "twitter"]);
 
 function exportStatusLabel(item: LeadListItem): string {
   if (item.enrichment_status === "success") return "Details Found";
@@ -188,10 +191,19 @@ function exportSocialPlatform(item: LeadListItem, platform: string): string {
   return (item.social_links as any)?.[platform] ?? "";
 }
 
+/** Returns the X/Twitter URL, preferring the 'x' key over legacy 'twitter'. */
+function exportXSocial(item: LeadListItem): string {
+  const sl = item.social_links as any;
+  if (!sl) return "";
+  return sl.x || sl.twitter || "";
+}
+
+/** Other platforms: excludes all dedicated columns including x/twitter. */
 function exportOtherSocial(item: LeadListItem): string {
   if (!item.social_links) return "";
+  const knownSet = new Set<string>([...KNOWN_PLATFORMS, ...X_KEYS]);
   return Object.entries(item.social_links)
-    .filter(([k, v]) => v && !KNOWN_PLATFORMS.includes(k as any))
+    .filter(([k, v]) => v && !knownSet.has(k))
     .map(([k, v]) => `${k}:${v}`)
     .join(" | ");
 }
@@ -252,7 +264,7 @@ export const FULL_HEADERS = [
   "Potential Score", "Score Tier", "Status", "Enrichment Status",
   "Rating", "Review Count",
   "Phone", "Website", "Email",
-  "Instagram", "Facebook", "Youtube", "Tiktok", "Linkedin",
+  "Instagram", "Facebook", "Youtube", "X", "Tiktok", "Linkedin",
   "Other Social Links", "Social Links Combined",
   "Has Contact Data", "Enrichment Eligible",
   "Note", "Tags",
@@ -295,7 +307,13 @@ function buildFullRow(item: LeadListItem): (string | number)[] {
     item.phone ?? "",
     item.website ?? "",
     item.email ?? "",
-    ...KNOWN_PLATFORMS.map((p) => exportSocialPlatform(item, p)),
+    // Social columns — order matches FULL_HEADERS
+    exportSocialPlatform(item, "instagram"),
+    exportSocialPlatform(item, "facebook"),
+    exportSocialPlatform(item, "youtube"),
+    exportXSocial(item),
+    exportSocialPlatform(item, "tiktok"),
+    exportSocialPlatform(item, "linkedin"),
     exportOtherSocial(item),
     exportSocialCombined(item),
     hasContactData(item) ? "yes" : "no",
@@ -308,7 +326,8 @@ function buildFullRow(item: LeadListItem): (string | number)[] {
 }
 
 const COMPACT_COL_WIDTHS = [30, 20, 16, 16, 36, 14, 16, 18, 32, 28, 40, 32, 24];
-const FULL_COL_WIDTHS    = [30, 20, 16, 16, 32, 24, 14, 10, 16, 18, 8, 12, 18, 32, 28, 22, 22, 22, 20, 22, 30, 40, 12, 18, 32, 24, 22, 22];
+// 30 cols: Instagram/Facebook/Youtube/X/Tiktok/Linkedin + Other/Combined + 2 flags
+const FULL_COL_WIDTHS    = [30, 20, 16, 16, 32, 24, 14, 10, 16, 18, 8, 12, 18, 32, 28, 22, 22, 22, 20, 22, 20, 22, 30, 40, 12, 18, 32, 24, 22, 22];
 
 // ─────────────────────────────────────────────
 // Component
@@ -367,7 +386,7 @@ export default function ListDetail() {
 
   // Export state
   const [showExportDialog, setShowExportDialog] = useState(false);
-  const [exportFormat, setExportFormat] = useState<"csv" | "xlsx">("csv");
+  const [exportFormat, setExportFormat] = useState<"csv" | "xlsx" | "gsheets">("csv");
   const [exportScope, setExportScope] = useState<"compact" | "full">("full");
   const [exportNote, setExportNote] = useState("");
   const [isExporting, setIsExporting] = useState(false);
@@ -595,7 +614,7 @@ export default function ListDetail() {
         URL.revokeObjectURL(url);
       };
 
-      if (exportFormat === "csv") {
+      if (exportFormat === "csv" || exportFormat === "gsheets") {
         const esc = (v: string | number) => {
           const s = String(v);
           return /[,"\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
@@ -1585,7 +1604,7 @@ export default function ListDetail() {
                 <label className="text-sm font-medium">{t("exports.format")}</label>
                 <Select
                   value={exportFormat}
-                  onValueChange={(v) => setExportFormat(v as "csv" | "xlsx")}
+                  onValueChange={(v) => setExportFormat(v as "csv" | "xlsx" | "gsheets")}
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -1593,6 +1612,7 @@ export default function ListDetail() {
                   <SelectContent>
                     <SelectItem value="csv">{t("exports.csv")}</SelectItem>
                     <SelectItem value="xlsx">{t("exports.excel")}</SelectItem>
+                    <SelectItem value="gsheets">Google Sheets (.csv)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
