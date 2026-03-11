@@ -54,52 +54,66 @@ function buildSearchQuery(province, district, category, keyword) {
 /**
  * Extract district (ilçe / subregion) from a Places API (New) place object.
  *
- * Priority order:
- *   1. sublocality_level_1  — neighbourhood / mahalle inside an ilçe (common in city cores)
- *   2. sublocality          — generic sublocality alias
- *   3. administrative_area_level_3 — ilçe in most TR urban addresses
- *   4. administrative_area_level_4 — ilçe in rural/small-settlement TR addresses
- *   5. formattedAddress string parse  — "... Akyurt/Ankara, Türkiye" → "Akyurt"
- *      Handles both:
- *        a) "Balıkhisar, 06750 Akyurt/Ankara, Türkiye"  (slash in a comma segment)
- *        b) "Akyurt/Ankara, Türkiye"                    (first segment has slash)
+ * Target level: ilçe — e.g. Akyurt, Kadıköy, Çankaya.
+ * NOT mahalle/semt — e.g. Balıkhisar, Güzelhisar, Yıldırım, Beyazıt.
  *
- * Returns null only when genuinely unavailable.
- * This function is global-ready: it is not hardcoded to Turkey — it uses address
- * component types that Google returns for any country, with formattedAddress parsing
- * as a last-resort heuristic that is harmless for non-TR addresses (they rarely have
- * the "Name/Province" slash pattern).
+ * Priority order:
+ *   1. administrative_area_level_3  — ilçe in TR urban/suburban addresses (most reliable)
+ *   2. formattedAddress slash parse — "... Akyurt/Ankara, Türkiye" → "Akyurt"
+ *        Covers cases where addressComponents omit level_3 but formattedAddress encodes
+ *        the ilçe explicitly as "İlçe/İl" before the country segment.
+ *        Handles:
+ *          a) "Balıkhisar, 06750 Akyurt/Ankara, Türkiye" → "Akyurt"
+ *          b) "Akyurt/Ankara, Türkiye"                   → "Akyurt"
+ *   3. administrative_area_level_4  — köy/belde in rural TR; only when 1 & 2 unavailable
+ *   4. sublocality_level_1          — last resort; mahalle/semt only if no ilçe found
+ *   5. sublocality                  — generic alias of 4; avoids mahalle as district name
+ *
+ * NOTE on sublocality types: Google returns sublocality = mahalle/semt (Balıkhisar,
+ * Güzelhisar, Beyazıt). These are intentionally deprioritised so the ilçe-level
+ * sources (1–3) are always preferred. Sublocality is kept as absolute last resort
+ * rather than removed entirely, because for some dense urban areas (e.g. city-core
+ * addresses with no level_3) it is the only available geographic signal.
+ *
+ * This function is global-ready: type names are standard Google Places API types
+ * returned for any country; the slash parse is harmless outside Turkey.
  */
 function extractDistrict(place) {
-    // ── 1–4: address component types ────────────────────────────────────────
+    // ── Priority 1: administrative_area_level_3 (ilçe) ──────────────────────
     if (Array.isArray(place.addressComponents)) {
-        const PRIORITY_TYPES = [
-            'sublocality_level_1',
-            'sublocality',
-            'administrative_area_level_3',
-            'administrative_area_level_4',
-        ];
-        for (const type of PRIORITY_TYPES) {
-            const comp = place.addressComponents.find(c => c.types?.includes(type));
-            if (comp?.longText) return comp.longText;
-        }
+        const level3 = place.addressComponents.find(c =>
+            c.types?.includes('administrative_area_level_3')
+        );
+        if (level3?.longText) return level3.longText;
     }
 
-    // ── 5: formattedAddress fallback — "District/Province" slash pattern ────
+    // ── Priority 2: formattedAddress "İlçe/İl" slash pattern ────────────────
     const addr = place.formattedAddress;
     if (addr) {
-        // Split by comma; find the first segment containing a slash (e.g. "Akyurt/Ankara")
         const segments = addr.split(',');
         for (const seg of segments) {
             const trimmed = seg.trim();
             const slashIdx = trimmed.indexOf('/');
             if (slashIdx > 0) {
-                // Take whatever is before the slash; strip leading numeric postal code if present
-                // e.g. "06750 Akyurt" → "Akyurt"
+                // Strip leading postal code, e.g. "06750 Akyurt" → "Akyurt"
                 const beforeSlash = trimmed.slice(0, slashIdx).trim();
                 const withoutPostal = beforeSlash.replace(/^\d+\s+/, '');
                 if (withoutPostal.length > 0) return withoutPostal;
             }
+        }
+    }
+
+    // ── Priority 3: administrative_area_level_4 (köy/belde — rural fallback) ─
+    // ── Priority 4–5: sublocality types (mahalle — last resort only) ─────────
+    if (Array.isArray(place.addressComponents)) {
+        const FALLBACK_TYPES = [
+            'administrative_area_level_4',
+            'sublocality_level_1',
+            'sublocality',
+        ];
+        for (const type of FALLBACK_TYPES) {
+            const comp = place.addressComponents.find(c => c.types?.includes(type));
+            if (comp?.longText) return comp.longText;
         }
     }
 
