@@ -91,10 +91,20 @@ const resources = {
                 noHistoryDesc: 'Henüz bir arama yapmadınız',
                 newSearch: 'Yeni Arama Yap',
                 continueSearch: 'Devam Et',
+                returnToResults: 'Sonuçlara Dön',
                 resultsFound: 'sonuç bulundu',
                 pagesViewed: 'sayfa görüntülendi',
                 keyword: 'Anahtar kelime',
                 timeAgo: '{{time}} önce',
+                sortNewest: 'En Yeni',
+                sortMostExplored: 'En Çok İncelenen',
+                signal: {
+                    deeplyExplored: 'Derin İncelendi',
+                    broadResultSet: 'Geniş Sonuç Seti',
+                    narrowSearch: 'Dar Hedefli',
+                    standardSearch: 'Standart Arama',
+                },
+                loadError: 'Arama geçmişi yüklenemedi.',
             },
 
             // Lead Lists
@@ -748,6 +758,16 @@ const resources = {
                 pagesViewed: 'pages viewed',
                 keyword: 'Keyword',
                 timeAgo: '{{time}} ago',
+                sortNewest: 'Newest First',
+                sortMostExplored: 'Most Explored',
+                returnToResults: 'Back to Results',
+                signal: {
+                    deeplyExplored: 'Deeply Explored',
+                    broadResultSet: 'Broad Result Set',
+                    narrowSearch: 'Targeted Search',
+                    standardSearch: 'Standard Search',
+                },
+                loadError: 'Search history could not be loaded.',
             },
 
             // Lead Lists
