@@ -54,6 +54,7 @@ import {
 } from "lucide-react";
 import {
   getLeadListItems,
+  getLeadList,
   bulkUpdateListItems,
   bulkDeleteListItems,
   enrichLeadListItem,
@@ -173,6 +174,7 @@ export default function ListDetail() {
   const listId = (params.listId || params.id) as string | undefined;
 
   const [items, setItems] = useState<LeadListItem[]>([]);
+  const [listName, setListName] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
@@ -248,10 +250,15 @@ export default function ListDetail() {
     try {
       setIsLoading(true);
       setError(null);
-      const response = await getLeadListItems(listId);
-      const itemsArray = Array.isArray(response)
-        ? response
-        : ((response as any).items ?? (response as any).leadItems ?? []);
+      // Fetch list meta (name) and items in parallel
+      const [listRes, itemsRes] = await Promise.all([
+        getLeadList(listId).catch(() => null),
+        getLeadListItems(listId),
+      ]);
+      if (listRes?.list?.name) setListName(listRes.list.name);
+      const itemsArray = Array.isArray(itemsRes)
+        ? itemsRes
+        : ((itemsRes as any).items ?? (itemsRes as any).leadItems ?? []);
       setItems(itemsArray);
     } catch (err: any) {
       console.error("[ListDetail] Failed to load items:", err);
@@ -563,29 +570,38 @@ export default function ListDetail() {
             </Link>
             <div className="min-w-0">
               <h2 className="text-xl font-bold tracking-tight truncate">
-                {t("listDetail.title")}
+                {listName ?? t("listDetail.title")}
               </h2>
               {!isLoading && !error && (
-                <div className="flex flex-wrap gap-x-4 gap-y-0.5 mt-0.5 text-xs text-muted-foreground">
-                  <span>{metrics.total} {t("listDetail.leads")}</span>
-                  {metrics.withDetails > 0 && (
-                    <span>· {metrics.withDetails} {t("listDetail.withDetails")}</span>
-                  )}
-                  {metrics.withPhone > 0 && (
-                    <span>· {metrics.withPhone} {t("listDetail.withPhone")}</span>
-                  )}
-                  {metrics.withWebsite > 0 && (
-                    <span>· {metrics.withWebsite} {t("listDetail.withWebsite")}</span>
-                  )}
-                  {metrics.enrichable > 0 && (
-                    <span>· {metrics.enrichable} {t("listDetail.enrichable")}</span>
-                  )}
+                <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-0.5 text-xs text-muted-foreground">
+                  <span><span className="font-medium text-foreground">{metrics.total}</span> {t("listDetail.leads")}</span>
+                  <span>·</span>
+                  <span><span className="font-medium text-foreground">{metrics.withDetails}</span> {t("listDetail.withDetails")}</span>
+                  <span>·</span>
+                  <span><span className="font-medium text-foreground">{metrics.withPhone}</span> {t("listDetail.withPhone")}</span>
+                  <span>·</span>
+                  <span><span className="font-medium text-foreground">{metrics.withWebsite}</span> {t("listDetail.withWebsite")}</span>
+                  <span>·</span>
+                  <span><span className="font-medium text-foreground">{metrics.enrichable}</span> {t("listDetail.enrichable")}</span>
                 </div>
               )}
             </div>
           </div>
           {/* Right CTAs */}
           <div className="flex items-center gap-2 shrink-0">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleBulkEnrich}
+              disabled={isBulkEnriching}
+            >
+              <Zap className="w-4 h-4" />
+              {isBulkEnriching && bulkEnrichProgress
+                ? `${bulkEnrichProgress.done}/${bulkEnrichProgress.total}`
+                : selectedItemIds.length > 0
+                ? t("listDetail.enrichSelected", { count: selectedItemIds.length })
+                : t("listDetail.bulkEnrich")}
+            </Button>
             <Button variant="outline" size="sm" onClick={() => setShowExportDialog(true)}>
               <FileDown className="w-4 h-4" />
               {t("exports.create")}
