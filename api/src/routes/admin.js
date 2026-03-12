@@ -1857,11 +1857,11 @@ router.get('/packages', requireAuth, requireAdmin, async (req, res) => {
         // to the core columns so the endpoint never 500s before migration.
         let { data, error } = await supabaseAdmin
             .from('credit_packages')
-            .select('id, name, display_name_tr, display_name_en, credits, price_try, price_usd, is_active, sort_order, description, features, created_at')
+            .select('id, name, display_name_tr, display_name_en, credits, price_try, price_usd, is_active, is_featured, sort_order, description, features, created_at')
             .order('sort_order', { ascending: true });
 
-        if (error && (error.message.includes('description') || error.message.includes('features'))) {
-            // Columns not yet migrated — fall back to core columns
+        if (error && (error.message.includes('description') || error.message.includes('features') || error.message.includes('is_featured'))) {
+            // Columns not yet migrated — fall back to core columns only
             const fallback = await supabaseAdmin
                 .from('credit_packages')
                 .select('id, name, display_name_tr, display_name_en, credits, price_try, price_usd, is_active, sort_order, created_at')
@@ -1870,8 +1870,8 @@ router.get('/packages', requireAuth, requireAdmin, async (req, res) => {
                 console.error('[Admin] Packages GET error:', fallback.error);
                 return res.status(500).json({ error: 'Database error', message: fallback.error.message });
             }
-            // Normalise: add null placeholders for missing columns
-            data = (fallback.data || []).map(p => ({ ...p, description: null, features: null }));
+            // Normalise: add null/false placeholders for missing columns
+            data = (fallback.data || []).map(p => ({ ...p, is_featured: false, description: null, features: null }));
             error = null;
         }
 
@@ -1892,7 +1892,7 @@ router.get('/packages', requireAuth, requireAdmin, async (req, res) => {
  */
 router.post('/packages', requireAuth, requireAdmin, async (req, res) => {
     try {
-        const { name, display_name_tr, display_name_en, credits, price_try, price_usd, is_active, sort_order, description, features } = req.body;
+        const { name, display_name_tr, display_name_en, credits, price_try, price_usd, is_active, is_featured, sort_order, description, features } = req.body;
 
         if (!name || !display_name_tr || !display_name_en || credits === undefined || price_try === undefined || price_usd === undefined) {
             return res.status(400).json({ error: 'name, display_name_tr, display_name_en, credits, price_try, price_usd are required' });
@@ -1914,6 +1914,7 @@ router.post('/packages', requireAuth, requireAdmin, async (req, res) => {
             price_try: parsedPriceTry,
             price_usd: parsedPriceUsd,
             is_active: is_active !== undefined ? Boolean(is_active) : true,
+            is_featured: is_featured !== undefined ? Boolean(is_featured) : false,
             sort_order: parseInt(sort_order) || 0,
         };
         if (description !== undefined) row.description = description || null;
@@ -2030,5 +2031,209 @@ router.delete('/packages/:id', requireAuth, requireAdmin, async (req, res) => {
     }
 });
 
-export default router;
 
+// ============================================================================
+// Cache Management Routes
+// ============================================================================
+
+/**
+ * GET /admin/cache/stats
+ * Aggregate stats across all cache tables.
+ */
+router.get('/cache/stats', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        const now = new Date().toISOString();
+
+        const [qcTotal, pcTotal, qcExpired, pcExpired, qcHits, pcHits] = await Promise.all([
+            supabaseAdmin.from('search_query_cache').select('*', { count: 'exact', head: true }),
+            supabaseAdmin.from('place_cache').select('*', { count: 'exact', head: true }),
+            supabaseAdmin.from('search_query_cache').select('*', { count: 'exact', head: true }).lte('expires_at', now),
+            supabaseAdmin.from('place_cache').select('*', { count: 'exact', head: true }).lte('expires_at', now),
+            supabaseAdmin.from('search_query_cache').select('hit_count'),
+            supabaseAdmin.from('place_cache').select('hit_count'),
+        ]);
+
+        const totalQueryHits = (qcHits.data || []).reduce((s, r) => s + (r.hit_count || 0), 0);
+        const totalPlaceHits = (pcHits.data || []).reduce((s, r) => s + (r.hit_count || 0), 0);
+
+        res.json({
+            query_cache_count: qcTotal.count || 0,
+            place_cache_count: pcTotal.count || 0,
+            query_cache_expired: qcExpired.count || 0,
+            place_cache_expired: pcExpired.count || 0,
+            total_query_hits: totalQueryHits,
+            total_place_hits: totalPlaceHits,
+        });
+    } catch (err) {
+        console.error('[Admin] cache/stats error:', err);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+/**
+ * GET /admin/cache/queries
+ * List query cache entries (paginated).
+ */
+router.get('/cache/queries', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        const limit = Math.min(parseInt(req.query.limit) || 50, 200);
+        const offset = parseInt(req.query.offset) || 0;
+
+        let q = supabaseAdmin
+            .from('search_query_cache')
+            .select('query_key, province, district, category, keyword, min_rating, min_reviews, total_results, created_at, expires_at, hit_count', { count: 'exact' })
+            .order('created_at', { ascending: false })
+            .range(offset, offset + limit - 1);
+
+        const { data, error, count } = await q;
+        if (error) return res.status(500).json({ error: error.message });
+
+        res.json({ entries: data || [], total: count || 0 });
+    } catch (err) {
+        console.error('[Admin] cache/queries GET error:', err);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+/**
+ * DELETE /admin/cache/queries/:key
+ * Invalidate a single query cache entry (and its pages).
+ */
+router.delete('/cache/queries/:key', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        const key = decodeURIComponent(req.params.key);
+        await supabaseAdmin.from('search_query_pages').delete().eq('query_key', key);
+        await supabaseAdmin.from('search_query_cache').delete().eq('query_key', key);
+        res.json({ success: true, deleted: key });
+    } catch (err) {
+        console.error('[Admin] cache/queries/:key DELETE error:', err);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+/**
+ * DELETE /admin/cache/queries
+ * Bulk invalidate query cache: mode = 'selected' | 'expired' | 'all'
+ */
+router.delete('/cache/queries', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        const { mode, keys } = req.body;
+        const now = new Date().toISOString();
+        let deleted = 0;
+
+        if (mode === 'selected' && Array.isArray(keys) && keys.length > 0) {
+            await supabaseAdmin.from('search_query_pages').delete().in('query_key', keys);
+            const { data } = await supabaseAdmin.from('search_query_cache').delete().in('query_key', keys).select('query_key');
+            deleted = data?.length || 0;
+
+        } else if (mode === 'expired') {
+            const { data: expiredKeys } = await supabaseAdmin
+                .from('search_query_cache').select('query_key').lte('expires_at', now);
+            const ks = (expiredKeys || []).map(r => r.query_key);
+            if (ks.length > 0) {
+                await supabaseAdmin.from('search_query_pages').delete().in('query_key', ks);
+                await supabaseAdmin.from('search_query_cache').delete().in('query_key', ks);
+            }
+            deleted = ks.length;
+
+        } else if (mode === 'all') {
+            // Delete all pages first (FK dependency), then cache entries
+            await supabaseAdmin.from('search_query_pages').delete().gte('created_at', '2000-01-01');
+            const { data } = await supabaseAdmin.from('search_query_cache').delete().gte('created_at', '2000-01-01').select('query_key');
+            deleted = data?.length || 0;
+
+        } else {
+            return res.status(400).json({ error: 'Invalid mode. Use selected|expired|all.' });
+        }
+
+        res.json({ success: true, deleted });
+    } catch (err) {
+        console.error('[Admin] cache/queries bulk DELETE error:', err);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+/**
+ * GET /admin/cache/places
+ * List place cache entries (paginated).
+ */
+router.get('/cache/places', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        const limit = Math.min(parseInt(req.query.limit) || 50, 200);
+        const offset = parseInt(req.query.offset) || 0;
+
+        const { data, error, count } = await supabaseAdmin
+            .from('place_cache')
+            .select('place_id, data_json, cached_at, expires_at, hit_count', { count: 'exact' })
+            .order('cached_at', { ascending: false })
+            .range(offset, offset + limit - 1);
+
+        if (error) return res.status(500).json({ error: error.message });
+
+        // Flatten display fields from data_json for admin UI
+        const entries = (data || []).map(row => ({
+            place_id: row.place_id,
+            name: row.data_json?.name || null,
+            phone: row.data_json?.phone || null,
+            website: row.data_json?.website || null,
+            cached_at: row.cached_at,
+            expires_at: row.expires_at,
+            hit_count: row.hit_count,
+        }));
+
+        res.json({ entries, total: count || 0 });
+    } catch (err) {
+        console.error('[Admin] cache/places GET error:', err);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+/**
+ * DELETE /admin/cache/places/:id
+ * Invalidate a single place cache entry.
+ */
+router.delete('/cache/places/:id', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        const placeId = decodeURIComponent(req.params.id);
+        await supabaseAdmin.from('place_cache').delete().eq('place_id', placeId);
+        res.json({ success: true, deleted: placeId });
+    } catch (err) {
+        console.error('[Admin] cache/places/:id DELETE error:', err);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+/**
+ * DELETE /admin/cache/places
+ * Bulk invalidate place cache: mode = 'selected' | 'expired' | 'all'
+ */
+router.delete('/cache/places', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        const { mode, ids } = req.body;
+        const now = new Date().toISOString();
+        let deleted = 0;
+
+        if (mode === 'selected' && Array.isArray(ids) && ids.length > 0) {
+            const { data } = await supabaseAdmin.from('place_cache').delete().in('place_id', ids).select('place_id');
+            deleted = data?.length || 0;
+
+        } else if (mode === 'expired') {
+            const { data } = await supabaseAdmin.from('place_cache').delete().lte('expires_at', now).select('place_id');
+            deleted = data?.length || 0;
+
+        } else if (mode === 'all') {
+            const { data } = await supabaseAdmin.from('place_cache').delete().gte('cached_at', '2000-01-01').select('place_id');
+            deleted = data?.length || 0;
+
+        } else {
+            return res.status(400).json({ error: 'Invalid mode. Use selected|expired|all.' });
+        }
+
+        res.json({ success: true, deleted });
+    } catch (err) {
+        console.error('[Admin] cache/places bulk DELETE error:', err);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+export default router;

@@ -785,11 +785,9 @@ export interface SearchResult {
     district: string;
     rating: number;
     reviews: number;
-    isOpen: boolean;
     phone: string | null;
     website: string | null;
     address: string | null;
-    hours: string | null;
 }
 
 export interface SearchResponse {
@@ -887,6 +885,90 @@ export async function getSearchCreditCost(): Promise<{
     credits_per_lead: number;
 }> {
     return apiRequest('/api/search/credit-cost');
+}
+
+// ============================================================================
+// ADMIN CACHE MANAGEMENT API
+// ============================================================================
+
+export interface QueryCacheEntry {
+    query_key: string;
+    province: string | null;
+    district: string | null;
+    category: string | null;
+    keyword: string | null;
+    min_rating: number | null;
+    min_reviews: number | null;
+    total_results: number;
+    created_at: string;
+    expires_at: string;
+    hit_count: number;
+}
+
+export interface PlaceCacheEntry {
+    place_id: string;
+    name: string | null;
+    phone: string | null;
+    website: string | null;
+    cached_at: string;
+    expires_at: string;
+    hit_count: number;
+}
+
+export interface CacheStats {
+    query_cache_count: number;
+    place_cache_count: number;
+    query_cache_expired: number;
+    place_cache_expired: number;
+    total_query_hits: number;
+    total_place_hits: number;
+}
+
+export async function getAdminCacheStats(): Promise<CacheStats> {
+    if (!ADMIN_SECRET) throw new Error('VITE_ADMIN_ROUTE_SECRET is not configured.');
+    return apiRequest(`/api/${ADMIN_SECRET}/admin/cache/stats`);
+}
+
+export async function getAdminQueryCache(params?: { limit?: number; offset?: number }): Promise<{ entries: QueryCacheEntry[]; total: number }> {
+    if (!ADMIN_SECRET) throw new Error('VITE_ADMIN_ROUTE_SECRET is not configured.');
+    const q = new URLSearchParams();
+    if (params?.limit) q.set('limit', String(params.limit));
+    if (params?.offset) q.set('offset', String(params.offset));
+    return apiRequest(`/api/${ADMIN_SECRET}/admin/cache/queries?${q.toString()}`);
+}
+
+export async function deleteAdminQueryCacheEntry(key: string): Promise<{ success: boolean }> {
+    if (!ADMIN_SECRET) throw new Error('VITE_ADMIN_ROUTE_SECRET is not configured.');
+    return apiRequest(`/api/${ADMIN_SECRET}/admin/cache/queries/${encodeURIComponent(key)}`, { method: 'DELETE' });
+}
+
+export async function deleteAdminQueryCache(body: { mode: 'selected' | 'expired' | 'all'; keys?: string[] }): Promise<{ success: boolean; deleted: number }> {
+    if (!ADMIN_SECRET) throw new Error('VITE_ADMIN_ROUTE_SECRET is not configured.');
+    return apiRequest(`/api/${ADMIN_SECRET}/admin/cache/queries`, {
+        method: 'DELETE',
+        body: JSON.stringify(body),
+    });
+}
+
+export async function getAdminPlaceCache(params?: { limit?: number; offset?: number }): Promise<{ entries: PlaceCacheEntry[]; total: number }> {
+    if (!ADMIN_SECRET) throw new Error('VITE_ADMIN_ROUTE_SECRET is not configured.');
+    const q = new URLSearchParams();
+    if (params?.limit) q.set('limit', String(params.limit));
+    if (params?.offset) q.set('offset', String(params.offset));
+    return apiRequest(`/api/${ADMIN_SECRET}/admin/cache/places?${q.toString()}`);
+}
+
+export async function deleteAdminPlaceCacheEntry(placeId: string): Promise<{ success: boolean }> {
+    if (!ADMIN_SECRET) throw new Error('VITE_ADMIN_ROUTE_SECRET is not configured.');
+    return apiRequest(`/api/${ADMIN_SECRET}/admin/cache/places/${encodeURIComponent(placeId)}`, { method: 'DELETE' });
+}
+
+export async function deleteAdminPlaceCache(body: { mode: 'selected' | 'expired' | 'all'; ids?: string[] }): Promise<{ success: boolean; deleted: number }> {
+    if (!ADMIN_SECRET) throw new Error('VITE_ADMIN_ROUTE_SECRET is not configured.');
+    return apiRequest(`/api/${ADMIN_SECRET}/admin/cache/places`, {
+        method: 'DELETE',
+        body: JSON.stringify(body),
+    });
 }
 
 // PRODUCT_SPEC 5.5: Lead Lists

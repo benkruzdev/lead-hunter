@@ -1,7 +1,7 @@
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import {
     LayoutDashboard, Users, CreditCard, Search, FileDown, Wallet,
-    LineChart, FileText, Mail, Wrench, Settings, Banknote, Package,
+    LineChart, FileText, Mail, Wrench, Settings, Banknote, Package, Database,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
@@ -48,6 +48,7 @@ export default function AdminLayout() {
                 { icon: FileDown, label: t('admin.navigation.exports'), path: '/app/admin/exports' },
                 { icon: FileText, label: t('admin.navigation.systemLogs'), path: '/app/admin/system-logs' },
                 { icon: LineChart, label: t('admin.navigation.costs'), path: '/app/admin/costs' },
+                { icon: Database, label: 'Cache', path: '/app/admin/cache' },
             ],
         },
         {

@@ -29,7 +29,6 @@ import {
   X,
   Phone,
   Globe,
-  Clock,
   ExternalLink,
   Loader2,
   AlertCircle,
@@ -136,13 +135,7 @@ const leadLevelConfig: Record<LeadLevelKey, { label: string; className: string }
   low:  { label: "Düşük",  className: "bg-gray-100 text-gray-500 border-gray-200" },
 };
 
-// ── Business signal badge: sadeleştirildi (Açık/Kapalı) ────────────────────
-interface SignalBadge { label: string; className: string }
 
-function getBusinessBadges(item: SearchResult): SignalBadge[] {
-  if (item.isOpen) return [{ label: "Açık",   className: "bg-green-50 text-green-700 border-green-200" }];
-  return               [{ label: "Kapalı", className: "bg-gray-100 text-gray-500 border-gray-200" }];
-}
 
 // ── Location formatter (global-ready) ─────────────────────────────────────────
 // district = subregion (e.g. Kadıköy), city = region/province (e.g. İstanbul)
@@ -708,7 +701,7 @@ export default function SearchPage() {
               </thead>
               <tbody>
                 {results.map(item => {
-                  const badges = getBusinessBadges(item);
+
                   const contactStatus = contactStatusConfig[getContactStatus(item)];
                   const enrichmentPotential = enrichmentPotentialConfig[getEnrichmentPotential(item)];
                   const leadScore = computeLeadScore(item);
@@ -730,19 +723,9 @@ export default function SearchPage() {
                         />
                       </td>
 
-                      {/* Business name + badges */}
+                      {/* Business name */}
                       <td className="p-4 min-w-[180px]">
                         <div className="font-medium leading-snug">{item.name}</div>
-                        <div className="flex gap-1 mt-1 flex-wrap">
-                          {badges.map(b => (
-                            <span
-                              key={b.label}
-                              className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium leading-none ${b.className}`}
-                            >
-                              {b.label}
-                            </span>
-                          ))}
-                        </div>
                       </td>
 
                       {/* Location */}
@@ -925,13 +908,6 @@ export default function SearchPage() {
                   <span className="px-2.5 py-0.5 bg-primary/10 text-primary rounded-full text-xs font-medium">
                     {detailItem.category}
                   </span>
-                  <span
-                    className={`px-2.5 py-0.5 rounded-full text-xs font-medium border ${
-                      detailItem.isOpen ? "chip-open" : "chip-closed"
-                    }`}
-                  >
-                    {detailItem.isOpen ? "Açık" : "Kapalı"}
-                  </span>
                 </div>
               </SheetHeader>
 
@@ -956,12 +932,7 @@ export default function SearchPage() {
                         "Konum bilgisi mevcut değil"}
                     </span>
                   </div>
-                  {detailItem.hours && (
-                    <div className="flex items-start gap-2">
-                      <Clock className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
-                      <span className="text-sm text-muted-foreground">{detailItem.hours}</span>
-                    </div>
-                  )}
+
                 </div>
               </section>
 

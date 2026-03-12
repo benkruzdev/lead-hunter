@@ -38,6 +38,7 @@ import AdminSystemSettingsPage from "./pages/admin/AdminSystemSettingsPage";
 import AdminConfigPage from "./pages/admin/AdminConfigPage";
 import AdminPaymentProvidersPage from "./pages/admin/AdminPaymentProvidersPage";
 import AdminPackagesPage from "./pages/admin/AdminPackagesPage";
+import AdminCachePage from "./pages/admin/AdminCachePage";
 import NotFound from "./pages/NotFound";
 
 
@@ -102,6 +103,7 @@ const AppContent = () => {
                     <Route path="config" element={<AdminConfigPage />} />
                     <Route path="payment-providers" element={<AdminPaymentProvidersPage />} />
                     <Route path="packages" element={<AdminPackagesPage />} />
+                    <Route path="cache" element={<AdminCachePage />} />
                   </Route>
                 </Route>
               </Route>
