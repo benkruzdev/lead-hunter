@@ -1084,7 +1084,10 @@ export default function ListDetail() {
                             </td>
 
                             {/* Contact */}
-                            <td className="p-3">
+                            <td
+                              className="p-3"
+                              onClick={(e) => e.stopPropagation()}
+                            >
                               {hasContactData(item) ? (
                                 <div className="flex flex-col gap-1">
                                   {item.phone && (

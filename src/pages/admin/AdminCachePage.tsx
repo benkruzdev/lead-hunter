@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Database, BarChart3, Trash2, RefreshCw, CheckSquare, Square, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -142,6 +142,12 @@ function QueryCacheTab() {
     });
 
     const entries: QueryCacheEntry[] = data?.entries || [];
+
+    // Reconcile selection: remove IDs no longer in the visible entry list
+    useEffect(() => {
+        const validKeys = new Set(entries.map(e => e.query_key));
+        setSelected(prev => prev.filter(k => validKeys.has(k)));
+    }, [entries]);
 
     const invalidateMutation = useMutation({
         mutationFn: async () => {
@@ -293,6 +299,12 @@ function PlaceCacheTab() {
     });
 
     const entries: PlaceCacheEntry[] = data?.entries || [];
+
+    // Reconcile selection: remove IDs no longer in the visible entry list
+    useEffect(() => {
+        const validIds = new Set(entries.map(e => e.place_id));
+        setSelected(prev => prev.filter(id => validIds.has(id)));
+    }, [entries]);
 
     const invalidateMutation = useMutation({
         mutationFn: async () => {

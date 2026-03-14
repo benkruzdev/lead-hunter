@@ -3,8 +3,11 @@ import { supabase } from './supabaseClient';
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 const ADMIN_SECRET = import.meta.env.VITE_ADMIN_ROUTE_SECRET;
 
+const REQUEST_TIMEOUT_MS = 30_000;
+
 /**
- * Make authenticated API request to backend
+ * Make authenticated API request to backend.
+ * Automatically aborts after REQUEST_TIMEOUT_MS with a user-friendly error.
  */
 async function apiRequest<T>(
     endpoint: string,
@@ -21,10 +24,26 @@ async function apiRequest<T>(
         headers['Authorization'] = `Bearer ${session.access_token}`;
     }
 
-    const response = await fetch(`${API_URL}${endpoint}`, {
-        ...options,
-        headers,
-    });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+    let response: Response;
+    try {
+        response = await fetch(`${API_URL}${endpoint}`, {
+            ...options,
+            headers,
+            signal: controller.signal,
+        });
+    } catch (e: any) {
+        clearTimeout(timeoutId);
+        if (e?.name === 'AbortError') {
+            const err = new Error('İstek zaman aşımına uğradı. Lütfen tekrar deneyin.') as any;
+            err.status = 408;
+            throw err;
+        }
+        throw e;
+    }
+    clearTimeout(timeoutId);
 
     if (!response.ok) {
         const error = await response.json().catch(() => ({
@@ -33,11 +52,14 @@ async function apiRequest<T>(
         }));
         const err = new Error(error.message || error.error || 'Request failed') as any;
         err.status = response.status;
+        if (error.required !== undefined) err.required = error.required;
+        if (error.available !== undefined) err.available = error.available;
         throw err;
     }
 
     return response.json();
 }
+
 
 /**
  * Enrich lead list item with email and social links

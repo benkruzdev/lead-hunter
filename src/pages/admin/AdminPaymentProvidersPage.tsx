@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -55,6 +55,19 @@ function BankTransferCard({ provider }: { provider: PaymentProvider }) {
             toast({ title: err.message || 'Kayıt başarısız', variant: 'destructive' });
         },
     });
+
+    // Resync local form when provider prop is refreshed after save
+    useEffect(() => {
+        setForm({
+            display_name:   provider.display_name,
+            enabled:        provider.enabled,
+            bank_name:      provider.bank_name ?? '',
+            account_holder: provider.account_holder ?? '',
+            iban:           provider.iban ?? '',
+            payment_note:   provider.payment_note ?? '',
+            sort_order:     provider.sort_order,
+        });
+    }, [provider]);
 
     const set = (key: keyof typeof form, value: unknown) =>
         setForm(prev => ({ ...prev, [key]: value }));
@@ -201,6 +214,22 @@ function ProviderCard({ provider }: { provider: PaymentProvider }) {
             toast({ title: err.message || 'Kayıt başarısız', variant: 'destructive' });
         },
     });
+
+    // Resync local form when provider prop is refreshed after save
+    useEffect(() => {
+        setForm({
+            display_name:         provider.display_name,
+            enabled:              provider.enabled,
+            mode:                 provider.mode,
+            supported_currencies: provider.supported_currencies,
+            merchant_id:          provider.merchant_id ?? '',
+            api_key:              provider.api_key ?? '',
+            secret_key:           provider.secret_key ?? '',
+            public_key:           provider.public_key ?? '',
+            webhook_secret:       provider.webhook_secret ?? '',
+            sort_order:           provider.sort_order,
+        });
+    }, [provider]);
 
     const handleSave = () => {
         mutation.mutate(form);

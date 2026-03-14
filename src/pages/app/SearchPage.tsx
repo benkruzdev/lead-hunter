@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { performSearch, getSearchPage, getSearchSession, getSearchCreditCost, SearchResult, getLeadLists, addLeadsToList, createLeadList, LeadList } from "@/lib/api";
@@ -179,16 +179,22 @@ export default function SearchPage() {
   const [detailItem, setDetailItem] = useState<SearchResult | null>(null);
   const [copiedPhone, setCopiedPhone] = useState(false);
 
-  // ── Pagination state ──
+  // ── Pagination / load-more state ──
   const [sessionId, setSessionId] = useState<string | null>(null);
-  const [currentPage, setCurrentPage] = useState(1);
+  const [nextPage, setNextPage] = useState(2);       // next page to load-more
   const [totalResults, setTotalResults] = useState(0);
-  const [viewedPages, setViewedPages] = useState<Set<number>>(new Set([1]));
-  const [showPaginationModal, setShowPaginationModal] = useState(false);
-  const [pendingPage, setPendingPage] = useState<number | null>(null);
+  const [hasMore, setHasMore] = useState(false);     // whether more pages exist
+  const [isLoadingMore, setIsLoadingMore] = useState(false); // separate from main isSearching
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // ── List dialog state ──
+  // Credit cost info (used in load-more button label)
+  const [creditsPerPage, setCreditsPerPage]             = useState(10);
+  const [creditsPerEnrichment, setCreditsPerEnrichment] = useState(1);
+
+  // Request-sequence guard: only the latest request may commit state
+  const reqSeq = useRef(0);
+
+  const resultsPerPage = 20;
   const [showListDialog, setShowListDialog] = useState(false);
   const [userLists, setUserLists] = useState<LeadList[]>([]);
   const [selectedListId, setSelectedListId] = useState<string>("");
@@ -201,17 +207,13 @@ export default function SearchPage() {
 
   const { toast } = useToast();
   const [pendingDistrict, setPendingDistrict] = useState<string | null>(null);
-  const [creditsPerPage, setCreditsPerPage]             = useState(10);
-  const [creditsPerEnrichment, setCreditsPerEnrichment] = useState(1);
 
   // ── Export template dialog state ──
   const [showExportTemplateDialog, setShowExportTemplateDialog] = useState(false);
 
-  // ── Ref for auto-scroll to results after page change ──
+  // ── Ref for auto-scroll to results ──
   const resultsRef = useRef<HTMLDivElement>(null);
 
-  const resultsPerPage = 20;
-  const totalPages = Math.max(1, Math.ceil(totalResults / resultsPerPage));
 
   // ─── Effects ───────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -245,23 +247,40 @@ export default function SearchPage() {
     const sid = searchParams.get("sessionId");
     if (sid) {
       loadSession(sid);
+    } else {
+      // sessionId removed from URL: clear session-restore state to avoid
+      // stale results/pagination from a previous restored session being shown.
+      // Form fields (city/district/category/keyword/filters) are intentionally
+      // left intact so the user can still launch a fresh search.
+      setSessionId(null);
+      setResults([]);
+      setTotalResults(0);
+      setHasMore(false);
+      setNextPage(2);
+      setHasSearched(false);
+      setErrorMessage(null);
     }
   }, [searchParams]);
 
   // ─── Handlers ──────────────────────────────────────────────────────────────
-  const loadSession = async (sid: string) => {
+  const loadSession = useCallback(async (sid: string) => {
+    const seq = ++reqSeq.current;
+    setIsSearching(true);
+    setErrorMessage(null);
     try {
       const { session } = await getSearchSession(sid);
+      if (seq !== reqSeq.current) return;
+
       setCity(session.province || "");
-      setDistrict(session.district || "");
+      setPendingDistrict(session.district || null);
       setCategory(session.category || "");
       setKeyword(session.keyword || "");
       setMinRating([session.min_rating || 0]);
       setMinReviews(session.min_reviews ? session.min_reviews.toString() : "");
       setSessionId(sid);
-      setViewedPages(new Set(session.viewed_pages));
       setTotalResults(session.total_results);
       setHasSearched(true);
+      setSelectedIds([]);   // clear selections on session restore
 
       getSearchCreditCost().then(costs => {
         setCreditsPerPage(costs.credits_per_page);
@@ -278,27 +297,34 @@ export default function SearchPage() {
         sessionId: sid,
       });
 
+      if (seq !== reqSeq.current) return;
       setResults(searchResponse.results);
-      setCurrentPage(1);
+      const total = searchResponse.totalResults ?? session.total_results;
+      setTotalResults(total);
+      setNextPage(2);
+      setHasMore(searchResponse.results.length < total);
     } catch (error: any) {
+      if (seq !== reqSeq.current) return;
       console.error("[SearchPage] Session load error:", error);
       if (error.status === 410) {
         navigate("/app/history", { replace: true });
       } else {
         setErrorMessage(t("searchPage.sessionLoadFailed"));
       }
+    } finally {
+      if (seq === reqSeq.current) setIsSearching(false);
     }
-  };
+  }, [navigate, t]);
 
   const handleOnboardingComplete = () => {
     setShowOnboarding(false);
   };
 
   const handleSearch = async () => {
+    const seq = ++reqSeq.current;
     setIsSearching(true);
     setErrorMessage(null);
-    setCurrentPage(1);
-    setViewedPages(new Set([1]));
+    setSelectedIds([]);     // clear selection on new search
 
     try {
       const response = await performSearch({
@@ -310,10 +336,12 @@ export default function SearchPage() {
         minReviews: minReviews ? Number(minReviews) : undefined,
       });
 
+      if (seq !== reqSeq.current) return;
       setSessionId(response.sessionId);
       setResults(response.results as any[]);
       setTotalResults(response.totalResults);
-      setCurrentPage(1);
+      setNextPage(2);
+      setHasMore((response.results as any[]).length < response.totalResults);
       setIsSearching(false);
       setHasSearched(true);
 
@@ -325,6 +353,7 @@ export default function SearchPage() {
       refreshProfile();
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.credits });
     } catch (error) {
+      if (seq !== reqSeq.current) return;
       console.error("[SearchPage] Search failed:", error);
       setErrorMessage(t("searchPage.searchFailed"));
       setIsSearching(false);
@@ -341,47 +370,41 @@ export default function SearchPage() {
     downloadCSV(csvContent, filename);
   };
 
-  const handlePageChange = (newPage: number) => {
-    if (newPage === currentPage) return;
-    if (newPage < 1 || newPage > totalPages) return;
-    if (viewedPages.has(newPage)) {
-      confirmPageChange(newPage, true);
-      return;
-    }
-    setPendingPage(newPage);
-    setShowPaginationModal(true);
-  };
-
-  const confirmPageChange = async (pageToFetch?: number, skipModal: boolean = false) => {
-    const targetPage = pageToFetch || pendingPage;
-    if (targetPage === null || !sessionId) return;
-
+  // ── Load More ──
+  const handleLoadMore = async () => {
+    if (!sessionId || isLoadingMore) return;
+    // Snapshot the page we intend to fetch and guard against stale responses
+    const pageToFetch = nextPage;
+    const seq = ++reqSeq.current;
+    setIsLoadingMore(true);
     setErrorMessage(null);
     try {
-      const response = await getSearchPage(sessionId, targetPage);
-      setResults(response.results as any[]);
-      setViewedPages(prev => new Set([...prev, targetPage]));
-      setCurrentPage(targetPage);
-      if (!skipModal) {
-        setShowPaginationModal(false);
-        setPendingPage(null);
-      }
+      const response = await getSearchPage(sessionId, pageToFetch);
+      // Discard if a newer search/load started while this was in flight
+      if (seq !== reqSeq.current) return;
+      setResults(prev => {
+        // Deduplicate: keep only truly new items
+        const existingIds = new Set(prev.map(r => r.id));
+        const newItems = (response.results as any[]).filter(r => !existingIds.has(r.id));
+        return [...prev, ...newItems];
+      });
+      setNextPage(pageToFetch + 1);
+      const totalPages = Math.max(1, Math.ceil(totalResults / resultsPerPage));
+      setHasMore(pageToFetch < totalPages);
       if (response.creditCost > 0) {
-        await refreshProfile();
+        refreshProfile();
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.credits });
       }
-      // Scroll to results top after successful page load
-      resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     } catch (error: any) {
-      console.error("[SearchPage] Page change failed:", error);
+      if (seq !== reqSeq.current) return;
+      console.error("[SearchPage] Load more failed:", error);
       if (error.status === 402) {
         setErrorMessage(t("leadLists.insufficientCredits"));
       } else {
         setErrorMessage(t("searchPage.pageLoadFailed"));
       }
-      if (!skipModal) {
-        setShowPaginationModal(false);
-        setPendingPage(null);
-      }
+    } finally {
+      if (seq === reqSeq.current) setIsLoadingMore(false);
     }
   };
 
@@ -637,7 +660,7 @@ export default function SearchPage() {
                 {totalResults.toLocaleString()} sonuç
               </span>
               <span className="text-sm text-muted-foreground">
-                Sayfa {currentPage} / {totalPages}
+                {results.length} gösteriliyor
               </span>
               {selectedIds.length > 0 && (
                 <span className="text-sm font-medium text-primary">
@@ -843,44 +866,23 @@ export default function SearchPage() {
             </table>
           </div>
 
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="flex justify-center items-center gap-2 p-4 border-t bg-muted/10">
+          {/* Load More */}
+          {hasMore && (
+            <div className="flex justify-center items-center gap-3 p-4 border-t bg-muted/10">
               <Button
                 variant="outline"
                 size="sm"
-                disabled={currentPage === 1}
-                onClick={() => handlePageChange(currentPage - 1)}
+                disabled={isLoadingMore}
+                onClick={handleLoadMore}
               >
-                {t("searchPage.previous")}
-              </Button>
-
-              {(() => {
-                const windowSize = Math.min(5, totalPages);
-                const half = Math.floor(windowSize / 2);
-                const start = Math.max(1, Math.min(currentPage - half, totalPages - windowSize + 1));
-                return Array.from({ length: windowSize }, (_, i) => {
-                  const pageNum = start + i;
-                  return (
-                    <Button
-                      key={pageNum}
-                      variant={currentPage === pageNum ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => handlePageChange(pageNum)}
-                    >
-                      {pageNum}
-                    </Button>
-                  );
-                });
-              })()}
-
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={currentPage === totalPages}
-                onClick={() => handlePageChange(currentPage + 1)}
-              >
-                {t("searchPage.next")}
+                {isLoadingMore ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                    Yükleniyor…
+                  </>
+                ) : (
+                  <>Daha Fazla Yükle ({creditsPerPage} kredi)</>
+                )}
               </Button>
             </div>
           )}
@@ -1074,34 +1076,6 @@ export default function SearchPage() {
           )}
         </SheetContent>
       </Sheet>
-
-      {/* ── Credit Confirmation Modal ── */}
-      <Dialog open={showPaginationModal} onOpenChange={setShowPaginationModal}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{t("searchPage.pageChangeTitle")}</DialogTitle>
-            <DialogDescription>
-              {t("searchPage.pageChangeDesc", { page: pendingPage, cost: creditsPerPage })}
-              <br />
-              {t("searchPage.pageChangeCreditInfo", { credits: profile?.credits || 0 })}
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="flex gap-2">
-            <Button
-              variant="outline"
-              onClick={() => {
-                setShowPaginationModal(false);
-                setPendingPage(null);
-              }}
-            >
-              {t("common.cancel")}
-            </Button>
-            <Button onClick={() => confirmPageChange()}>
-              {t("searchPage.confirmPageBtn", { cost: creditsPerPage })}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       {/* ── List Selection Dialog ── */}
       <Dialog

@@ -8,6 +8,14 @@ const router = express.Router();
 const PAGE_SIZE = 20;
 const PLACES_BASE = 'https://places.googleapis.com/v1';
 const CACHE_TTL_DAYS = 90;
+const GOOGLE_TIMEOUT_MS = 15_000;
+
+// Abort-signal timeout helper for Google API calls
+function googleSignal() {
+    const ctrl = new AbortController();
+    setTimeout(() => ctrl.abort(), GOOGLE_TIMEOUT_MS);
+    return ctrl.signal;
+}
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -147,6 +155,7 @@ async function collectPlaceIdsFiltered(apiKey, query, minRating, maxResults = 60
                 'X-Goog-FieldMask': 'places.id,nextPageToken',
             },
             body: JSON.stringify(body),
+            signal: googleSignal(),
         });
 
         if (!resp.ok) {
@@ -195,6 +204,7 @@ async function fetchPlaceDetails(apiKey, placeIds) {
                         'X-Goog-Api-Key': apiKey,
                         'X-Goog-FieldMask': fieldMask,
                     },
+                    signal: googleSignal(),
                 });
                 if (!resp.ok) return null;
                 const place = await resp.json();
@@ -588,7 +598,9 @@ router.get('/:sessionId/page/:pageNumber', requireAuth, async (req, res) => {
         const creditsPerPage = await getCreditsPerPage();
         const creditCost = alreadyViewed ? 0 : creditsPerPage;
 
-        // Deduct credits before fetching (for new pages only)
+        // Deduct credits BEFORE fetch (lock the page-view intent).
+        // viewed_pages is updated AFTER successful fetch to avoid
+        // "credits deducted but page never loaded" inconsistency.
         if (!alreadyViewed) {
             const { data: profile } = await supabaseAdmin
                 .from('profiles')
@@ -612,24 +624,7 @@ router.get('/:sessionId/page/:pageNumber', requireAuth, async (req, res) => {
                 console.error('[Search] Credit deduction failed:', deductError);
                 return res.status(500).json({ error: 'Failed to deduct credits' });
             }
-
-            await supabaseAdmin
-                .from('search_sessions')
-                .update({ viewed_pages: [...viewedPages, page] })
-                .eq('id', sessionId);
-
-            // Log page_view_paid (non-fatal)
-            await logEvent(supabaseAdmin, {
-                level: 'info',
-                source: 'search',
-                event_type: 'page_view_paid',
-                actor_user_id: userId,
-                target_type: 'search_session',
-                target_id: sessionId,
-                message: `Ödeyerek sayfa görüntülendi: sayfa ${page}`,
-                credit_delta: -creditCost,
-                metadata: { session_id: sessionId, page, credits_per_page: creditsPerPage },
-            });
+            // NOTE: viewed_pages written after successful content fetch below
         }
 
         const now = new Date().toISOString();
@@ -650,6 +645,21 @@ router.get('/:sessionId/page/:pageNumber', requireAuth, async (req, res) => {
                 supabaseAdmin
                     .rpc('increment_page_cache_hit', { p_query_key: queryKey, p_page_number: page })
                     .then(() => {}).catch(() => {});
+
+                // Write viewed_pages + event after confirming we have results
+                if (!alreadyViewed && creditCost > 0) {
+                    supabaseAdmin.from('search_sessions')
+                        .update({ viewed_pages: [...viewedPages, page] })
+                        .eq('id', sessionId)
+                        .then(() => {}).catch(() => {});
+                    logEvent(supabaseAdmin, {
+                        level: 'info', source: 'search', event_type: 'page_view_paid',
+                        actor_user_id: userId, target_type: 'search_session', target_id: sessionId,
+                        message: `Ödeyerek sayfa görüntülendi: sayfa ${page}`,
+                        credit_delta: -creditCost,
+                        metadata: { session_id: sessionId, page, credits_per_page: creditsPerPage },
+                    }).catch(() => {});
+                }
 
                 return res.json({
                     results: pageRow.results_json,
@@ -693,6 +703,35 @@ router.get('/:sessionId/page/:pageNumber', requireAuth, async (req, res) => {
             console.warn('[Search] No API key and no cached place IDs for page fetch');
         }
 
+        // Compensation guard: credits were deducted but fetch returned nothing.
+        // Attempt refund synchronously so we can report actual outcome to client.
+        if (results.length === 0 && !alreadyViewed && creditCost > 0) {
+            console.warn('[Search] Empty results after credit deduction — attempting compensation refund', {
+                userId, sessionId, page, creditCost,
+            });
+            let compensationSucceeded = false;
+            try {
+                const { error: refundErr } = await supabaseAdmin
+                    .rpc('decrement_credits', { user_id: userId, amount: -creditCost });
+                if (refundErr) {
+                    console.error('[Search] Compensation refund failed (RPC error):', refundErr);
+                } else {
+                    compensationSucceeded = true;
+                    console.info('[Search] Compensation refund succeeded', { userId, creditCost });
+                }
+            } catch (refundEx) {
+                console.error('[Search] Compensation refund threw:', refundEx);
+            }
+            return res.status(502).json({
+                error: 'No results returned',
+                message: compensationSucceeded
+                    ? 'Sayfa verisi alınamadı. Krediniz iade edildi.'
+                    : 'Sayfa verisi alınamadı. Kredi iadesi denendi ancak doğrulanamadı; lütfen destek ile iletişime geçin.',
+                compensation_attempted: true,
+                compensation_succeeded: compensationSucceeded,
+            });
+        }
+
         // Write this page to page cache if we have a query_key
         if (queryKey && results.length > 0) {
             const expiry = cacheExpiry();
@@ -707,6 +746,21 @@ router.get('/:sessionId/page/:pageNumber', requireAuth, async (req, res) => {
                     hit_count: 0,
                 }, { onConflict: 'query_key,page_number', ignoreDuplicates: false })
                 .then(() => {}).catch(err => console.error('[Cache] page write error:', err));
+        }
+
+        // Write viewed_pages + event AFTER successful fetch
+        if (!alreadyViewed && creditCost > 0) {
+            supabaseAdmin.from('search_sessions')
+                .update({ viewed_pages: [...viewedPages, page] })
+                .eq('id', sessionId)
+                .then(() => {}).catch(() => {});
+            logEvent(supabaseAdmin, {
+                level: 'info', source: 'search', event_type: 'page_view_paid',
+                actor_user_id: userId, target_type: 'search_session', target_id: sessionId,
+                message: `Ödeyerek sayfa görüntülendi: sayfa ${page}`,
+                credit_delta: -creditCost,
+                metadata: { session_id: sessionId, page, credits_per_page: creditsPerPage },
+            }).catch(() => {});
         }
 
         res.json({

@@ -72,6 +72,12 @@ export default function AppLayout() {
     }
   }, [creditsData?.credits]);
 
+  // Close user dropdown on route change
+  useEffect(() => {
+    setUserMenuOpen(false);
+  }, [location.pathname]);
+
+
   // Get display name (full_name or email)
   const displayName = profile?.full_name || profile?.email || "User";
   const initials = displayName
