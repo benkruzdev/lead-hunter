@@ -376,26 +376,34 @@ export default function SearchPage() {
   };
 
   // ── Load More ──
-  const handleLoadMore = async () => {
+  const handleLoadMore = () => {
     if (!sessionId || isLoadingMore) return;
 
-    // If the detail sheet is open, close it first to prevent focus-lock
-    // overlap that can leave the UI in a visually stuck state.
-    if (detailItem) setDetailItem(null);
+    if (detailItem) {
+      // Sheet is open: close it first so React can unmount the portal and
+      // release its focus-trap before we start the fetch. Deferring via
+      // setTimeout(0) gives one render cycle for the sheet to fully tear down,
+      // preventing focus-lock / overlay stuck-states.
+      setDetailItem(null);
+      setTimeout(() => doLoadMore(), 0);
+    } else {
+      doLoadMore();
+    }
+  };
 
-    // Snapshot the page we intend to fetch.
-    // Uses a SEPARATE sequence counter from search/session so that a
-    // concurrent search firing reqSeq does not race with this guard.
+  // Inner async worker — separated so both the immediate and deferred paths
+  // share the same logic without duplicating the try/finally cleanup.
+  const doLoadMore = async () => {
+    if (!sessionId || isLoadingMore) return;
+
     const pageToFetch = nextPage;
     const seq = ++loadMoreSeq.current;
     setIsLoadingMore(true);
     setErrorMessage(null);
     try {
       const response = await getSearchPage(sessionId, pageToFetch);
-      // Discard if a newer load-more started while this was in flight
       if (seq !== loadMoreSeq.current) return;
       setResults(prev => {
-        // Deduplicate: keep only truly new items
         const existingIds = new Set(prev.map(r => r.id));
         const newItems = (response.results as any[]).filter(r => !existingIds.has(r.id));
         return [...prev, ...newItems];
@@ -416,8 +424,6 @@ export default function SearchPage() {
         setErrorMessage(t("searchPage.pageLoadFailed"));
       }
     } finally {
-      // Always clean up spinner — even on stale guard, guard only returns in
-      // the success/error paths above; finally always runs.
       if (seq === loadMoreSeq.current) setIsLoadingMore(false);
     }
   };
@@ -1023,8 +1029,10 @@ export default function SearchPage() {
                       setSelectedIds(prev =>
                         prev.includes(detailItem.id) ? prev : [...prev, detailItem.id]
                       );
+                      // Close sheet first, defer dialog open so the sheet portal fully
+                      // unmounts before the dialog mounts — prevents focus-lock overlap.
                       setDetailItem(null);
-                      openListDialog();
+                      setTimeout(() => openListDialog(), 0);
                     }}
                   >
                     <Plus className="w-4 h-4" />

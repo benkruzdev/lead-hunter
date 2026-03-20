@@ -552,10 +552,11 @@ export default function ListDetail() {
         tags,
       });
       await loadItems();
-      setEditTarget(null);
     } catch (error) {
       console.error("[ListDetail] Edit failed:", error);
     } finally {
+      // Always close the dialog — even if loadItems() throws.
+      setEditTarget(null);
       setIsSavingEdit(false);
     }
   };
@@ -566,11 +567,12 @@ export default function ListDetail() {
       setIsDeletingSingle(true);
       await bulkDeleteListItems(listId!, [deleteTarget.id]);
       await loadItems();
-      setDeleteTarget(null);
       if (detailItem?.id === deleteTarget.id) setDetailItem(null);
     } catch (error) {
       console.error("[ListDetail] Single delete failed:", error);
     } finally {
+      // Always dismiss the confirm dialog — even if loadItems() throws.
+      setDeleteTarget(null);
       setIsDeletingSingle(false);
     }
   };
