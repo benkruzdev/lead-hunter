@@ -81,6 +81,9 @@ const resources = {
                 settings: 'Ayarlar',
                 profile: 'Profil',
                 buyCredits: 'Kredi Satın Al',
+                collapse: 'Daralt',
+                expandSidebar: 'Kenar çubuğunu genişlet',
+                collapseSidebar: 'Kenar çubuğunu daralt',
             },
 
             // Search History
@@ -922,6 +925,9 @@ const resources = {
                 settings: 'Settings',
                 profile: 'Profile',
                 buyCredits: 'Buy Credits',
+                collapse: 'Collapse',
+                expandSidebar: 'Expand sidebar',
+                collapseSidebar: 'Collapse sidebar',
             },
 
             // Search History

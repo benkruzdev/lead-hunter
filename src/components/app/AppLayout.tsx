@@ -9,6 +9,8 @@ import {
   Menu,
   X,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   User,
   Globe,
   Shield,
@@ -23,11 +25,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQuery } from "@tanstack/react-query";
 import { getProfile, getCredits } from "@/lib/api";
 import { QUERY_KEYS } from "@/lib/queryKeys";
 import { useTranslation } from "react-i18next";
+
+const SIDEBAR_COLLAPSED_KEY = "sidebar:collapsed";
 
 const sidebarItems = [
   { icon: Search, label: "layout.search", path: "/app/search" },
@@ -41,10 +46,21 @@ const sidebarItems = [
 export default function AppLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    try { return localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "true"; } catch { return false; }
+  });
   const navigate = useNavigate();
   const location = useLocation();
   const { user, signOut, profile: authProfile, refreshProfile, credits: contextCredits, setCredits } = useAuth();
   const { t, i18n } = useTranslation();
+
+  const toggleCollapsed = () => {
+    setSidebarCollapsed(prev => {
+      const next = !prev;
+      try { localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(next)); } catch {}
+      return next;
+    });
+  };
 
   // Fetch profile and credits from backend
   const { data: profileData } = useQuery({
@@ -112,56 +128,85 @@ export default function AppLayout() {
   };
 
   return (
-    <div className="min-h-screen bg-muted/30 flex">
+    <div className="h-screen overflow-hidden bg-muted/30 flex">
       {/* Sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 w-64 bg-sidebar border-r transform transition-transform duration-200 lg:translate-x-0 lg:static ${sidebarOpen ? "translate-x-0" : "-translate-x-full"
-          }`}
+        className={`fixed inset-y-0 left-0 z-50 w-64 bg-sidebar border-r transform transition-[width,transform] duration-200 lg:static lg:inset-auto lg:translate-x-0 lg:h-full lg:flex-shrink-0 ${sidebarOpen ? "translate-x-0" : "-translate-x-full"} ${sidebarCollapsed ? "lg:w-16" : "lg:w-64"}`}
       >
         <div className="flex flex-col h-full">
           {/* Logo */}
-          <div className="p-6 border-b">
+          <div className={`border-b flex items-center ${sidebarCollapsed ? "p-3 lg:justify-center" : "p-6"}`}>
             <NavLink to="/" className="text-2xl font-bold">
               <span className="text-sidebar-primary">Lead</span>
-              <span className="text-sidebar-foreground">Hunter</span>
+              <span className={`text-sidebar-foreground ${sidebarCollapsed ? "lg:hidden" : ""}`}>Hunter</span>
             </NavLink>
           </div>
 
           {/* Nav items */}
-          <nav className="flex-1 p-4 space-y-1">
-            {sidebarItems.map((item) => {
-              const isActive = currentPath.startsWith(item.path);
-              return (
-                <NavLink
-                  key={item.path}
-                  to={item.path}
-                  onClick={() => setSidebarOpen(false)}
-                  className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${isActive
-                    ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                    : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                    }`}
-                >
-                  <item.icon className="w-5 h-5" />
-                  {t(item.label)}
-                </NavLink>
-              );
-            })}
+          <nav className="flex-1 p-2 space-y-1 overflow-y-auto">
+            <TooltipProvider delayDuration={100}>
+              {sidebarItems.map((item) => {
+                const isActive = currentPath.startsWith(item.path);
+                return (
+                  <Tooltip key={item.path}>
+                    <TooltipTrigger asChild>
+                      <NavLink
+                        to={item.path}
+                        onClick={() => setSidebarOpen(false)}
+                        className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${sidebarCollapsed ? "lg:justify-center lg:px-0" : ""} ${isActive
+                          ? "bg-sidebar-accent text-sidebar-accent-foreground font-semibold"
+                          : "text-sidebar-foreground hover:bg-sidebar-accent/60"
+                        }`}
+                      >
+                        <item.icon className="w-5 h-5 flex-shrink-0" />
+                        <span className={sidebarCollapsed ? "lg:hidden" : ""}>{t(item.label)}</span>
+                      </NavLink>
+                    </TooltipTrigger>
+                    {sidebarCollapsed && (
+                      <TooltipContent side="right">{t(item.label)}</TooltipContent>
+                    )}
+                  </Tooltip>
+                );
+              })}
 
-            {/* Admin Panel (conditional) */}
-            {authProfile?.role === 'admin' && (
-              <NavLink
-                to="/app/admin"
-                onClick={() => setSidebarOpen(false)}
-                className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${currentPath.startsWith('/app/admin')
-                  ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                  : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                  }`}
-              >
-                <Shield className="w-5 h-5" />
-                Admin Panel
-              </NavLink>
-            )}
+              {/* Admin Panel (conditional) */}
+              {authProfile?.role === 'admin' && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <NavLink
+                      to="/app/admin"
+                      onClick={() => setSidebarOpen(false)}
+                      className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${sidebarCollapsed ? "lg:justify-center lg:px-0" : ""} ${currentPath.startsWith('/app/admin')
+                        ? "bg-sidebar-accent text-sidebar-accent-foreground font-semibold"
+                        : "text-sidebar-foreground hover:bg-sidebar-accent/60"
+                      }`}
+                    >
+                      <Shield className="w-5 h-5 flex-shrink-0" />
+                      <span className={sidebarCollapsed ? "lg:hidden" : ""}>Admin Panel</span>
+                    </NavLink>
+                  </TooltipTrigger>
+                  {sidebarCollapsed && (
+                    <TooltipContent side="right">Admin Panel</TooltipContent>
+                  )}
+                </Tooltip>
+              )}
+            </TooltipProvider>
           </nav>
+
+          {/* Collapse toggle - desktop only */}
+          <div className="hidden lg:block border-t p-2">
+            <button
+              onClick={toggleCollapsed}
+              aria-label={sidebarCollapsed ? t("layout.expandSidebar") : t("layout.collapseSidebar")}
+              title={sidebarCollapsed ? t("layout.expandSidebar") : t("layout.collapseSidebar")}
+              className={`flex items-center w-full p-2 rounded-lg text-sidebar-foreground hover:bg-sidebar-accent/50 transition-colors ${sidebarCollapsed ? "justify-center" : "gap-2"}`}
+            >
+              {sidebarCollapsed
+                ? <ChevronRight className="w-4 h-4" />
+                : <><ChevronLeft className="w-4 h-4" /><span className="text-xs text-sidebar-foreground/60">{t("layout.collapse")}</span></>
+              }
+            </button>
+          </div>
         </div>
       </aside>
 
@@ -174,7 +219,7 @@ export default function AppLayout() {
       )}
 
       {/* Main content */}
-      <div className="flex-1 flex flex-col min-h-screen">
+      <div className="flex-1 flex flex-col min-h-0">
         {/* Header */}
         <header className="sticky top-0 z-30 bg-background/80 backdrop-blur-md border-b h-16 flex items-center px-4 lg:px-8">
           <button
@@ -266,11 +311,10 @@ export default function AppLayout() {
         </header>
 
         {/* Page content */}
-        <main className="flex-1 p-4 lg:p-8">
+        <main className="flex-1 overflow-y-auto p-4 lg:p-8">
           <Outlet />
         </main>
       </div>
     </div>
   );
 }
-
