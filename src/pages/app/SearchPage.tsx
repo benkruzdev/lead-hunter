@@ -190,6 +190,9 @@ export default function SearchPage() {
   // Credit cost info (used in load-more button label)
   const [creditsPerPage, setCreditsPerPage]             = useState(10);
   const [creditsPerEnrichment, setCreditsPerEnrichment] = useState(1);
+  // Tracks which page numbers have already been viewed (fetched) in this session.
+  // Pages in this set were already paid for — Load More won't charge for them again.
+  const [viewedPages, setViewedPages] = useState<Set<number>>(new Set([1]));
 
   // Request-sequence guards:
   // reqSeq    — search & session restore (full result replacement)
@@ -311,6 +314,12 @@ export default function SearchPage() {
       setResults(searchResponse.results);
       const total = searchResponse.totalResults ?? session.total_results;
       setTotalResults(total);
+      // Seed viewedPages from the session so the button label knows which pages
+      // have already been paid for. nextPage stays at 2 because restore always
+      // renders only the first page — the user re-loads subsequent pages one by
+      // one via Load More, in order, even if they were previously viewed.
+      const alreadyViewed = Array.isArray(session.viewed_pages) ? session.viewed_pages : [1];
+      setViewedPages(new Set(alreadyViewed));
       setNextPage(2);
       setHasMore(searchResponse.results.length < total);
       console.debug('[DEBUG][SearchPage] loadSession:success', { sid, results: searchResponse.results.length, total });
@@ -363,6 +372,8 @@ export default function SearchPage() {
       setNextPage(2);
       setHasMore((response.results as any[]).length < response.totalResults);
       setHasSearched(true);
+      // Page 1 was just served — mark it viewed so the credit label shows correctly.
+      setViewedPages(new Set([1]));
       console.debug('[DEBUG][SearchPage] handleSearch:success', { seq, results: (response.results as any[]).length, total: response.totalResults, sessionId: response.sessionId });
 
       getSearchCreditCost().then(costs => {
@@ -451,6 +462,8 @@ export default function SearchPage() {
         return [...prev, ...newItems];
       });
       setNextPage(pageToFetch + 1);
+      // Mark this page as viewed so the credit label updates correctly.
+      setViewedPages(prev => new Set([...prev, pageToFetch]));
       const totalPages = Math.max(1, Math.ceil(totalResults / resultsPerPage));
       setHasMore(pageToFetch < totalPages);
       if (response.creditCost > 0) {
@@ -946,7 +959,12 @@ export default function SearchPage() {
                     Yükleniyor…
                   </>
                 ) : (
-                  <>Daha Fazla Yükle ({creditsPerPage} kredi)</>
+                  // Show credit cost only when the next page hasn't been viewed before.
+                  // Restored sessions may already have paid for upcoming pages —
+                  // avoid misleading the user with a credit cost that won't apply.
+                  viewedPages.has(nextPage)
+                    ? <>Daha Fazla Yükle</>
+                    : <>Daha Fazla Yükle ({creditsPerPage} kredi)</>
                 )}
               </Button>
             </div>
