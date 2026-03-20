@@ -519,19 +519,23 @@ export default function ListDetail() {
     const ids = candidates.map((item) => item.id);
     setIsBulkEnriching(true);
     setBulkEnrichProgress({ done: 0, total: ids.length });
-    for (let i = 0; i < ids.length; i++) {
-      try {
-        await enrichLeadListItem(listId!, ids[i]);
-      } catch {
-        // continue on per-item error (e.g. no website, 402)
+    try {
+      for (let i = 0; i < ids.length; i++) {
+        try {
+          await enrichLeadListItem(listId!, ids[i]);
+        } catch {
+          // continue on per-item error (e.g. no website, 402)
+        }
+        setBulkEnrichProgress({ done: i + 1, total: ids.length });
       }
-      setBulkEnrichProgress({ done: i + 1, total: ids.length });
+      await loadItems();
+      setSelectedItemIds([]);
+      refreshProfile();
+    } finally {
+      // Always clear loading state — even if loadItems() or any step above throws.
+      setIsBulkEnriching(false);
+      setBulkEnrichProgress(null);
     }
-    await loadItems();
-    setIsBulkEnriching(false);
-    setBulkEnrichProgress(null);
-    setSelectedItemIds([]);
-    refreshProfile();
   };
 
   // ── Per-row actions ────────────────────────

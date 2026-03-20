@@ -6,14 +6,44 @@ const ADMIN_SECRET = import.meta.env.VITE_ADMIN_ROUTE_SECRET;
 const REQUEST_TIMEOUT_MS = 30_000;
 
 /**
+ * Rejects after `ms` milliseconds with a user-friendly timeout error (status 408).
+ * Returns a cleanup handle so the timer can be cancelled on success.
+ */
+function makeTimeoutPromise(ms: number): { promise: Promise<never>; cancel: () => void } {
+    let timerId: ReturnType<typeof setTimeout>;
+    const promise = new Promise<never>((_, reject) => {
+        timerId = setTimeout(() => {
+            const err = new Error('İstek zaman aşımına uğradı. Lütfen tekrar deneyin.') as any;
+            err.status = 408;
+            reject(err);
+        }, ms);
+    });
+    return { promise, cancel: () => clearTimeout(timerId!) };
+}
+
+/**
  * Make authenticated API request to backend.
- * Automatically aborts after REQUEST_TIMEOUT_MS with a user-friendly error.
+ * - getSession() is raced against REQUEST_TIMEOUT_MS so a stalled Supabase
+ *   auth call cannot leave the UI in permanent loading state.
+ * - The fetch itself keeps its own AbortController so the in-flight network
+ *   request is genuinely cancelled (not just ignored on the JS side).
  */
 async function apiRequest<T>(
     endpoint: string,
     options: RequestInit = {}
 ): Promise<T> {
-    const { data: { session } } = await supabase.auth.getSession();
+    // ── 1. getSession with timeout ──────────────────────────────────────────
+    const sessionTimeout = makeTimeoutPromise(REQUEST_TIMEOUT_MS);
+    let session: any;
+    try {
+        const result = await Promise.race([
+            supabase.auth.getSession(),
+            sessionTimeout.promise,
+        ]);
+        session = (result as Awaited<ReturnType<typeof supabase.auth.getSession>>).data.session;
+    } finally {
+        sessionTimeout.cancel();
+    }
 
     const headers: HeadersInit = {
         'Content-Type': 'application/json',
@@ -24,26 +54,34 @@ async function apiRequest<T>(
         headers['Authorization'] = `Bearer ${session.access_token}`;
     }
 
+    // ── 2. fetch with AbortController (genuine network cancel) ──────────────
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+    const fetchTimeout = makeTimeoutPromise(REQUEST_TIMEOUT_MS);
+    const abortOnTimeout = fetchTimeout.promise.catch((err) => {
+        controller.abort();
+        throw err;
+    });
 
     let response: Response;
     try {
-        response = await fetch(`${API_URL}${endpoint}`, {
-            ...options,
-            headers,
-            signal: controller.signal,
-        });
+        response = await Promise.race([
+            fetch(`${API_URL}${endpoint}`, {
+                ...options,
+                headers,
+                signal: controller.signal,
+            }),
+            abortOnTimeout,
+        ]);
     } catch (e: any) {
-        clearTimeout(timeoutId);
-        if (e?.name === 'AbortError') {
+        if (e?.name === 'AbortError' || e?.status === 408) {
             const err = new Error('İstek zaman aşımına uğradı. Lütfen tekrar deneyin.') as any;
             err.status = 408;
             throw err;
         }
         throw e;
+    } finally {
+        fetchTimeout.cancel();
     }
-    clearTimeout(timeoutId);
 
     if (!response.ok) {
         const error = await response.json().catch(() => ({

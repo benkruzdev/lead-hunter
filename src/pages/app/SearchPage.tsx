@@ -191,8 +191,11 @@ export default function SearchPage() {
   const [creditsPerPage, setCreditsPerPage]             = useState(10);
   const [creditsPerEnrichment, setCreditsPerEnrichment] = useState(1);
 
-  // Request-sequence guard: only the latest request may commit state
+  // Request-sequence guards:
+  // reqSeq    — search & session restore (full result replacement)
+  // loadMoreSeq — load-more only (append path, separate counter)
   const reqSeq = useRef(0);
+  const loadMoreSeq = useRef(0);
 
   const resultsPerPage = 20;
   const [showListDialog, setShowListDialog] = useState(false);
@@ -342,7 +345,6 @@ export default function SearchPage() {
       setTotalResults(response.totalResults);
       setNextPage(2);
       setHasMore((response.results as any[]).length < response.totalResults);
-      setIsSearching(false);
       setHasSearched(true);
 
       getSearchCreditCost().then(costs => {
@@ -356,7 +358,10 @@ export default function SearchPage() {
       if (seq !== reqSeq.current) return;
       console.error("[SearchPage] Search failed:", error);
       setErrorMessage(t("searchPage.searchFailed"));
-      setIsSearching(false);
+    } finally {
+      // Always reset spinner — even if stale guard returned early above,
+      // we only clear when this is still the active request.
+      if (seq === reqSeq.current) setIsSearching(false);
     }
   };
 
@@ -373,15 +378,22 @@ export default function SearchPage() {
   // ── Load More ──
   const handleLoadMore = async () => {
     if (!sessionId || isLoadingMore) return;
-    // Snapshot the page we intend to fetch and guard against stale responses
+
+    // If the detail sheet is open, close it first to prevent focus-lock
+    // overlap that can leave the UI in a visually stuck state.
+    if (detailItem) setDetailItem(null);
+
+    // Snapshot the page we intend to fetch.
+    // Uses a SEPARATE sequence counter from search/session so that a
+    // concurrent search firing reqSeq does not race with this guard.
     const pageToFetch = nextPage;
-    const seq = ++reqSeq.current;
+    const seq = ++loadMoreSeq.current;
     setIsLoadingMore(true);
     setErrorMessage(null);
     try {
       const response = await getSearchPage(sessionId, pageToFetch);
-      // Discard if a newer search/load started while this was in flight
-      if (seq !== reqSeq.current) return;
+      // Discard if a newer load-more started while this was in flight
+      if (seq !== loadMoreSeq.current) return;
       setResults(prev => {
         // Deduplicate: keep only truly new items
         const existingIds = new Set(prev.map(r => r.id));
@@ -396,7 +408,7 @@ export default function SearchPage() {
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.credits });
       }
     } catch (error: any) {
-      if (seq !== reqSeq.current) return;
+      if (seq !== loadMoreSeq.current) return;
       console.error("[SearchPage] Load more failed:", error);
       if (error.status === 402) {
         setErrorMessage(t("leadLists.insufficientCredits"));
@@ -404,7 +416,9 @@ export default function SearchPage() {
         setErrorMessage(t("searchPage.pageLoadFailed"));
       }
     } finally {
-      if (seq === reqSeq.current) setIsLoadingMore(false);
+      // Always clean up spinner — even on stale guard, guard only returns in
+      // the success/error paths above; finally always runs.
+      if (seq === loadMoreSeq.current) setIsLoadingMore(false);
     }
   };
 
