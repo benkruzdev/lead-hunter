@@ -84,6 +84,7 @@ const resources = {
                 collapse: 'Daralt',
                 expandSidebar: 'Kenar çubuğunu genişlet',
                 collapseSidebar: 'Kenar çubuğunu daralt',
+                adminPanel: 'Admin Paneli',
             },
 
             // Search History
@@ -928,6 +929,7 @@ const resources = {
                 collapse: 'Collapse',
                 expandSidebar: 'Expand sidebar',
                 collapseSidebar: 'Collapse sidebar',
+                adminPanel: 'Admin Panel',
             },
 
             // Search History

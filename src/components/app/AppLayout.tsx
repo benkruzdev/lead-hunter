@@ -25,7 +25,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQuery } from "@tanstack/react-query";
 import { getProfile, getCredits } from "@/lib/api";
@@ -144,53 +143,40 @@ export default function AppLayout() {
 
           {/* Nav items */}
           <nav className="flex-1 p-2 space-y-1 overflow-y-auto">
-            <TooltipProvider delayDuration={100}>
-              {sidebarItems.map((item) => {
-                const isActive = currentPath.startsWith(item.path);
-                return (
-                  <Tooltip key={item.path}>
-                    <TooltipTrigger asChild>
-                      <NavLink
-                        to={item.path}
-                        onClick={() => setSidebarOpen(false)}
-                        className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${sidebarCollapsed ? "lg:justify-center lg:px-0" : ""} ${isActive
-                          ? "bg-sidebar-accent text-sidebar-accent-foreground font-semibold"
-                          : "text-sidebar-foreground hover:bg-sidebar-accent/60"
-                        }`}
-                      >
-                        <item.icon className="w-5 h-5 flex-shrink-0" />
-                        <span className={sidebarCollapsed ? "lg:hidden" : ""}>{t(item.label)}</span>
-                      </NavLink>
-                    </TooltipTrigger>
-                    {sidebarCollapsed && (
-                      <TooltipContent side="right">{t(item.label)}</TooltipContent>
-                    )}
-                  </Tooltip>
-                );
-              })}
+            {sidebarItems.map((item) => {
+              const isActive = currentPath.startsWith(item.path);
+              return (
+                <NavLink
+                  key={item.path}
+                  to={item.path}
+                  onClick={() => setSidebarOpen(false)}
+                  aria-label={sidebarCollapsed ? t(item.label) : undefined}
+                  className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${sidebarCollapsed ? "lg:justify-center lg:px-0" : ""} ${isActive
+                    ? "bg-sidebar-accent text-sidebar-accent-foreground font-semibold"
+                    : "text-sidebar-foreground hover:bg-sidebar-accent/60"
+                  }`}
+                >
+                  <item.icon className="w-5 h-5 flex-shrink-0" />
+                  <span className={sidebarCollapsed ? "lg:hidden" : ""}>{t(item.label)}</span>
+                </NavLink>
+              );
+            })}
 
-              {/* Admin Panel (conditional) */}
-              {authProfile?.role === 'admin' && (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <NavLink
-                      to="/app/admin"
-                      onClick={() => setSidebarOpen(false)}
-                      className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${sidebarCollapsed ? "lg:justify-center lg:px-0" : ""} ${currentPath.startsWith('/app/admin')
-                        ? "bg-sidebar-accent text-sidebar-accent-foreground font-semibold"
-                        : "text-sidebar-foreground hover:bg-sidebar-accent/60"
-                      }`}
-                    >
-                      <Shield className="w-5 h-5 flex-shrink-0" />
-                      <span className={sidebarCollapsed ? "lg:hidden" : ""}>Admin Panel</span>
-                    </NavLink>
-                  </TooltipTrigger>
-                  {sidebarCollapsed && (
-                    <TooltipContent side="right">Admin Panel</TooltipContent>
-                  )}
-                </Tooltip>
-              )}
-            </TooltipProvider>
+            {/* Admin Panel (conditional) */}
+            {authProfile?.role === 'admin' && (
+              <NavLink
+                to="/app/admin"
+                onClick={() => setSidebarOpen(false)}
+                aria-label={sidebarCollapsed ? t("layout.adminPanel") : undefined}
+                className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${sidebarCollapsed ? "lg:justify-center lg:px-0" : ""} ${currentPath.startsWith('/app/admin')
+                  ? "bg-sidebar-accent text-sidebar-accent-foreground font-semibold"
+                  : "text-sidebar-foreground hover:bg-sidebar-accent/60"
+                }`}
+              >
+                <Shield className="w-5 h-5 flex-shrink-0" />
+                <span className={sidebarCollapsed ? "lg:hidden" : ""}>Admin Panel</span>
+              </NavLink>
+            )}
           </nav>
 
           {/* Collapse toggle - desktop only */}
