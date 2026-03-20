@@ -51,6 +51,12 @@ export default function AppLayout() {
     queryKey: ["profile"],
     queryFn: getProfile,
     enabled: !!user,
+    // Disable automatic focus/reconnect refetch: these background queries
+    // fire concurrent getSession() calls that race with load-more and other
+    // user-triggered requests, stalling the auth pipeline. Explicit
+    // invalidation (refreshProfile, queryClient.invalidateQueries) still works.
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
 
   const { data: creditsData } = useQuery({
@@ -58,6 +64,10 @@ export default function AppLayout() {
     queryFn: getCredits,
     enabled: !!user,
     refetchInterval: 30000, // Auto-refresh every 30 seconds
+    // Disable focus/reconnect triggered refetch for the same reason as profile:
+    // avoids concurrent getSession() spikes when the user returns to the tab.
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
 
   const profile = profileData?.profile;
