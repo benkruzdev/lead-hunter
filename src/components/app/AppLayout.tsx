@@ -63,9 +63,10 @@ export default function AppLayout() {
     queryKey: QUERY_KEYS.credits,
     queryFn: getCredits,
     enabled: !!user,
-    refetchInterval: 30000, // Auto-refresh every 30 seconds
-    // Disable focus/reconnect triggered refetch for the same reason as profile:
-    // avoids concurrent getSession() spikes when the user returns to the tab.
+    // refetchInterval removed: the 30s timer was firing getSession() concurrently
+    // with load-more and other user-triggered requests, stalling the auth pipeline.
+    // Credits stay accurate via explicit queryClient.invalidateQueries(QUERY_KEYS.credits)
+    // after every action that changes the balance (search, load-more, enrich, purchase).
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
   });
