@@ -268,11 +268,15 @@ export default function SearchPage() {
   // ─── Handlers ──────────────────────────────────────────────────────────────
   const loadSession = useCallback(async (sid: string) => {
     const seq = ++reqSeq.current;
+    console.debug('[DEBUG][SearchPage] loadSession:start', { sid, seq });
     setIsSearching(true);
     setErrorMessage(null);
     try {
       const { session } = await getSearchSession(sid);
-      if (seq !== reqSeq.current) return;
+      if (seq !== reqSeq.current) {
+        console.debug('[DEBUG][SearchPage] loadSession:stale — discarding', { seq, current: reqSeq.current });
+        return;
+      }
 
       setCity(session.province || "");
       setPendingDistrict(session.district || null);
@@ -300,22 +304,31 @@ export default function SearchPage() {
         sessionId: sid,
       });
 
-      if (seq !== reqSeq.current) return;
+      if (seq !== reqSeq.current) {
+        console.debug('[DEBUG][SearchPage] loadSession:stale after performSearch — discarding', { seq, current: reqSeq.current });
+        return;
+      }
       setResults(searchResponse.results);
       const total = searchResponse.totalResults ?? session.total_results;
       setTotalResults(total);
       setNextPage(2);
       setHasMore(searchResponse.results.length < total);
+      console.debug('[DEBUG][SearchPage] loadSession:success', { sid, results: searchResponse.results.length, total });
     } catch (error: any) {
-      if (seq !== reqSeq.current) return;
-      console.error("[SearchPage] Session load error:", error);
+      if (seq !== reqSeq.current) {
+        console.debug('[DEBUG][SearchPage] loadSession:catch stale — discarding', { seq });
+        return;
+      }
+      console.error('[DEBUG][SearchPage] loadSession:catch', { sid, status: error?.status, message: error?.message });
       if (error.status === 410) {
         navigate("/app/history", { replace: true });
       } else {
         setErrorMessage(t("searchPage.sessionLoadFailed"));
       }
     } finally {
-      if (seq === reqSeq.current) setIsSearching(false);
+      const willClear = seq === reqSeq.current;
+      console.debug('[DEBUG][SearchPage] loadSession:finally', { seq, willClearSpinner: willClear });
+      if (willClear) setIsSearching(false);
     }
   }, [navigate, t]);
 
@@ -325,6 +338,7 @@ export default function SearchPage() {
 
   const handleSearch = async () => {
     const seq = ++reqSeq.current;
+    console.debug('[DEBUG][SearchPage] handleSearch:start', { seq, city, category });
     setIsSearching(true);
     setErrorMessage(null);
     setSelectedIds([]);     // clear selection on new search
@@ -339,13 +353,17 @@ export default function SearchPage() {
         minReviews: minReviews ? Number(minReviews) : undefined,
       });
 
-      if (seq !== reqSeq.current) return;
+      if (seq !== reqSeq.current) {
+        console.debug('[DEBUG][SearchPage] handleSearch:stale — discarding', { seq, current: reqSeq.current });
+        return;
+      }
       setSessionId(response.sessionId);
       setResults(response.results as any[]);
       setTotalResults(response.totalResults);
       setNextPage(2);
       setHasMore((response.results as any[]).length < response.totalResults);
       setHasSearched(true);
+      console.debug('[DEBUG][SearchPage] handleSearch:success', { seq, results: (response.results as any[]).length, total: response.totalResults, sessionId: response.sessionId });
 
       getSearchCreditCost().then(costs => {
         setCreditsPerPage(costs.credits_per_page);
@@ -354,14 +372,17 @@ export default function SearchPage() {
 
       refreshProfile();
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.credits });
-    } catch (error) {
-      if (seq !== reqSeq.current) return;
-      console.error("[SearchPage] Search failed:", error);
+    } catch (error: any) {
+      if (seq !== reqSeq.current) {
+        console.debug('[DEBUG][SearchPage] handleSearch:catch stale — discarding', { seq });
+        return;
+      }
+      console.error('[DEBUG][SearchPage] handleSearch:catch', { seq, status: error?.status, message: error?.message });
       setErrorMessage(t("searchPage.searchFailed"));
     } finally {
-      // Always reset spinner — even if stale guard returned early above,
-      // we only clear when this is still the active request.
-      if (seq === reqSeq.current) setIsSearching(false);
+      const willClear = seq === reqSeq.current;
+      console.debug('[DEBUG][SearchPage] handleSearch:finally', { seq, willClearSpinner: willClear });
+      if (willClear) setIsSearching(false);
     }
   };
 
@@ -375,17 +396,28 @@ export default function SearchPage() {
     downloadCSV(csvContent, filename);
   };
 
+
   // ── Load More ──
   const handleLoadMore = () => {
-    if (!sessionId || isLoadingMore) return;
+    console.debug('[DEBUG][SearchPage] handleLoadMore:clicked', {
+      sessionId,
+      isLoadingMore,
+      detailOpen: !!detailItem,
+      detailId: detailItem?.id ?? null,
+      nextPage,
+    });
+    if (!sessionId || isLoadingMore) {
+      console.debug('[DEBUG][SearchPage] handleLoadMore:blocked', { hasSessionId: !!sessionId, isLoadingMore });
+      return;
+    }
 
     if (detailItem) {
-      // Sheet is open: close it first so React can unmount the portal and
-      // release its focus-trap before we start the fetch. Deferring via
-      // setTimeout(0) gives one render cycle for the sheet to fully tear down,
-      // preventing focus-lock / overlay stuck-states.
+      console.debug('[DEBUG][SearchPage] handleLoadMore:detail-open — closing sheet, scheduling deferred load');
       setDetailItem(null);
-      setTimeout(() => doLoadMore(), 0);
+      setTimeout(() => {
+        console.debug('[DEBUG][SearchPage] handleLoadMore:deferred-fire');
+        doLoadMore();
+      }, 0);
     } else {
       doLoadMore();
     }
@@ -394,18 +426,28 @@ export default function SearchPage() {
   // Inner async worker — separated so both the immediate and deferred paths
   // share the same logic without duplicating the try/finally cleanup.
   const doLoadMore = async () => {
-    if (!sessionId || isLoadingMore) return;
+    console.debug('[DEBUG][SearchPage] doLoadMore:start', { sessionId, isLoadingMore, nextPage });
+    if (!sessionId || isLoadingMore) {
+      console.debug('[DEBUG][SearchPage] doLoadMore:blocked-early', { hasSessionId: !!sessionId, isLoadingMore });
+      return;
+    }
 
     const pageToFetch = nextPage;
     const seq = ++loadMoreSeq.current;
     setIsLoadingMore(true);
     setErrorMessage(null);
+    console.debug('[DEBUG][SearchPage] doLoadMore:getSearchPage', { pageToFetch, seq });
     try {
       const response = await getSearchPage(sessionId, pageToFetch);
-      if (seq !== loadMoreSeq.current) return;
+      console.debug('[DEBUG][SearchPage] doLoadMore:response', { pageToFetch, seq, resultCount: (response.results as any[]).length, creditCost: response.creditCost });
+      if (seq !== loadMoreSeq.current) {
+        console.debug('[DEBUG][SearchPage] doLoadMore:stale — discarding', { seq, current: loadMoreSeq.current });
+        return;
+      }
       setResults(prev => {
         const existingIds = new Set(prev.map(r => r.id));
         const newItems = (response.results as any[]).filter(r => !existingIds.has(r.id));
+        console.debug('[DEBUG][SearchPage] doLoadMore:dedup', { incoming: (response.results as any[]).length, appended: newItems.length, skipped: (response.results as any[]).length - newItems.length });
         return [...prev, ...newItems];
       });
       setNextPage(pageToFetch + 1);
@@ -872,7 +914,10 @@ export default function SearchPage() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => setDetailItem(item)}
+                          onClick={() => {
+                            console.debug('[DEBUG][SearchPage] detail:open', { itemId: item.id, name: item.name });
+                            setDetailItem(item);
+                          }}
                           className="h-8 px-2 text-xs"
                         >
                           <Eye className="w-3.5 h-3.5 mr-1" />
@@ -920,7 +965,12 @@ export default function SearchPage() {
       )}
 
       {/* ── Detail Drawer ── */}
-      <Sheet open={!!detailItem} onOpenChange={() => setDetailItem(null)}>
+      <Sheet open={!!detailItem} onOpenChange={(open) => {
+        if (!open) {
+          console.debug('[DEBUG][SearchPage] detail:close', { itemId: detailItem?.id ?? null });
+          setDetailItem(null);
+        }
+      }}>
         <SheetContent className="sm:max-w-md overflow-y-auto">
           {detailItem && (
             <div className="animate-slide-in-right space-y-6 pb-6">
@@ -1032,7 +1082,10 @@ export default function SearchPage() {
                       // Close sheet first, defer dialog open so the sheet portal fully
                       // unmounts before the dialog mounts — prevents focus-lock overlap.
                       setDetailItem(null);
-                      setTimeout(() => openListDialog(), 0);
+                      setTimeout(() => {
+                        console.debug('[DEBUG][SearchPage] detail:listeye-ekle deferred-open');
+                        openListDialog();
+                      }, 0);
                     }}
                   >
                     <Plus className="w-4 h-4" />

@@ -32,7 +32,11 @@ async function apiRequest<T>(
     endpoint: string,
     options: RequestInit = {}
 ): Promise<T> {
+    const method = (options.method ?? 'GET').toUpperCase();
+    console.debug('[DEBUG][apiRequest] start', { endpoint, method });
+
     // ── 1. getSession with timeout ──────────────────────────────────────────
+    console.debug('[DEBUG][apiRequest] getSession:start', { endpoint });
     const sessionTimeout = makeTimeoutPromise(REQUEST_TIMEOUT_MS);
     let session: any;
     try {
@@ -41,6 +45,7 @@ async function apiRequest<T>(
             sessionTimeout.promise,
         ]);
         session = (result as Awaited<ReturnType<typeof supabase.auth.getSession>>).data.session;
+        console.debug('[DEBUG][apiRequest] getSession:done', { endpoint, hasSession: !!session });
     } finally {
         sessionTimeout.cancel();
     }
@@ -55,9 +60,13 @@ async function apiRequest<T>(
     }
 
     // ── 2. fetch with AbortController (genuine network cancel) ──────────────
+    const fullUrl = `${API_URL}${endpoint}`;
+    console.debug('[DEBUG][apiRequest] fetch:start', { url: fullUrl, method });
+
     const controller = new AbortController();
     const fetchTimeout = makeTimeoutPromise(REQUEST_TIMEOUT_MS);
     const abortOnTimeout = fetchTimeout.promise.catch((err) => {
+        console.warn('[DEBUG][apiRequest] fetch:timeout — aborting', { url: fullUrl });
         controller.abort();
         throw err;
     });
@@ -65,19 +74,22 @@ async function apiRequest<T>(
     let response: Response;
     try {
         response = await Promise.race([
-            fetch(`${API_URL}${endpoint}`, {
+            fetch(fullUrl, {
                 ...options,
                 headers,
                 signal: controller.signal,
             }),
             abortOnTimeout,
         ]);
+        console.debug('[DEBUG][apiRequest] fetch:done', { url: fullUrl, status: response.status, ok: response.ok });
     } catch (e: any) {
         if (e?.name === 'AbortError' || e?.status === 408) {
+            console.warn('[DEBUG][apiRequest] fetch:aborted/timeout', { url: fullUrl, name: e?.name, status: e?.status });
             const err = new Error('İstek zaman aşımına uğradı. Lütfen tekrar deneyin.') as any;
             err.status = 408;
             throw err;
         }
+        console.warn('[DEBUG][apiRequest] fetch:error', { url: fullUrl, name: e?.name, message: e?.message });
         throw e;
     } finally {
         fetchTimeout.cancel();
@@ -88,6 +100,7 @@ async function apiRequest<T>(
             error: 'Request failed',
             message: response.statusText,
         }));
+        console.warn('[DEBUG][apiRequest] response:non-ok', { url: fullUrl, status: response.status, error: error.error, message: error.message });
         const err = new Error(error.message || error.error || 'Request failed') as any;
         err.status = response.status;
         if (error.required !== undefined) err.required = error.required;
@@ -95,7 +108,9 @@ async function apiRequest<T>(
         throw err;
     }
 
-    return response.json();
+    const data = await response.json();
+    console.debug('[DEBUG][apiRequest] complete', { endpoint, status: response.status });
+    return data;
 }
 
 

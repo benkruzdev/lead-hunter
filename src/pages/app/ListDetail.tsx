@@ -517,21 +517,27 @@ export default function ListDetail() {
     }
 
     const ids = candidates.map((item) => item.id);
+    console.debug('[DEBUG][ListDetail] handleBulkEnrich:start', { candidateCount: ids.length, selectedCount: selectedItemIds.length });
     setIsBulkEnriching(true);
     setBulkEnrichProgress({ done: 0, total: ids.length });
     try {
       for (let i = 0; i < ids.length; i++) {
+        console.debug('[DEBUG][ListDetail] handleBulkEnrich:item', { index: i + 1, total: ids.length, itemId: ids[i] });
         try {
           await enrichLeadListItem(listId!, ids[i]);
         } catch {
           // continue on per-item error (e.g. no website, 402)
+          console.debug('[DEBUG][ListDetail] handleBulkEnrich:item-error (skipped)', { itemId: ids[i] });
         }
         setBulkEnrichProgress({ done: i + 1, total: ids.length });
       }
       await loadItems();
       setSelectedItemIds([]);
       refreshProfile();
+    } catch (err: any) {
+      console.warn('[DEBUG][ListDetail] handleBulkEnrich:catch', { message: err?.message, status: err?.status });
     } finally {
+      console.debug('[DEBUG][ListDetail] handleBulkEnrich:finally', { isBulkEnrichingWillBeFalse: true });
       // Always clear loading state — even if loadItems() or any step above throws.
       setIsBulkEnriching(false);
       setBulkEnrichProgress(null);
@@ -541,6 +547,7 @@ export default function ListDetail() {
   // ── Per-row actions ────────────────────────
   const handleSaveEdit = async () => {
     if (!editTarget) return;
+    console.debug('[DEBUG][ListDetail] handleSaveEdit:start', { itemId: editTarget.id });
     try {
       setIsSavingEdit(true);
       const tags = editTags
@@ -552,10 +559,11 @@ export default function ListDetail() {
         tags,
       });
       await loadItems();
-    } catch (error) {
-      console.error("[ListDetail] Edit failed:", error);
+    } catch (error: any) {
+      console.warn('[DEBUG][ListDetail] handleSaveEdit:catch', { message: error?.message, status: error?.status });
     } finally {
       // Always close the dialog — even if loadItems() throws.
+      console.debug('[DEBUG][ListDetail] handleSaveEdit:finally', { dialogWillClose: true });
       setEditTarget(null);
       setIsSavingEdit(false);
     }
@@ -563,15 +571,17 @@ export default function ListDetail() {
 
   const handleSingleDelete = async () => {
     if (!deleteTarget) return;
+    console.debug('[DEBUG][ListDetail] handleSingleDelete:start', { itemId: deleteTarget.id });
     try {
       setIsDeletingSingle(true);
       await bulkDeleteListItems(listId!, [deleteTarget.id]);
       await loadItems();
       if (detailItem?.id === deleteTarget.id) setDetailItem(null);
-    } catch (error) {
-      console.error("[ListDetail] Single delete failed:", error);
+    } catch (error: any) {
+      console.warn('[DEBUG][ListDetail] handleSingleDelete:catch', { message: error?.message, status: error?.status });
     } finally {
       // Always dismiss the confirm dialog — even if loadItems() throws.
+      console.debug('[DEBUG][ListDetail] handleSingleDelete:finally', { dialogWillClose: true });
       setDeleteTarget(null);
       setIsDeletingSingle(false);
     }
