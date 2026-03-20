@@ -22,9 +22,33 @@ function makeTimeoutPromise(ms: number): { promise: Promise<never>; cancel: () =
 }
 
 /**
+ * Deduplicates concurrent supabase.auth.getSession() calls.
+ *
+ * When multiple apiRequest() calls fire simultaneously (e.g. load-more +
+ * profile refresh + credits refresh) each one was starting its own
+ * getSession() round-trip. Supabase serialises these internally, so the
+ * second and third calls queue behind the first and can exhaust the timeout
+ * window before they even reach the network.
+ *
+ * Solution: share one in-flight promise across all concurrent callers.
+ * The promise is nulled after it settles so the next batch always gets
+ * a fresh call.
+ */
+let inFlightGetSession: Promise<Awaited<ReturnType<typeof supabase.auth.getSession>>> | null = null;
+
+function getSessionOnce() {
+    if (!inFlightGetSession) {
+        inFlightGetSession = supabase.auth.getSession().finally(() => {
+            inFlightGetSession = null;
+        });
+    }
+    return inFlightGetSession;
+}
+
+/**
  * Make authenticated API request to backend.
- * - getSession() is raced against REQUEST_TIMEOUT_MS so a stalled Supabase
- *   auth call cannot leave the UI in permanent loading state.
+ * - getSession() is deduped: concurrent calls share one in-flight promise.
+ * - getSession() is raced against REQUEST_TIMEOUT_MS (per-caller).
  * - The fetch itself keeps its own AbortController so the in-flight network
  *   request is genuinely cancelled (not just ignored on the JS side).
  */
@@ -35,20 +59,21 @@ async function apiRequest<T>(
     const method = (options.method ?? 'GET').toUpperCase();
     console.debug('[DEBUG][apiRequest] start', { endpoint, method });
 
-    // ── 1. getSession with timeout ──────────────────────────────────────────
-    console.debug('[DEBUG][apiRequest] getSession:start', { endpoint });
+    // ── 1. getSession with timeout (deduped) ────────────────────────────────
+    console.debug('[DEBUG][apiRequest] getSession:start', { endpoint, reuse: !!inFlightGetSession });
     const sessionTimeout = makeTimeoutPromise(REQUEST_TIMEOUT_MS);
     let session: any;
     try {
         const result = await Promise.race([
-            supabase.auth.getSession(),
+            getSessionOnce(),
             sessionTimeout.promise,
         ]);
-        session = (result as Awaited<ReturnType<typeof supabase.auth.getSession>>).data.session;
+        session = result.data.session;
         console.debug('[DEBUG][apiRequest] getSession:done', { endpoint, hasSession: !!session });
     } finally {
         sessionTimeout.cancel();
     }
+
 
     const headers: HeadersInit = {
         'Content-Type': 'application/json',
