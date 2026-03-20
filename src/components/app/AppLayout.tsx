@@ -14,7 +14,8 @@ import {
   User,
   Globe,
   Shield,
-  Clock
+  Clock,
+  LayoutDashboard
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
@@ -34,6 +35,7 @@ import { useTranslation } from "react-i18next";
 const SIDEBAR_COLLAPSED_KEY = "sidebar:collapsed";
 
 const sidebarItems = [
+  { icon: LayoutDashboard, label: "layout.dashboard", path: "/app/dashboard" },
   { icon: Search, label: "layout.search", path: "/app/search" },
   { icon: Clock, label: "layout.searchHistory", path: "/app/history" },
   { icon: List, label: "layout.leadLists", path: "/app/lists" },

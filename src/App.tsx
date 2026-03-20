@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { GoogleReCaptchaProvider } from "react-google-recaptcha-v3";
 import { useConfig } from "@/contexts/ConfigContext";
@@ -23,6 +23,7 @@ import ListDetail from "./pages/app/ListDetail";
 import ExportsPage from "./pages/app/ExportsPage";
 import BillingPage from "./pages/app/BillingPage";
 import SettingsPage from "./pages/app/SettingsPage";
+import DashboardPage from "./pages/app/DashboardPage";
 import AdminLayout from "./components/admin/AdminLayout";
 import AdminDashboardPage from "./pages/admin/AdminDashboardPage";
 import AdminUsersPage from "./pages/admin/AdminUsersPage";
@@ -81,6 +82,8 @@ const AppContent = () => {
               {/* App routes (protected) */}
               <Route element={<ProtectedRoute />}>
                 <Route path="/app" element={<AppLayout />}>
+                  <Route index element={<Navigate to="dashboard" replace />} />
+                  <Route path="dashboard" element={<DashboardPage />} />
                   <Route path="search" element={<SearchPage />} />
                   <Route path="history" element={<SearchHistoryPage />} />
                   <Route path="lists" element={<LeadLists />} />
