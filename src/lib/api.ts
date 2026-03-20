@@ -46,7 +46,40 @@ function getSessionOnce() {
 }
 
 /**
+ * Short-lived session cache (TTL = SESSION_CACHE_TTL_MS).
+ *
+ * supabase.auth.getSession() can hang indefinitely in certain browser states
+ * (post-external-navigation, focus return, OAuth popup close). Even with the
+ * dedup above, one stalled call blocks every concurrent apiRequest() for the
+ * full 30-second timeout.
+ *
+ * Strategy: if the last successful session is less than SESSION_CACHE_TTL_MS
+ * old, reuse it without touching Supabase. Only updated on a successful
+ * non-null result — never on error or missing session, so stale/invalid auth
+ * is never cached.
+ */
+const SESSION_CACHE_TTL_MS = 20_000;   // 20 s — short enough for token validity, long enough to cover rapid bursts
+
+let cachedSession: { session: any; at: number } | null = null;
+
+function getCachedSession(): any | null {
+    if (!cachedSession) return null;
+    if (Date.now() - cachedSession.at > SESSION_CACHE_TTL_MS) {
+        cachedSession = null;
+        return null;
+    }
+    return cachedSession.session;
+}
+
+function setCachedSession(session: any) {
+    if (session) {
+        cachedSession = { session, at: Date.now() };
+    }
+}
+
+/**
  * Make authenticated API request to backend.
+ * - getSession() is short-circuit cached (20 s TTL) to avoid repeated calls.
  * - getSession() is deduped: concurrent calls share one in-flight promise.
  * - getSession() is raced against REQUEST_TIMEOUT_MS (per-caller).
  * - The fetch itself keeps its own AbortController so the in-flight network
@@ -59,19 +92,24 @@ async function apiRequest<T>(
     const method = (options.method ?? 'GET').toUpperCase();
     console.debug('[DEBUG][apiRequest] start', { endpoint, method });
 
-    // ── 1. getSession with timeout (deduped) ────────────────────────────────
-    console.debug('[DEBUG][apiRequest] getSession:start', { endpoint, reuse: !!inFlightGetSession });
-    const sessionTimeout = makeTimeoutPromise(REQUEST_TIMEOUT_MS);
-    let session: any;
-    try {
-        const result = await Promise.race([
-            getSessionOnce(),
-            sessionTimeout.promise,
-        ]);
-        session = result.data.session;
-        console.debug('[DEBUG][apiRequest] getSession:done', { endpoint, hasSession: !!session });
-    } finally {
-        sessionTimeout.cancel();
+    // ── 1. getSession — cached or fresh ────────────────────────────────────
+    let session: any = getCachedSession();
+    if (session) {
+        console.debug('[DEBUG][apiRequest] getSession:cached', { endpoint, hasSession: true });
+    } else {
+        console.debug('[DEBUG][apiRequest] getSession:start', { endpoint, reuse: !!inFlightGetSession });
+        const sessionTimeout = makeTimeoutPromise(REQUEST_TIMEOUT_MS);
+        try {
+            const result = await Promise.race([
+                getSessionOnce(),
+                sessionTimeout.promise,
+            ]);
+            session = result.data.session;
+            setCachedSession(session);   // only set on success with a real session
+            console.debug('[DEBUG][apiRequest] getSession:done', { endpoint, hasSession: !!session });
+        } finally {
+            sessionTimeout.cancel();
+        }
     }
 
 
