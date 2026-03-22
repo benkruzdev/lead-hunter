@@ -10,12 +10,18 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 import { Slider } from "@/components/ui/slider";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -37,6 +43,8 @@ import {
   Navigation,
   Zap,
   Info,
+  Check,
+  ChevronsUpDown,
 } from "lucide-react";
 import {
   Tooltip,
@@ -73,11 +81,11 @@ function getContactStatus(item: SearchResult): ContactStatusKey {
   return "noContactData";
 }
 
-const contactStatusConfig: Record<ContactStatusKey, { label: string; className: string }> = {
-  phoneAndWebsite: { label: "Telefon + Website", className: "bg-emerald-50 text-emerald-700 border-emerald-200" },
-  hasPhone:        { label: "Telefon Var",        className: "bg-blue-50 text-blue-700 border-blue-200" },
-  hasWebsite:      { label: "Website Var",         className: "bg-indigo-50 text-indigo-700 border-indigo-200" },
-  noContactData:   { label: "İletişim Verisi Yok", className: "bg-gray-100 text-gray-500 border-gray-200" },
+const contactStatusConfig: Record<ContactStatusKey, { labelKey: string; className: string }> = {
+  phoneAndWebsite: { labelKey: "searchPage.contactPhoneAndWebsite", className: "bg-emerald-50 text-emerald-700 border-emerald-200" },
+  hasPhone:        { labelKey: "searchPage.contactHasPhone",        className: "bg-blue-50 text-blue-700 border-blue-200" },
+  hasWebsite:      { labelKey: "searchPage.contactHasWebsite",      className: "bg-indigo-50 text-indigo-700 border-indigo-200" },
+  noContactData:   { labelKey: "searchPage.contactNone",            className: "bg-gray-100 text-gray-500 border-gray-200" },
 };
 
 // ── Ek İletişim: e-posta/sosyal zenginleştirme potansiyelini yansıtır ──────
@@ -88,9 +96,9 @@ function getEnrichmentPotential(item: SearchResult): EnrichmentPotentialKey {
   return item.website ? "canEnrich" : "noEnrichmentSource";
 }
 
-const enrichmentPotentialConfig: Record<EnrichmentPotentialKey, { label: string; className: string }> = {
-  canEnrich:           { label: "Zenginleştirme Mümkün", className: "bg-violet-50 text-violet-700 border-violet-200" },
-  noEnrichmentSource:  { label: "Ek Veri Kaynağı Yok",   className: "bg-gray-100 text-gray-400 border-gray-200" },
+const enrichmentPotentialConfig: Record<EnrichmentPotentialKey, { labelKey: string; className: string }> = {
+  canEnrich:           { labelKey: "searchPage.enrichCanEnrich", className: "bg-muted text-muted-foreground border-border" },
+  noEnrichmentSource:  { labelKey: "",                           className: "" },
 };
 
 // ── Lead Potansiyeli: deterministik 0-100 skor ────────────────────────────
@@ -129,11 +137,58 @@ function getLeadLevel(score: number): LeadLevelKey {
   if (score >= 55) return "mid";
   return "low";
 }
-const leadLevelConfig: Record<LeadLevelKey, { label: string; className: string }> = {
-  high: { label: "Yüksek", className: "bg-emerald-50 text-emerald-700 border-emerald-200" },
-  mid:  { label: "Orta",   className: "bg-amber-50 text-amber-700 border-amber-200" },
-  low:  { label: "Düşük",  className: "bg-gray-100 text-gray-500 border-gray-200" },
+const leadLevelConfig: Record<LeadLevelKey, { labelKey: string; className: string }> = {
+  high: { labelKey: "searchPage.leadHigh", className: "bg-emerald-50 text-emerald-700 border-emerald-200" },
+  mid:  { labelKey: "searchPage.leadMid",  className: "bg-amber-50 text-amber-700 border-amber-200" },
+  low:  { labelKey: "searchPage.leadLow",  className: "bg-gray-100 text-gray-500 border-gray-200" },
 };
+
+// ── Supported countries (global-ready slot) ───────────────────────────────────
+// Add more entries as the backend expands coverage.
+// `hasSubregions` = true  → uses structured dropdown data (turkey.json etc.)
+// `hasSubregions` = false → city/district become free-text inputs
+interface Country {
+  code: string;   // ISO 3166-1 alpha-2
+  name: string;   // display name
+  flag: string;   // emoji flag
+  hasSubregions: boolean;
+}
+const COUNTRIES: Country[] = [
+  { code: "TR", name: "Türkiye",        flag: "🇹🇷", hasSubregions: true  },
+  { code: "US", name: "United States",  flag: "🇺🇸", hasSubregions: false },
+  { code: "GB", name: "United Kingdom", flag: "🇬🇧", hasSubregions: false },
+  { code: "DE", name: "Germany",        flag: "🇩🇪", hasSubregions: false },
+  { code: "FR", name: "France",         flag: "🇫🇷", hasSubregions: false },
+  { code: "NL", name: "Netherlands",    flag: "🇳🇱", hasSubregions: false },
+  { code: "ES", name: "Spain",          flag: "🇪🇸", hasSubregions: false },
+  { code: "IT", name: "Italy",          flag: "🇮🇹", hasSubregions: false },
+  { code: "PL", name: "Poland",         flag: "🇵🇱", hasSubregions: false },
+  { code: "AE", name: "UAE",            flag: "🇦🇪", hasSubregions: false },
+  { code: "SA", name: "Saudi Arabia",   flag: "🇸🇦", hasSubregions: false },
+  { code: "EG", name: "Egypt",          flag: "🇪🇬", hasSubregions: false },
+  { code: "NG", name: "Nigeria",        flag: "🇳🇬", hasSubregions: false },
+  { code: "ZA", name: "South Africa",   flag: "🇿🇦", hasSubregions: false },
+  { code: "IN", name: "India",          flag: "🇮🇳", hasSubregions: false },
+  { code: "PK", name: "Pakistan",       flag: "🇵🇰", hasSubregions: false },
+  { code: "BD", name: "Bangladesh",     flag: "🇧🇩", hasSubregions: false },
+  { code: "ID", name: "Indonesia",      flag: "🇮🇩", hasSubregions: false },
+  { code: "MY", name: "Malaysia",       flag: "🇲🇾", hasSubregions: false },
+  { code: "SG", name: "Singapore",      flag: "🇸🇬", hasSubregions: false },
+  { code: "PH", name: "Philippines",    flag: "🇵🇭", hasSubregions: false },
+  { code: "AU", name: "Australia",      flag: "🇦🇺", hasSubregions: false },
+  { code: "CA", name: "Canada",         flag: "🇨🇦", hasSubregions: false },
+  { code: "MX", name: "Mexico",         flag: "🇲🇽", hasSubregions: false },
+  { code: "BR", name: "Brazil",         flag: "🇧🇷", hasSubregions: false },
+  { code: "AR", name: "Argentina",      flag: "🇦🇷", hasSubregions: false },
+  { code: "RU", name: "Russia",         flag: "🇷🇺", hasSubregions: false },
+  { code: "UA", name: "Ukraine",        flag: "🇺🇦", hasSubregions: false },
+  { code: "GR", name: "Greece",         flag: "🇬🇷", hasSubregions: false },
+  { code: "RO", name: "Romania",        flag: "🇷🇴", hasSubregions: false },
+];
+const COUNTRY_BY_CODE = new Map(COUNTRIES.map(c => [c.code, c]));
+// Note: backend currently only processes Turkey (province/district fields).
+// For other countries the search is still fired with the user-entered city/district;
+// results correctness depends on the backend's location-aware logic.
 
 
 
@@ -149,6 +204,105 @@ function formatLocation(district: string | null | undefined, city: string | null
   return "—";
 }
 
+// ─── Searchable combobox (Popover + Command) ─────────────────────────────────
+// onSelect fix: cmdk normalises the user-typed query, but `CommandItem.value`
+// is used as the match key. We store options in a Map keyed by their
+// lowercase form so we can always retrieve the original-case string.
+interface SearchableSelectProps {
+  value: string;
+  onValueChange: (v: string) => void;
+  options: string[];
+  placeholder: string;
+  searchPlaceholder?: string;
+  emptyText?: string;
+  clearLabel?: string;
+  disabled?: boolean;
+  id?: string;
+  "data-onboarding"?: string;
+}
+function SearchableSelect({
+  value,
+  onValueChange,
+  options,
+  placeholder,
+  searchPlaceholder = "Search…",
+  emptyText = "No results",
+  clearLabel = "Clear",
+  disabled = false,
+  id,
+  ...rest
+}: SearchableSelectProps) {
+  const [open, setOpen] = useState(false);
+  // Map: lowercase → original string, for safe onSelect lookup
+  const optionMap = new Map(options.map(o => [o.toLocaleLowerCase(), o]));
+  return (
+    <Popover open={open} onOpenChange={disabled ? undefined : setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          id={id}
+          type="button"
+          role="combobox"
+          aria-expanded={open}
+          aria-haspopup="listbox"
+          disabled={disabled}
+          {...rest}
+          className={
+            "flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background " +
+            "focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 " +
+            "disabled:cursor-not-allowed disabled:opacity-50 transition-colors " +
+            (open ? "ring-2 ring-ring ring-offset-2" : "")
+          }
+          onClick={() => !disabled && setOpen(o => !o)}
+        >
+          <span className={value ? "text-foreground" : "text-muted-foreground"}>
+            {value || placeholder}
+          </span>
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+        <Command>
+          <CommandInput placeholder={searchPlaceholder} className="h-9" />
+          <CommandList>
+            <CommandEmpty className="py-4 text-center text-sm text-muted-foreground">{emptyText}</CommandEmpty>
+            <CommandGroup>
+              {value && (
+                <CommandItem
+                  key="__clear__"
+                  value="__clear__"
+                  onSelect={() => { onValueChange(""); setOpen(false); }}
+                  className="text-muted-foreground italic"
+                >
+                  <X className="mr-2 h-3.5 w-3.5 opacity-50" />
+                  {clearLabel}
+                </CommandItem>
+              )}
+              {options.map(opt => (
+                <CommandItem
+                  key={opt}
+                  value={opt}
+                  onSelect={selectedNormalized => {
+                    // Recover original-case string; fall back to opt if map miss
+                    const original = optionMap.get(selectedNormalized) ?? opt;
+                    onValueChange(original === value ? "" : original);
+                    setOpen(false);
+                  }}
+                >
+                  <Check
+                    className={"mr-2 h-4 w-4 " + (value === opt ? "opacity-100" : "opacity-0")}
+                  />
+                  {opt}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+
 // ─── Component ───────────────────────────────────────────────────────────────
 export default function SearchPage() {
   const { t } = useTranslation();
@@ -158,13 +312,19 @@ export default function SearchPage() {
   const [searchParams] = useSearchParams();
   const [showOnboarding, setShowOnboarding] = useState(false);
 
-  // ── Location state (global-ready naming) ──
-  // country: currently always Türkiye (locked), region = city, subregion = district
-  const [country] = useState("Türkiye");
+  // ── Location state (global-ready) ──
+  // country: ISO code; defaults to TR (existing backend is TR-only)
+  // city / district: for TR, driven by turkey.json structured data
+  //                  for other countries, free-text inputs
+  const [country, setCountry] = useState("TR");
   const [city, setCity] = useState("");
   const [district, setDistrict] = useState("");
   const [availableDistricts, setAvailableDistricts] = useState<string[]>([]);
 
+  // Derived: is the selected country Turkey (structured subregion data available)?
+  const isTurkey = country === "TR";
+  const countryObj = COUNTRY_BY_CODE.get(country);
+  const countryDisplay = countryObj ? `${countryObj.flag} ${countryObj.name}` : country;
   // ── Search filters ──
   const [category, setCategory] = useState("");
   const [keyword, setKeyword] = useState("");
@@ -223,6 +383,11 @@ export default function SearchPage() {
 
   // ─── Effects ───────────────────────────────────────────────────────────────
   useEffect(() => {
+    if (!isTurkey) {
+      // For non-Turkey countries: no structured district list; keep city free-text
+      setAvailableDistricts([]);
+      return;
+    }
     if (city) {
       const selectedProvince = turkeyData.provinces.find((p) => p.name === city);
       const districts = selectedProvince?.districts || [];
@@ -241,7 +406,15 @@ export default function SearchPage() {
       setDistrict("");
       setPendingDistrict(null);
     }
-  }, [city, pendingDistrict]);
+  }, [city, pendingDistrict, isTurkey]);
+
+  // When country changes: clear city/district so the form stays coherent
+  useEffect(() => {
+    setCity("");
+    setDistrict("");
+    setAvailableDistricts([]);
+    setPendingDistrict(null);
+  }, [country]);
 
   useEffect(() => {
     if (profile && profile.onboarding_completed === false) {
@@ -549,76 +722,112 @@ export default function SearchPage() {
       )}
 
       {/* ── Filter Panel ── */}
-      <div className="bg-card rounded-xl border shadow-soft p-6 space-y-4">
-        {/* Basic filters */}
+      <div className="bg-card rounded-xl border shadow-soft p-6 space-y-5">
+        {/* Primary filters */}
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {/* Country (locked, global-ready slot) */}
-          <div className="space-y-2">
-            <Label className="flex items-center gap-2 text-sm font-medium">
-              <MapPin className="w-4 h-4 text-muted-foreground" />
-              Ülke
+          {/* Country — real SearchableSelect */}
+          <div className="space-y-1.5">
+            <Label className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-primary">
+              <MapPin className="w-3.5 h-3.5" />
+              {t("searchPage.country")}
             </Label>
-            <Select value={country} disabled>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Türkiye">🇹🇷 Türkiye</SelectItem>
-              </SelectContent>
-            </Select>
+            <SearchableSelect
+              value={countryDisplay}
+              onValueChange={display => {
+                // display is "🇹🇷 Türkiye" etc — find by display string
+                const found = COUNTRIES.find(c => `${c.flag} ${c.name}` === display);
+                if (found) setCountry(found.code);
+              }}
+              options={COUNTRIES.map(c => `${c.flag} ${c.name}`)}
+              placeholder={t("searchPage.selectCountry")}
+              searchPlaceholder={t("searchPage.searchCountry")}
+              emptyText={t("searchPage.noCountryFound")}
+              clearLabel={t("searchPage.clearSelection")}
+            />
           </div>
 
           {/* City / Region */}
-          <div className="space-y-2">
-            <Label className="flex items-center gap-2 text-sm font-medium">
-              <MapPin className="w-4 h-4 text-muted-foreground" />
+          <div className="space-y-1.5">
+            <Label
+              htmlFor="city-select"
+              className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-foreground"
+            >
+              <MapPin className="w-3.5 h-3.5 text-primary" />
               {t("searchPage.city")}
-            </Label>
-            <Select value={city} onValueChange={setCity}>
-              <SelectTrigger data-onboarding="city-select" id="city-select">
-                <SelectValue placeholder={t("searchPage.selectCity")} />
-              </SelectTrigger>
-              <SelectContent>
-                {turkeyData.provinces.map(province => (
-                  <SelectItem key={province.id} value={province.name}>
-                    {province.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* District / İlçe */}
-          <div className="space-y-2">
-            <Label className="flex items-center gap-2 text-sm font-medium">
-              <MapPin className="w-4 h-4 text-muted-foreground" />
-              <span>
-                {t("searchPage.district")}
-                {city && (
-                  <span className="ml-1.5 text-[11px] font-normal text-muted-foreground">(İlçe — isteğe bağlı)</span>
-                )}
+              <span className="ml-auto text-[10px] font-normal normal-case tracking-normal text-muted-foreground">
+                {isTurkey ? t("searchPage.cityHint") : t("searchPage.districtFreeHint")}
               </span>
             </Label>
-            <Select value={district} onValueChange={setDistrict} disabled={!city}>
-              <SelectTrigger data-onboarding="district-select" id="district-select">
-                <SelectValue placeholder={
-                  city
-                    ? `${city} ilçesi seçin (isteğe bağlı)`
-                    : "Önce şehir / il seçin"
-                } />
-              </SelectTrigger>
-              <SelectContent>
-                {availableDistricts.map(d => (
-                  <SelectItem key={d} value={d}>{d}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {isTurkey ? (
+              <SearchableSelect
+                id="city-select"
+                data-onboarding="city-select"
+                value={city}
+                onValueChange={setCity}
+                options={turkeyData.provinces.map(p => p.name)}
+                placeholder={t("searchPage.selectCity")}
+                searchPlaceholder={t("searchPage.searchCity")}
+                emptyText={t("searchPage.noCityFound")}
+                clearLabel={t("searchPage.clearSelection")}
+              />
+            ) : (
+              <Input
+                id="city-select"
+                data-onboarding="city-select"
+                type="text"
+                placeholder={t("searchPage.cityPlaceholderFree")}
+                value={city}
+                onChange={e => setCity(e.target.value)}
+              />
+            )}
+          </div>
+
+          {/* District / Subregion */}
+          <div className="space-y-1.5">
+            <Label
+              htmlFor="district-select"
+              className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-foreground"
+            >
+              <MapPin className="w-3.5 h-3.5 text-primary" />
+              {t("searchPage.district")}
+              {city && (
+                <span className="ml-auto text-[10px] font-normal normal-case tracking-normal text-muted-foreground">
+                  {t("searchPage.districtOptional")}
+                </span>
+              )}
+            </Label>
+            {isTurkey ? (
+              <SearchableSelect
+                id="district-select"
+                data-onboarding="district-select"
+                value={district}
+                onValueChange={setDistrict}
+                options={availableDistricts}
+                placeholder={city ? `${city} ${t("searchPage.selectDistrict")}` : t("searchPage.selectCityFirst")}
+                searchPlaceholder={t("searchPage.searchDistrict")}
+                emptyText={t("searchPage.noDistrictFound")}
+                clearLabel={t("searchPage.clearSelection")}
+                disabled={!city}
+              />
+            ) : (
+              <Input
+                id="district-select"
+                data-onboarding="district-select"
+                type="text"
+                placeholder={t("searchPage.districtPlaceholderFree")}
+                value={district}
+                onChange={e => setDistrict(e.target.value)}
+              />
+            )}
           </div>
 
           {/* Category */}
-          <div className="space-y-2">
-            <Label className="flex items-center gap-2 text-sm font-medium">
-              <Tag className="w-4 h-4 text-muted-foreground" />
+          <div className="space-y-1.5">
+            <Label
+              htmlFor="category-input"
+              className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-foreground"
+            >
+              <Tag className="w-3.5 h-3.5 text-primary" />
               {t("searchPage.category")}
             </Label>
             <Input
@@ -632,12 +841,12 @@ export default function SearchPage() {
           </div>
         </div>
 
-        {/* Advanced filters — always visible inline */}
-        <div className="grid sm:grid-cols-3 gap-4 pt-2 border-t">
+        {/* Secondary filters */}
+        <div className="grid sm:grid-cols-3 gap-4 pt-4 border-t border-dashed">
           {/* Keyword */}
-          <div className="space-y-2">
-            <Label className="flex items-center gap-2 text-sm font-medium">
-              <Search className="w-4 h-4 text-muted-foreground" />
+          <div className="space-y-1.5">
+            <Label className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+              <Search className="w-3.5 h-3.5" />
               {t("searchPage.keyword")}
             </Label>
             <Input
@@ -646,14 +855,16 @@ export default function SearchPage() {
               placeholder={t("searchPage.keywordPlaceholder")}
               value={keyword}
               onChange={e => setKeyword(e.target.value)}
+              className="text-sm"
             />
           </div>
 
           {/* Min rating */}
-          <div className="space-y-2">
-            <Label className="flex items-center gap-2 text-sm font-medium">
-              <Star className="w-4 h-4 text-muted-foreground" />
-              {t("searchPage.minRating")}: {minRating[0].toFixed(1)}
+          <div className="space-y-1.5">
+            <Label className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+              <Star className="w-3.5 h-3.5" />
+              {t("searchPage.minRating")}:
+              <span className="font-semibold text-foreground ml-1">{minRating[0].toFixed(1)}</span>
             </Label>
             <Slider
               id="min-rating-slider"
@@ -667,9 +878,9 @@ export default function SearchPage() {
           </div>
 
           {/* Min reviews */}
-          <div className="space-y-2">
-            <Label className="flex items-center gap-2 text-sm font-medium">
-              <MessageSquare className="w-4 h-4 text-muted-foreground" />
+          <div className="space-y-1.5">
+            <Label className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+              <MessageSquare className="w-3.5 h-3.5" />
               {t("searchPage.minReviews")}
             </Label>
             <Input
@@ -682,26 +893,28 @@ export default function SearchPage() {
                 const value = Number(e.target.value);
                 setMinReviews(value < 0 ? "0" : e.target.value);
               }}
+              className="text-sm"
             />
           </div>
         </div>
 
-        {/* Search button */}
-        <div className="flex justify-end">
+        {/* Search button — full-width, prominent */}
+        <div className="pt-1">
           <Button
             data-onboarding="search-button"
             onClick={handleSearch}
-            className="min-w-[140px]"
+            size="lg"
+            className="w-full gap-2 text-base font-semibold"
             disabled={!city || !category || isSearching}
           >
             {isSearching ? (
               <>
-                <Loader2 className="w-4 h-4 animate-spin" />
+                <Loader2 className="w-5 h-5 animate-spin" />
                 {t("searchPage.searching")}
               </>
             ) : (
               <>
-                <Search className="w-4 h-4" />
+                <Search className="w-5 h-5" />
                 {t("searchPage.search")}
               </>
             )}
@@ -728,18 +941,20 @@ export default function SearchPage() {
           </div>
         ) : hasSearched ? (
         <div className="bg-card rounded-xl border shadow-soft overflow-hidden">
-          {/* Results header */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-3 border-b bg-muted/20">
-            <div className="flex items-center gap-4 flex-wrap">
-              <span className="text-sm font-medium">
-                {totalResults.toLocaleString()} sonuç
+          {/* Results action bar */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-3 border-b bg-muted/30">
+            <div className="flex items-center gap-3 flex-wrap">
+              <span className="text-sm font-semibold text-foreground">
+                {t("searchPage.resultsTotal", { count: totalResults })}
               </span>
+              <span className="text-muted-foreground/40 select-none">·</span>
               <span className="text-sm text-muted-foreground">
-                {results.length} gösteriliyor
+                {t("searchPage.resultsShowing", { count: results.length })}
               </span>
               {selectedIds.length > 0 && (
-                <span className="text-sm font-medium text-primary">
-                  {selectedIds.length} seçili
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 text-primary text-xs font-semibold px-2.5 py-0.5">
+                  <Check className="w-3 h-3" />
+                  {t("searchPage.selectedPill", { count: selectedIds.length })}
                 </span>
               )}
             </div>
@@ -747,11 +962,15 @@ export default function SearchPage() {
               data-onboarding="add-to-list"
               disabled={selectedIds.length === 0}
               size="sm"
+              variant={selectedIds.length > 0 ? "default" : "outline"}
               onClick={openListDialog}
+              className="gap-1.5 shrink-0"
             >
               <Plus className="w-4 h-4" />
-              Seçilenleri Listeye Ekle
-              {selectedIds.length > 0 && ` (${selectedIds.length})`}
+              {t("searchPage.addToList")}
+              {selectedIds.length > 0 && (
+                <span className="ml-0.5 opacity-80">({selectedIds.length})</span>
+              )}
             </Button>
           </div>
 
@@ -759,49 +978,50 @@ export default function SearchPage() {
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b bg-muted/20">
-                  <th className="text-left p-4 w-10">
+                <tr className="border-b bg-muted/10">
+                  <th className="text-left px-4 py-3 w-10">
                     <Checkbox
                       checked={selectedIds.length === results.length && results.length > 0}
                       onCheckedChange={toggleSelectAll}
                     />
                   </th>
-                  <th className="text-left p-4 font-medium text-muted-foreground">İşletme</th>
-                  <th className="text-left p-4 font-medium text-muted-foreground">Konum</th>
-                  <th className="text-left p-4 font-medium text-muted-foreground">Kategori</th>
-                  <th className="text-left p-4 font-medium text-muted-foreground">Puan</th>
-                  <th className="text-left p-4 font-medium text-muted-foreground">Yorum</th>
-                  <th className="text-left p-4 font-medium text-muted-foreground">
+                  <th className="text-left px-4 py-3 font-semibold text-foreground">{t("searchPage.colBusiness")}</th>
+                  <th className="text-left px-4 py-3 font-medium text-muted-foreground text-xs uppercase tracking-wide">{t("searchPage.colLocation")}</th>
+                  <th className="text-left px-4 py-3 font-medium text-muted-foreground text-xs uppercase tracking-wide">{t("searchPage.colCategory")}</th>
+                  <th className="text-left px-4 py-3 font-medium text-muted-foreground text-xs uppercase tracking-wide">{t("searchPage.colRating")}</th>
+                  <th className="text-left px-4 py-3 font-medium text-muted-foreground text-xs uppercase tracking-wide">{t("searchPage.colReviews")}</th>
+                  <th className="text-left px-4 py-3 font-medium text-muted-foreground text-xs uppercase tracking-wide">
                     <span className="flex items-center gap-1">
-                      Lead Potansiyeli
+                      {t("searchPage.colLeadScore")}
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <Info className="w-3.5 h-3.5 text-muted-foreground/60 cursor-help" />
+                          <Info className="w-3 h-3 text-muted-foreground/50 cursor-help" />
                         </TooltipTrigger>
                         <TooltipContent side="top" className="max-w-[220px] text-xs space-y-1">
-                          <p className="font-semibold">Lead Potansiyeli</p>
-                          <p>Görünen sinyallere göre önceliklendirme skoru (0–100). Satış garantisi değildir.</p>
+                          <p className="font-semibold">{t("searchPage.leadScoreTooltipTitle")}</p>
+                          <p>{t("searchPage.leadScoreTooltipDesc")}</p>
                           <ul className="mt-1 space-y-0.5 text-muted-foreground">
-                            <li>Yorum hacmi — %45</li>
-                            <li>Puan — %30</li>
-                            <li>Website — %15</li>
-                            <li>Telefon — %10</li>
+                            <li>{t("searchPage.leadScoreReviews")}</li>
+                            <li>{t("searchPage.leadScoreRating")}</li>
+                            <li>{t("searchPage.leadScoreWebsite")}</li>
+                            <li>{t("searchPage.leadScorePhone")}</li>
                           </ul>
                         </TooltipContent>
                       </Tooltip>
                     </span>
                   </th>
-                  <th className="text-left p-4 font-medium text-muted-foreground">İletişim</th>
-                  <th className="text-left p-4 font-medium text-muted-foreground">Ek İletişim</th>
-                  <th className="text-left p-4 font-medium text-muted-foreground">Website</th>
-                  <th className="text-left p-4 font-medium text-muted-foreground w-24">İşlemler</th>
+                  <th className="text-left px-4 py-3 font-medium text-muted-foreground text-xs uppercase tracking-wide">{t("searchPage.colContact")}</th>
+                  <th className="text-left px-4 py-3 font-medium text-muted-foreground text-xs uppercase tracking-wide">{t("searchPage.colExtraData")}</th>
+                  <th className="text-left px-4 py-3 font-medium text-muted-foreground text-xs uppercase tracking-wide">{t("searchPage.colWebsite")}</th>
+                  <th className="text-left px-4 py-3 font-medium text-muted-foreground text-xs uppercase tracking-wide w-24">{t("searchPage.colAction")}</th>
                 </tr>
               </thead>
               <tbody>
                 {results.map(item => {
 
                   const contactStatus = contactStatusConfig[getContactStatus(item)];
-                  const enrichmentPotential = enrichmentPotentialConfig[getEnrichmentPotential(item)];
+                  const enrichmentKey = getEnrichmentPotential(item);
+                  const enrichmentPotential = enrichmentPotentialConfig[enrichmentKey];
                   const leadScore = computeLeadScore(item);
                   const leadLevel = leadLevelConfig[getLeadLevel(leadScore)];
                   const websiteDisplay = item.website
@@ -811,10 +1031,10 @@ export default function SearchPage() {
                   return (
                     <tr
                       key={item.id}
-                      className="border-b hover:bg-muted/30 transition-colors"
+                      className="border-b hover:bg-muted/40 transition-colors group"
                     >
                       {/* Checkbox */}
-                      <td className="p-4">
+                      <td className="px-4 py-3">
                         <Checkbox
                           checked={selectedIds.includes(item.id)}
                           onCheckedChange={() => toggleSelect(item.id)}
@@ -822,28 +1042,28 @@ export default function SearchPage() {
                       </td>
 
                       {/* Business name */}
-                      <td className="p-4 min-w-[180px]">
-                        <div className="font-medium leading-snug">{item.name}</div>
+                      <td className="px-4 py-3 min-w-[180px]">
+                        <div className="font-semibold text-sm leading-snug text-foreground">{item.name}</div>
                       </td>
 
                       {/* Location */}
-                      <td className="p-4 min-w-[120px] max-w-[180px]">
+                      <td className="px-4 py-3 min-w-[120px] max-w-[180px]">
                         {(() => {
                           const d = item.district?.trim();
                           const c = city?.trim();
                           const label = formatLocation(d, c);
                           return (
                             <span
-                              className="block truncate text-sm text-muted-foreground leading-snug"
+                              className="block truncate leading-snug"
                               title={label}
                             >
                               {d && c ? (
                                 <>
-                                  <span className="font-medium text-foreground">{d}</span>
-                                  <span className="block text-xs text-muted-foreground">{c}</span>
+                                  <span className="text-sm text-muted-foreground">{d}</span>
+                                  <span className="block text-xs text-muted-foreground/60">{c}</span>
                                 </>
                               ) : (
-                                label
+                                <span className="text-sm text-muted-foreground">{label}</span>
                               )}
                             </span>
                           );
@@ -851,62 +1071,66 @@ export default function SearchPage() {
                       </td>
 
                       {/* Category */}
-                      <td className="p-4 text-muted-foreground max-w-[140px] truncate">
+                      <td className="px-4 py-3 text-xs text-muted-foreground max-w-[140px] truncate">
                         {item.category || "—"}
                       </td>
 
                       {/* Rating */}
-                      <td className="p-4 whitespace-nowrap">
+                      <td className="px-4 py-3 whitespace-nowrap">
                         <span className="flex items-center gap-1">
                           <Star className="w-3.5 h-3.5 text-yellow-500 fill-yellow-500" />
-                          <span className="font-medium">{item.rating ?? "—"}</span>
+                          <span className="font-semibold text-sm">{item.rating ?? "—"}</span>
                         </span>
                       </td>
 
                       {/* Reviews */}
-                      <td className="p-4 text-muted-foreground whitespace-nowrap">
+                      <td className="px-4 py-3 text-sm text-muted-foreground whitespace-nowrap">
                         {typeof item.reviews === "number" ? item.reviews.toLocaleString() : "—"}
                       </td>
 
-                      {/* Lead Potansiyeli skoru */}
-                      <td className="p-4 whitespace-nowrap">
+                      {/* Lead Score */}
+                      <td className="px-4 py-3 whitespace-nowrap">
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium cursor-default ${leadLevel.className}`}>
                               {leadScore}
-                              <span className="font-normal opacity-70">{leadLevel.label}</span>
+                              <span className="font-normal opacity-70">{t(leadLevel.labelKey)}</span>
                               <Info className="w-3 h-3 opacity-50" />
                             </span>
                           </TooltipTrigger>
                           <TooltipContent side="top" className="max-w-[220px] text-xs space-y-1">
-                            <p className="font-semibold">Lead Potansiyeli: {leadScore}/100</p>
-                            <p>Görünen sinyallere göre önceliklendirme skoru. Satış garantisi değildir.</p>
+                            <p className="font-semibold">{t("searchPage.leadScoreTooltipTitle")}: {leadScore}/100</p>
+                            <p>{t("searchPage.leadScoreTooltipDesc")}</p>
                             <ul className="mt-1 space-y-0.5 text-muted-foreground">
-                              <li>Yorum hacmi — %45</li>
-                              <li>Puan — %30</li>
-                              <li>Website — %15</li>
-                              <li>Telefon — %10</li>
+                              <li>{t("searchPage.leadScoreReviews")}</li>
+                              <li>{t("searchPage.leadScoreRating")}</li>
+                              <li>{t("searchPage.leadScoreWebsite")}</li>
+                              <li>{t("searchPage.leadScorePhone")}</li>
                             </ul>
                           </TooltipContent>
                         </Tooltip>
                       </td>
 
-                      {/* Contact status — mevcut veri */}
-                      <td className="p-4">
+                      {/* Contact status */}
+                      <td className="px-4 py-3">
                         <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium ${contactStatus.className}`}>
-                          {contactStatus.label}
+                          {t(contactStatus.labelKey)}
                         </span>
                       </td>
 
-                      {/* Enrichment potential — e-posta/sosyal */}
-                      <td className="p-4">
-                        <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium ${enrichmentPotential.className}`}>
-                          {enrichmentPotential.label}
-                        </span>
+                      {/* Enrichment potential (secondary) */}
+                      <td className="px-4 py-3">
+                        {enrichmentKey === "canEnrich" ? (
+                          <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium ${enrichmentPotential.className}`}>
+                            {t(enrichmentPotential.labelKey)}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground/40 text-[11px]">—</span>
+                        )}
                       </td>
 
                       {/* Website */}
-                      <td className="p-4 max-w-[160px]">
+                      <td className="px-4 py-3 max-w-[160px]">
                         {websiteDisplay ? (
                           <a
                             href={`https://${item.website!.replace(/^https?:\/\//, "")}`}
@@ -918,23 +1142,23 @@ export default function SearchPage() {
                             {websiteDisplay}
                           </a>
                         ) : (
-                          <span className="text-muted-foreground text-xs">—</span>
+                          <span className="text-muted-foreground/40 text-xs">—</span>
                         )}
                       </td>
 
                       {/* Actions */}
-                      <td className="p-4">
+                      <td className="px-4 py-3">
                         <Button
-                          variant="ghost"
+                          variant="outline"
                           size="sm"
                           onClick={() => {
                             console.debug('[DEBUG][SearchPage] detail:open', { itemId: item.id, name: item.name });
                             setDetailItem(item);
                           }}
-                          className="h-8 px-2 text-xs"
+                          className="h-7 px-2.5 text-xs opacity-70 group-hover:opacity-100 transition-opacity"
                         >
                           <Eye className="w-3.5 h-3.5 mr-1" />
-                          Detay
+                          {t("searchPage.detailBtn")}
                         </Button>
                       </td>
                     </tr>
@@ -956,15 +1180,12 @@ export default function SearchPage() {
                 {isLoadingMore ? (
                   <>
                     <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                    Yükleniyor…
+                    {t("searchPage.loading")}
                   </>
                 ) : (
-                  // Show credit cost only when the next page hasn't been viewed before.
-                  // Restored sessions may already have paid for upcoming pages —
-                  // avoid misleading the user with a credit cost that won't apply.
                   viewedPages.has(nextPage)
-                    ? <>Daha Fazla Yükle</>
-                    : <>Daha Fazla Yükle ({creditsPerPage} kredi)</>
+                    ? <>{t("searchPage.loadMore")}</>
+                    : <>{t("searchPage.loadMoreWithCost", { cost: creditsPerPage })}</>
                 )}
               </Button>
             </div>
