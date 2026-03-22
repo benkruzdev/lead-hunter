@@ -770,6 +770,29 @@ const resources = {
                 enrichCanEnrich: 'Zenginleştirme Mümkün',
                 // Action button
                 detailBtn: 'Detay',
+                // Detail drawer sections
+                drawerGeneral: 'Genel',
+                drawerContact: 'İletişim',
+                drawerActions: 'Aksiyonlar',
+                reviewsLabel: 'yorum',
+                noLocationInfo: 'Konum bilgisi mevcut değil',
+                phone: 'Telefon',
+                noData: 'Veri bulunamadı',
+                website: 'Website',
+                emailAndSocial: 'E-posta ve Sosyal Profiller',
+                enrichmentAvailable: 'Zenginleştirme ile alınabilir',
+                noEnrichmentSource: 'Ek veri kaynağı yok',
+                addToListAction: 'Listeye Ekle',
+                openWebsite: 'Siteyi Aç',
+                copyPhone: 'Telefonu Kopyala',
+                copied: 'Kopyalandı!',
+                openMap: 'Haritada Aç',
+                // Country selector
+                comingSoonBadge: 'Yakında',
+                comingSoonTooltip: 'Bu ülke yakında desteklenecek.',
+                // Credit error interpolation (add-to-list dialog)
+                creditErrorRequired: '{{required}} kredi gerekli,',
+                creditErrorAvailable: '{{available}} kredi mevcut.',
             },
             leadQuality: {
                 new: {
@@ -1627,7 +1650,7 @@ const resources = {
                     freshnessTooltip: 'Data freshness will be measured with backend.',
                 },
                 emptyTitle: 'Start Searching Businesses',
-                emptyDescription: 'Select a city and category to search businesses across Turkey. Build your lead list from the results.',
+                emptyDescription: 'Select a country, city and category to search businesses worldwide. Build your lead list from the results.',
                 detailAddress: 'Address',
                 detailPhone: 'Phone',
                 detailWebsite: 'Website',
@@ -1695,6 +1718,29 @@ const resources = {
                 enrichCanEnrich: 'Enrichable',
                 // Action button
                 detailBtn: 'Detail',
+                // Detail drawer sections
+                drawerGeneral: 'General',
+                drawerContact: 'Contact',
+                drawerActions: 'Actions',
+                reviewsLabel: 'reviews',
+                noLocationInfo: 'Location not available',
+                phone: 'Phone',
+                noData: 'No data available',
+                website: 'Website',
+                emailAndSocial: 'Email & Social Profiles',
+                enrichmentAvailable: 'Available via enrichment',
+                noEnrichmentSource: 'No enrichment source',
+                addToListAction: 'Add to List',
+                openWebsite: 'Open Website',
+                copyPhone: 'Copy Phone',
+                copied: 'Copied!',
+                openMap: 'Open in Maps',
+                // Country selector
+                comingSoonBadge: 'Coming Soon',
+                comingSoonTooltip: 'This country will be supported soon.',
+                // Credit error interpolation (add-to-list dialog)
+                creditErrorRequired: '{{required}} credits needed,',
+                creditErrorAvailable: '{{available}} available.',
             },
             leadQuality: {
                 new: {

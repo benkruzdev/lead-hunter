@@ -914,6 +914,8 @@ export interface SearchParams {
     minRating?: number;
     minReviews?: number;
     sessionId?: string;
+    /** ISO 3166-1 alpha-2. Defaults to 'TR' on the backend when omitted. */
+    countryCode?: string;
 }
 
 export interface SearchResult {
@@ -985,6 +987,8 @@ export async function getSearchPage(
 
 export interface SearchSession {
     id: string;
+    /** ISO 3166-1 alpha-2. Absent on pre-migration sessions — treat as 'TR'. */
+    country_code?: string;
     province: string;
     district: string | null;
     category: string;

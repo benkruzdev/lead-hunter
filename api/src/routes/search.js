@@ -3,6 +3,17 @@ import { requireAuth } from '../middleware/auth.js';
 import { supabaseAdmin } from '../config/supabase.js';
 import { logEvent } from '../utils/eventLogger.js';
 
+/**
+ * MANDATORY DB MIGRATION — run once before deploying this version:
+ *
+ *   ALTER TABLE search_sessions
+ *     ADD COLUMN IF NOT EXISTS country_code TEXT DEFAULT 'TR';
+ *
+ * This is additive and non-breaking: existing rows receive 'TR' as default.
+ * Country-aware query identity, session restore, and cache isolation all
+ * depend on this column being present.
+ */
+
 const router = express.Router();
 
 const PAGE_SIZE = 20;
@@ -39,21 +50,27 @@ async function getCreditsPerPage() {
     return data.credits_per_page;
 }
 
-function buildSearchQuery(province, district, category, keyword) {
+function buildSearchQuery(province, district, category, keyword, countryCode) {
     const parts = [province];
     if (district) parts.push(district);
     parts.push(category);
     if (keyword) parts.push(keyword);
+    // For non-TR countries append the country name so Google returns the right
+    // geographic context without relying solely on regionCode.
+    if (countryCode && countryCode !== 'TR') parts.push(countryCode);
     return parts.join(' ');
 }
 
 /**
  * Build a deterministic, normalized query cache key.
  * All args lowercased + trimmed. Empty/null fields become empty string.
+ * countryCode is included so the same city+category in different countries
+ * produces different cache entries and different Google results.
  */
-function buildQueryKey(province, district, category, keyword, minRating, minReviews) {
+function buildQueryKey(province, district, category, keyword, minRating, minReviews, countryCode) {
     const norm = (v) => (v ? String(v).toLowerCase().trim() : '');
     return [
+        norm(countryCode || 'tr'),
         norm(province),
         norm(district),
         norm(category),
@@ -132,16 +149,21 @@ function mapPlace(place) {
  * Perform Places Text Search (New) with optional rating filter.
  * Returns all unique place IDs (up to 60).
  */
-async function collectPlaceIdsFiltered(apiKey, query, minRating, maxResults = 60) {
+async function collectPlaceIdsFiltered(apiKey, query, minRating, countryCode, maxResults = 60) {
     const placeIds = [];
     let pageToken = undefined;
     const maxPages = Math.ceil(Math.min(maxResults, 60) / PAGE_SIZE);
 
+    // Map countryCode to a sensible languageCode for display names.
+    // Default to 'tr' for TR (existing behaviour), 'en' for all others.
+    const langCode = countryCode === 'TR' ? 'tr' : 'en';
+    const regionCode = countryCode || 'TR';
+
     for (let i = 0; i < maxPages; i++) {
         const body = {
             textQuery: query,
-            languageCode: 'tr',
-            regionCode: 'TR',
+            languageCode: langCode,
+            regionCode: regionCode,
             maxResultCount: PAGE_SIZE,
         };
         if (pageToken) body.pageToken = pageToken;
@@ -293,6 +315,8 @@ router.post('/', requireAuth, async (req, res) => {
     try {
         const userId = req.user.id;
         const { province, district, category, keyword, minRating, minReviews, sessionId } = req.body;
+        // countryCode defaults to 'TR' for full backward compatibility.
+        const countryCode = (req.body.countryCode || 'TR').toUpperCase();
 
         // ── A. Session restore (history → search page) ──────────────────────
         if (sessionId) {
@@ -370,7 +394,7 @@ router.post('/', requireAuth, async (req, res) => {
             return res.status(400).json({ error: 'Province and category are required' });
         }
 
-        const queryKey = buildQueryKey(province, district, category, keyword, minRating, minReviews);
+        const queryKey = buildQueryKey(province, district, category, keyword, minRating, minReviews, countryCode);
         const now = new Date().toISOString();
 
         // 1. Check query cache
@@ -415,6 +439,7 @@ router.post('/', requireAuth, async (req, res) => {
                     .from('search_sessions')
                     .insert({
                         user_id: userId,
+                        country_code: countryCode,
                         province,
                         district: district || null,
                         category,
@@ -451,8 +476,8 @@ router.post('/', requireAuth, async (req, res) => {
 
         console.log('[Search] Cache miss — hitting Google. Query:', queryKey);
 
-        const query = buildSearchQuery(province, district, category, keyword);
-        const { placeIds } = await collectPlaceIdsFiltered(apiKey, query, minRating);
+        const query = buildSearchQuery(province, district, category, keyword, countryCode);
+        const { placeIds } = await collectPlaceIdsFiltered(apiKey, query, minRating, countryCode);
 
         // Apply minReviews filter: fetch details for all, filter, keep IDs ordered
         let filteredIds = placeIds;
@@ -512,6 +537,7 @@ router.post('/', requireAuth, async (req, res) => {
             .from('search_sessions')
             .insert({
                 user_id: userId,
+                country_code: countryCode,
                 province,
                 district: district || null,
                 category,
@@ -823,6 +849,7 @@ router.get('/sessions', requireAuth, async (req, res) => {
 
         const normalizedSessions = sessions.map(row => ({
             id: row.id,
+            country_code: row.country_code ?? 'TR',
             province: row.province ?? row.filters?.province ?? null,
             district: row.district ?? row.filters?.district ?? null,
             category: row.category ?? row.filters?.category ?? null,

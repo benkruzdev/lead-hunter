@@ -10,6 +10,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Popover,
   PopoverContent,
   PopoverTrigger,
@@ -69,6 +76,7 @@ import turkeyData from "@/data/turkey.json";
 import { useToast } from "@/hooks/use-toast";
 import { ExportTemplateDialog } from "@/components/app/ExportTemplateDialog";
 import { templates, mapItemToRecord, generateCSV, downloadCSV } from "@/lib/exportTemplates";
+import { COUNTRY_BY_CODE, VISIBLE_COUNTRIES } from "@/config/countries";
 
 // ─── Contact status helper ─────────────────────────────────────────────────
 // ── İletişim: mevcut veriyi yansıtır (phone / website) ────────────────────
@@ -143,58 +151,7 @@ const leadLevelConfig: Record<LeadLevelKey, { labelKey: string; className: strin
   low:  { labelKey: "searchPage.leadLow",  className: "bg-gray-100 text-gray-500 border-gray-200" },
 };
 
-// ── Supported countries (global-ready slot) ───────────────────────────────────
-// Add more entries as the backend expands coverage.
-// `hasSubregions` = true  → uses structured dropdown data (turkey.json etc.)
-// `hasSubregions` = false → city/district become free-text inputs
-interface Country {
-  code: string;   // ISO 3166-1 alpha-2
-  name: string;   // display name
-  flag: string;   // emoji flag
-  hasSubregions: boolean;
-}
-const COUNTRIES: Country[] = [
-  { code: "TR", name: "Türkiye",        flag: "🇹🇷", hasSubregions: true  },
-  { code: "US", name: "United States",  flag: "🇺🇸", hasSubregions: false },
-  { code: "GB", name: "United Kingdom", flag: "🇬🇧", hasSubregions: false },
-  { code: "DE", name: "Germany",        flag: "🇩🇪", hasSubregions: false },
-  { code: "FR", name: "France",         flag: "🇫🇷", hasSubregions: false },
-  { code: "NL", name: "Netherlands",    flag: "🇳🇱", hasSubregions: false },
-  { code: "ES", name: "Spain",          flag: "🇪🇸", hasSubregions: false },
-  { code: "IT", name: "Italy",          flag: "🇮🇹", hasSubregions: false },
-  { code: "PL", name: "Poland",         flag: "🇵🇱", hasSubregions: false },
-  { code: "AE", name: "UAE",            flag: "🇦🇪", hasSubregions: false },
-  { code: "SA", name: "Saudi Arabia",   flag: "🇸🇦", hasSubregions: false },
-  { code: "EG", name: "Egypt",          flag: "🇪🇬", hasSubregions: false },
-  { code: "NG", name: "Nigeria",        flag: "🇳🇬", hasSubregions: false },
-  { code: "ZA", name: "South Africa",   flag: "🇿🇦", hasSubregions: false },
-  { code: "IN", name: "India",          flag: "🇮🇳", hasSubregions: false },
-  { code: "PK", name: "Pakistan",       flag: "🇵🇰", hasSubregions: false },
-  { code: "BD", name: "Bangladesh",     flag: "🇧🇩", hasSubregions: false },
-  { code: "ID", name: "Indonesia",      flag: "🇮🇩", hasSubregions: false },
-  { code: "MY", name: "Malaysia",       flag: "🇲🇾", hasSubregions: false },
-  { code: "SG", name: "Singapore",      flag: "🇸🇬", hasSubregions: false },
-  { code: "PH", name: "Philippines",    flag: "🇵🇭", hasSubregions: false },
-  { code: "AU", name: "Australia",      flag: "🇦🇺", hasSubregions: false },
-  { code: "CA", name: "Canada",         flag: "🇨🇦", hasSubregions: false },
-  { code: "MX", name: "Mexico",         flag: "🇲🇽", hasSubregions: false },
-  { code: "BR", name: "Brazil",         flag: "🇧🇷", hasSubregions: false },
-  { code: "AR", name: "Argentina",      flag: "🇦🇷", hasSubregions: false },
-  { code: "RU", name: "Russia",         flag: "🇷🇺", hasSubregions: false },
-  { code: "UA", name: "Ukraine",        flag: "🇺🇦", hasSubregions: false },
-  { code: "GR", name: "Greece",         flag: "🇬🇷", hasSubregions: false },
-  { code: "RO", name: "Romania",        flag: "🇷🇴", hasSubregions: false },
-];
-const COUNTRY_BY_CODE = new Map(COUNTRIES.map(c => [c.code, c]));
-// Note: backend currently only processes Turkey (province/district fields).
-// For other countries the search is still fired with the user-entered city/district;
-// results correctness depends on the backend's location-aware logic.
-
-
-
 // ── Location formatter (global-ready) ─────────────────────────────────────────
-// district = subregion (e.g. Kadıköy), city = region/province (e.g. İstanbul)
-// Output: "İlçe, Şehir" | "Şehir" | "—"
 function formatLocation(district: string | null | undefined, city: string | null | undefined): string {
   const d = district?.trim();
   const c = city?.trim();
@@ -204,10 +161,9 @@ function formatLocation(district: string | null | undefined, city: string | null
   return "—";
 }
 
-// ─── Searchable combobox (Popover + Command) ─────────────────────────────────
-// onSelect fix: cmdk normalises the user-typed query, but `CommandItem.value`
-// is used as the match key. We store options in a Map keyed by their
-// lowercase form so we can always retrieve the original-case string.
+// ─── Searchable combobox (Popover + Command) ──────────────────────────────────
+// onSelect fix: cmdk normalises the value string; we keep a lowercase→original
+// map so we always recover the original-case string correctly.
 interface SearchableSelectProps {
   value: string;
   onValueChange: (v: string) => void;
@@ -233,7 +189,6 @@ function SearchableSelect({
   ...rest
 }: SearchableSelectProps) {
   const [open, setOpen] = useState(false);
-  // Map: lowercase → original string, for safe onSelect lookup
   const optionMap = new Map(options.map(o => [o.toLocaleLowerCase(), o]));
   return (
     <Popover open={open} onOpenChange={disabled ? undefined : setOpen}>
@@ -282,7 +237,6 @@ function SearchableSelect({
                   key={opt}
                   value={opt}
                   onSelect={selectedNormalized => {
-                    // Recover original-case string; fall back to opt if map miss
                     const original = optionMap.get(selectedNormalized) ?? opt;
                     onValueChange(original === value ? "" : original);
                     setOpen(false);
@@ -302,6 +256,120 @@ function SearchableSelect({
   );
 }
 
+// ─── Country selector (Popover + Command) ────────────────────────────────────
+// comingSoon entries are visible but truly non-selectable:
+// • aria-disabled keeps them out of keyboard navigation
+// • onSelect is a no-op so even direct cmdk keyboard selection is blocked
+// • state is never mutated → no broken search is triggered
+interface CountrySelectProps {
+  value: string;                     // ISO code of selected country
+  onValueChange: (code: string) => void;
+  placeholder: string;
+  searchPlaceholder?: string;
+  emptyText?: string;
+  clearLabel?: string;
+  comingSoonBadge?: string;
+  comingSoonTooltip?: string;
+}
+function CountrySelect({
+  value,
+  onValueChange,
+  placeholder,
+  searchPlaceholder = "Search…",
+  emptyText = "No results",
+  clearLabel = "Clear",
+  comingSoonBadge = "Coming Soon",
+  comingSoonTooltip = "This country will be supported soon.",
+}: CountrySelectProps) {
+  const [open, setOpen] = useState(false);
+  const selectedEntry = COUNTRY_BY_CODE.get(value);
+  const selectedDisplay = selectedEntry ? `${selectedEntry.flag} ${selectedEntry.name}` : "";
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          role="combobox"
+          aria-expanded={open}
+          aria-haspopup="listbox"
+          className={
+            "flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background " +
+            "focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 transition-colors " +
+            (open ? "ring-2 ring-ring ring-offset-2" : "")
+          }
+          onClick={() => setOpen(o => !o)}
+        >
+          <span className={selectedDisplay ? "text-foreground" : "text-muted-foreground"}>
+            {selectedDisplay || placeholder}
+          </span>
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+        <Command>
+          <CommandInput placeholder={searchPlaceholder} className="h-9" />
+          <CommandList>
+            <CommandEmpty className="py-4 text-center text-sm text-muted-foreground">{emptyText}</CommandEmpty>
+            <CommandGroup>
+              {value && (
+                <CommandItem
+                  key="__clear__"
+                  value="__clear__"
+                  onSelect={() => { onValueChange(""); setOpen(false); }}
+                  className="text-muted-foreground italic"
+                >
+                  <X className="mr-2 h-3.5 w-3.5 opacity-50" />
+                  {clearLabel}
+                </CommandItem>
+              )}
+              {VISIBLE_COUNTRIES.map(entry => {
+                const isComingSoon = entry.status === "comingSoon";
+                const display = `${entry.flag} ${entry.name}`;
+                return (
+                  <Tooltip key={entry.code} delayDuration={isComingSoon ? 400 : 99999}>
+                    <TooltipTrigger asChild>
+                      <CommandItem
+                        value={display}
+                        aria-disabled={isComingSoon}
+                        onSelect={() => {
+                          // comingSoon countries are hard-blocked — no state mutation
+                          if (isComingSoon) return;
+                          onValueChange(entry.code === value ? "" : entry.code);
+                          setOpen(false);
+                        }}
+                        className={
+                          isComingSoon
+                            ? "opacity-50 cursor-not-allowed select-none"
+                            : ""
+                        }
+                      >
+                        <Check
+                          className={"mr-2 h-4 w-4 " + (value === entry.code ? "opacity-100" : "opacity-0")}
+                        />
+                        <span className="flex-1">{display}</span>
+                        {isComingSoon && (
+                          <span className="ml-2 text-[10px] font-medium bg-muted text-muted-foreground rounded px-1.5 py-0.5">
+                            {comingSoonBadge}
+                          </span>
+                        )}
+                      </CommandItem>
+                    </TooltipTrigger>
+                    {isComingSoon && (
+                      <TooltipContent side="right" className="text-xs max-w-[180px]">
+                        {comingSoonTooltip}
+                      </TooltipContent>
+                    )}
+                  </Tooltip>
+                );
+              })}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 
 // ─── Component ───────────────────────────────────────────────────────────────
 export default function SearchPage() {
@@ -312,19 +380,17 @@ export default function SearchPage() {
   const [searchParams] = useSearchParams();
   const [showOnboarding, setShowOnboarding] = useState(false);
 
-  // ── Location state (global-ready) ──
-  // country: ISO code; defaults to TR (existing backend is TR-only)
-  // city / district: for TR, driven by turkey.json structured data
-  //                  for other countries, free-text inputs
+  // ── Location state ──
+  // country: ISO code (from src/config/countries.ts)
+  // city / district: structured dropdown for TR, free-text for others
   const [country, setCountry] = useState("TR");
   const [city, setCity] = useState("");
   const [district, setDistrict] = useState("");
   const [availableDistricts, setAvailableDistricts] = useState<string[]>([]);
 
-  // Derived: is the selected country Turkey (structured subregion data available)?
+  // Derived helpers
+  const countryEntry = COUNTRY_BY_CODE.get(country);
   const isTurkey = country === "TR";
-  const countryObj = COUNTRY_BY_CODE.get(country);
-  const countryDisplay = countryObj ? `${countryObj.flag} ${countryObj.name}` : country;
   // ── Search filters ──
   const [category, setCategory] = useState("");
   const [keyword, setKeyword] = useState("");
@@ -454,6 +520,9 @@ export default function SearchPage() {
         return;
       }
 
+      // Restore country — old sessions without country_code default to TR
+      const restoredCountry = session.country_code ?? "TR";
+      setCountry(restoredCountry);
       setCity(session.province || "");
       setPendingDistrict(session.district || null);
       setCategory(session.category || "");
@@ -463,7 +532,7 @@ export default function SearchPage() {
       setSessionId(sid);
       setTotalResults(session.total_results);
       setHasSearched(true);
-      setSelectedIds([]);   // clear selections on session restore
+      setSelectedIds([]);
 
       getSearchCreditCost().then(costs => {
         setCreditsPerPage(costs.credits_per_page);
@@ -478,6 +547,7 @@ export default function SearchPage() {
         minRating: session.min_rating || undefined,
         minReviews: session.min_reviews || undefined,
         sessionId: sid,
+        countryCode: restoredCountry,
       });
 
       if (seq !== reqSeq.current) {
@@ -533,6 +603,7 @@ export default function SearchPage() {
         keyword: keyword || undefined,
         minRating: minRating[0] || undefined,
         minReviews: minReviews ? Number(minReviews) : undefined,
+        countryCode: country,
       });
 
       if (seq !== reqSeq.current) {
@@ -573,6 +644,7 @@ export default function SearchPage() {
   const handleExportConfirm = (templateId: "basic" | "salesCrm" | "outreach") => {
     const template = templates[templateId];
     const selectedItems = results.filter(item => selectedIds.includes(item.id));
+    // Pass city as location context for export templates
     const records = selectedItems.map(item => mapItemToRecord(item, template, city));
     const csvContent = generateCSV(records, template.columns);
     const timestamp = new Date().toISOString().split("T")[0];
@@ -725,24 +797,21 @@ export default function SearchPage() {
       <div className="bg-card rounded-xl border shadow-soft p-6 space-y-5">
         {/* Primary filters */}
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {/* Country — real SearchableSelect */}
+          {/* Country — CountrySelect with comingSoon support */}
           <div className="space-y-1.5">
             <Label className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-primary">
               <MapPin className="w-3.5 h-3.5" />
               {t("searchPage.country")}
             </Label>
-            <SearchableSelect
-              value={countryDisplay}
-              onValueChange={display => {
-                // display is "🇹🇷 Türkiye" etc — find by display string
-                const found = COUNTRIES.find(c => `${c.flag} ${c.name}` === display);
-                if (found) setCountry(found.code);
-              }}
-              options={COUNTRIES.map(c => `${c.flag} ${c.name}`)}
+            <CountrySelect
+              value={country}
+              onValueChange={setCountry}
               placeholder={t("searchPage.selectCountry")}
               searchPlaceholder={t("searchPage.searchCountry")}
               emptyText={t("searchPage.noCountryFound")}
               clearLabel={t("searchPage.clearSelection")}
+              comingSoonBadge={t("searchPage.comingSoonBadge")}
+              comingSoonTooltip={t("searchPage.comingSoonTooltip")}
             />
           </div>
 
@@ -1222,17 +1291,17 @@ export default function SearchPage() {
                 </div>
               </SheetHeader>
 
-              {/* A) Genel */}
+              {/* A) General */}
               <section>
                 <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
-                  Genel
+                  {t("searchPage.drawerGeneral")}
                 </h4>
                 <div className="space-y-3">
                   <div className="flex items-center gap-2">
                     <Star className="w-4 h-4 text-yellow-500 fill-yellow-500 flex-shrink-0" />
                     <span className="font-semibold">{detailItem.rating ?? "—"}</span>
                     <span className="text-muted-foreground text-sm">
-                      ({typeof detailItem.reviews === "number" ? detailItem.reviews.toLocaleString() : "—"} yorum)
+                      ({typeof detailItem.reviews === "number" ? detailItem.reviews.toLocaleString() : "—"} {t("searchPage.reviewsLabel")})
                     </span>
                   </div>
                   <div className="flex items-start gap-2">
@@ -1240,30 +1309,29 @@ export default function SearchPage() {
                     <span className="text-sm text-muted-foreground leading-relaxed">
                       {detailItem.address ||
                         [detailItem.district, city].filter(Boolean).join(", ") ||
-                        "Konum bilgisi mevcut değil"}
+                        t("searchPage.noLocationInfo")}
                     </span>
                   </div>
-
                 </div>
               </section>
 
               <div className="border-t" />
 
-              {/* B) İletişim */}
+              {/* B) Contact */}
               <section>
                 <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
-                  İletişim
+                  {t("searchPage.drawerContact")}
                 </h4>
                 <div className="space-y-3">
                   {/* Phone */}
                   <div className="flex items-start gap-2">
                     <Phone className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
                     <div>
-                      <p className="text-xs text-muted-foreground mb-0.5">Telefon</p>
+                      <p className="text-xs text-muted-foreground mb-0.5">{t("searchPage.phone")}</p>
                       {detailItem.phone ? (
                         <p className="text-sm font-medium">{detailItem.phone}</p>
                       ) : (
-                        <p className="text-sm text-muted-foreground">Veri bulunamadı</p>
+                        <p className="text-sm text-muted-foreground">{t("searchPage.noData")}</p>
                       )}
                     </div>
                   </div>
@@ -1272,7 +1340,7 @@ export default function SearchPage() {
                   <div className="flex items-start gap-2">
                     <Globe className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
                     <div>
-                      <p className="text-xs text-muted-foreground mb-0.5">Website</p>
+                      <p className="text-xs text-muted-foreground mb-0.5">{t("searchPage.website")}</p>
                       {detailItem.website ? (
                         <a
                           href={`https://${detailItem.website.replace(/^https?:\/\//, "")}`}
@@ -1283,20 +1351,20 @@ export default function SearchPage() {
                           {detailItem.website.replace(/^https?:\/\//, "")}
                         </a>
                       ) : (
-                        <p className="text-sm text-muted-foreground">Veri bulunamadı</p>
+                        <p className="text-sm text-muted-foreground">{t("searchPage.noData")}</p>
                       )}
                     </div>
                   </div>
 
-                  {/* E-posta + Sosyal: enrichment potansiyeli */}
+                  {/* Email + Social via enrichment */}
                   <div className="flex items-start gap-2">
                     <Mail className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
                     <div>
-                      <p className="text-xs text-muted-foreground mb-0.5">E-posta ve Sosyal Profiller</p>
+                      <p className="text-xs text-muted-foreground mb-0.5">{t("searchPage.emailAndSocial")}</p>
                       {detailItem.website ? (
-                        <p className="text-sm text-violet-700">Zenginleştirme ile alınabilir</p>
+                        <p className="text-sm text-violet-700">{t("searchPage.enrichmentAvailable")}</p>
                       ) : (
-                        <p className="text-sm text-muted-foreground">Ek veri kaynağı yok</p>
+                        <p className="text-sm text-muted-foreground">{t("searchPage.noEnrichmentSource")}</p>
                       )}
                     </div>
                   </div>
@@ -1305,10 +1373,10 @@ export default function SearchPage() {
 
               <div className="border-t" />
 
-              {/* C) Aksiyonlar */}
+              {/* C) Actions */}
               <section>
                 <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
-                  Aksiyonlar
+                  {t("searchPage.drawerActions")}
                 </h4>
                 <div className="space-y-2">
                   {/* Add to list */}
@@ -1318,17 +1386,15 @@ export default function SearchPage() {
                       setSelectedIds(prev =>
                         prev.includes(detailItem.id) ? prev : [...prev, detailItem.id]
                       );
-                      // Close sheet first, defer dialog open so the sheet portal fully
-                      // unmounts before the dialog mounts — prevents focus-lock overlap.
                       setDetailItem(null);
                       setTimeout(() => {
-                        console.debug('[DEBUG][SearchPage] detail:listeye-ekle deferred-open');
+                        console.debug('[DEBUG][SearchPage] detail:add-to-list deferred-open');
                         openListDialog();
                       }, 0);
                     }}
                   >
                     <Plus className="w-4 h-4" />
-                    Listeye Ekle
+                    {t("searchPage.addToListAction")}
                   </Button>
 
                   {/* Open website */}
@@ -1344,7 +1410,7 @@ export default function SearchPage() {
                       }
                     >
                       <ExternalLink className="w-4 h-4" />
-                      Siteyi Aç
+                      {t("searchPage.openWebsite")}
                     </Button>
                   )}
 
@@ -1356,7 +1422,7 @@ export default function SearchPage() {
                       onClick={() => handleCopyPhone(detailItem.phone!)}
                     >
                       <Copy className="w-4 h-4" />
-                      {copiedPhone ? "Kopyalandı!" : "Telefonu Kopyala"}
+                      {copiedPhone ? t("searchPage.copied") : t("searchPage.copyPhone")}
                     </Button>
                   )}
 
@@ -1367,10 +1433,10 @@ export default function SearchPage() {
                     onClick={() => handleOpenMap(detailItem)}
                   >
                     <Navigation className="w-4 h-4" />
-                    Haritada Aç
+                    {t("searchPage.openMap")}
                   </Button>
 
-                  {/* Mark for enrichment — adds to selection so user can batch-enrich from ListDetail */}
+                  {/* Mark for enrichment */}
                   <Button
                     variant="ghost"
                     className="w-full justify-start text-muted-foreground"
