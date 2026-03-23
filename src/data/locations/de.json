@@ -1,0 +1,22 @@
+{
+  "countryCode": "DE",
+  "regions": ["Baden-Württemberg","Bavaria","Berlin","Brandenburg","Bremen","Hamburg","Hesse","Lower Saxony","Mecklenburg-Vorpommern","North Rhine-Westphalia","Rhineland-Palatinate","Saarland","Saxony","Saxony-Anhalt","Schleswig-Holstein","Thuringia"],
+  "subregions": {
+    "Baden-Württemberg": ["Stuttgart","Karlsruhe","Mannheim","Freiburg im Breisgau","Heidelberg","Heilbronn","Ulm","Konstanz","Pforzheim","Reutlingen"],
+    "Bavaria": ["Munich","Nuremberg","Augsburg","Regensburg","Würzburg","Ingolstadt","Fürth","Erlangen","Bayreuth","Bamberg"],
+    "Berlin": ["Mitte","Charlottenburg","Prenzlauer Berg","Kreuzberg","Schöneberg","Neukölln","Friedrichshain","Spandau","Reinickendorf","Tempelhof"],
+    "Brandenburg": ["Potsdam","Cottbus","Brandenburg an der Havel","Frankfurt (Oder)","Eberswalde","Oranienburg"],
+    "Bremen": ["Bremen","Bremerhaven"],
+    "Hamburg": ["Hamburg-Mitte","Altona","Eimsbüttel","Hamburg-Nord","Wandsbek","Bergedorf","Harburg"],
+    "Hesse": ["Frankfurt am Main","Wiesbaden","Kassel","Darmstadt","Offenbach am Main","Hanau","Marburg","Fulda","Gießen"],
+    "Lower Saxony": ["Hanover","Braunschweig","Osnabrück","Oldenburg","Göttingen","Wolfsburg","Salzgitter","Hildesheim","Celle"],
+    "Mecklenburg-Vorpommern": ["Rostock","Schwerin","Neubrandenburg","Stralsund","Wismar","Greifswald"],
+    "North Rhine-Westphalia": ["Cologne","Düsseldorf","Dortmund","Essen","Duisburg","Bochum","Wuppertal","Bielefeld","Bonn","Münster","Gelsenkirchen","Aachen","Krefeld"],
+    "Rhineland-Palatinate": ["Mainz","Ludwigshafen","Koblenz","Trier","Kaiserslautern","Worms","Neustadt","Idar-Oberstein"],
+    "Saarland": ["Saarbrücken","Neunkirchen","Homburg","Völklingen","St. Ingbert"],
+    "Saxony": ["Leipzig","Dresden","Chemnitz","Zwickau","Erfurt","Plauen","Görlitz","Freiberg"],
+    "Saxony-Anhalt": ["Halle","Magdeburg","Dessau-Roßlau","Wittenberg","Halberstadt"],
+    "Schleswig-Holstein": ["Kiel","Lübeck","Flensburg","Neumünster","Norderstedt"],
+    "Thuringia": ["Erfurt","Jena","Gera","Weimar","Gotha","Eisenach","Nordhausen"]
+  }
+}

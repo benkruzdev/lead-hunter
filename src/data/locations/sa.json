@@ -1,0 +1,19 @@
+{
+  "countryCode": "SA",
+  "regions": ["Riyadh","Makkah","Madinah","Eastern Province","Al-Qassim","Asir","Tabuk","Ha'il","Northern Borders","Jizan","Najran","Al-Baha","Al-Jawf"],
+  "subregions": {
+    "Riyadh": ["Riyadh","Al Kharj","Dawadmi","Al-Aflaj","Al-Zulfi","Shaqra","Al-Majma'ah","Al Quwayiyah","Al Muzahimiyah"],
+    "Makkah": ["Mecca","Jeddah","Taif","Al-Lith","Al-Qunfudhah","Rabigh","Khulais","Al Jumum","Al Kamil","Bahra"],
+    "Madinah": ["Medina","Yanbu","Badr","Al Ula","Al Mahd","Khaybar","Wadi Al Fura"],
+    "Eastern Province": ["Dammam","Al-Ahsa","Al-Khobar","Dhahran","Qatif","Jubail","Hafar Al-Batin","Safwa","Ras Tanura"],
+    "Asir": ["Abha","Khamis Mushait","Bisha","Najran","Dhahran Al Janoub","Sarat Abidah","Al Namas"],
+    "Al-Qassim": ["Buraidah","Unayzah","Al-Rass","Al Badai","Al Mithnab"],
+    "Tabuk": ["Tabuk","Tayma","Al Wajh","Umluj","Dhuba","Al Bad"],
+    "Ha'il": ["Ha'il","Baqqa","Al Shinan","Saqf"],
+    "Jizan": ["Jizan","Sabya","Abu Arish","Baish","Al Darb"],
+    "Najran": ["Najran","Sharurah","Haboonah"],
+    "Al-Baha": ["Al-Baha","Baljurashi","Al Mukhwah"],
+    "Northern Borders": ["Arar","Rafha","Turaif","Al Uwayqilah"],
+    "Al-Jawf": ["Sakaka","Dumat Al Jandal","Al Qurayyat"]
+  }
+}

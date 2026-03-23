@@ -1,0 +1,23 @@
+{
+  "countryCode": "PH",
+  "regions": ["Ilocos Region","Cagayan Valley","Central Luzon","CALABARZON","MIMAROPA","Bicol Region","Western Visayas","Central Visayas","Eastern Visayas","Zamboanga Peninsula","Northern Mindanao","Davao Region","SOCCSKSARGEN","Caraga","BARMM","NCR","CAR"],
+  "subregions": {
+    "NCR": ["Manila","Quezon City","Makati","Pasig","Taguig","Caloocan","Mandaluyong","Pasay","Parañaque","Las Piñas","Marikina","Muntinlupa","Navotas","Valenzuela","Malabon","Pateros","San Juan"],
+    "CALABARZON": ["Antipolo","Bacoor","Dasmariñas","Calamba","Santa Rosa","Imus","Biñan","Cabuyao","General Trias","Lucena","Lipa","Batangas City"],
+    "Central Luzon": ["San Jose del Monte","Malolos","Meycauayan","Balanga","Olongapo","Angeles","San Fernando","Cabanatuan","Tarlac City"],
+    "Central Visayas": ["Cebu City","Mandaue","Lapu-Lapu","Talisay","Tagbilaran","Toledo","Danao"],
+    "Davao Region": ["Davao City","Tagum","Panabo","Samal","Digos","Mati"],
+    "Western Visayas": ["Iloilo City","Bacolod","Roxas City","Kabankalan","Victorias"],
+    "Northern Mindanao": ["Cagayan de Oro","Iligan","Bukidnon","Ozamiz","Gingoog"],
+    "SOCCSKSARGEN": ["General Santos","Koronadal","Kidapawan","Cotabato City"],
+    "Ilocos Region": ["Laoag","Vigan","San Fernando","Urdaneta","Dagupan"],
+    "Bicol Region": ["Legazpi","Naga","Sorsogon","Masbate"],
+    "Zamboanga Peninsula": ["Zamboanga City","Pagadian","Dipolog","Dapitan"],
+    "Cagayan Valley": ["Tuguegarao","Santiago","Cauayan","Ilagan"],
+    "BARMM": ["Cotabato City","Marawi","Jolo","Lamitan"],
+    "Eastern Visayas": ["Tacloban","Ormoc","Calbayog","Catbalogan"],
+    "Caraga": ["Butuan","Surigao","Bislig","Bayugan","Tandag"],
+    "CAR": ["Baguio","La Trinidad","Tabuk","Lagawe"],
+    "MIMAROPA": ["Palawan","Puerto Princesa","Calapan","Romblon","San Jose"]
+  }
+}

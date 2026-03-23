@@ -1,0 +1,20 @@
+{
+  "countryCode": "BR",
+  "regions": ["Acre","Alagoas","Amapá","Amazonas","Bahia","Ceará","Distrito Federal","Espírito Santo","Goiás","Maranhão","Mato Grosso","Mato Grosso do Sul","Minas Gerais","Pará","Paraíba","Paraná","Pernambuco","Piauí","Rio de Janeiro","Rio Grande do Norte","Rio Grande do Sul","Rondônia","Roraima","Santa Catarina","São Paulo","Sergipe","Tocantins"],
+  "subregions": {
+    "São Paulo": ["São Paulo","Guarulhos","Campinas","São Bernardo do Campo","Santo André","Osasco","São José dos Campos","Mauá","Sorocaba","Ribeirão Preto","Santos","Diadema","Jundiaí"],
+    "Rio de Janeiro": ["Rio de Janeiro","São Gonçalo","Duque de Caxias","Nova Iguaçu","Niterói","Belford Roxo","São João de Meriti","Petrópolis","Volta Redonda","Macaé"],
+    "Minas Gerais": ["Belo Horizonte","Uberlândia","Contagem","Juiz de Fora","Betim","Montes Claros","Ribeirão das Neves","Uberaba","Governador Valadares","Ibirité"],
+    "Bahia": ["Salvador","Feira de Santana","Vitória da Conquista","Camaçari","Itabuna","Juazeiro","Lauro de Freitas","Ilhéus","Barreiras","Jequié"],
+    "Rio Grande do Sul": ["Porto Alegre","Caxias do Sul","Canoas","Pelotas","Santa Maria","Gravataí","Viamão","Novo Hamburgo","São Leopoldo","Rio Grande"],
+    "Paraná": ["Curitiba","Londrina","Maringá","Ponta Grossa","Cascavel","São José dos Pinhais","Foz do Iguaçu","Colombo","Guarapuava","Paranaguá"],
+    "Pernambuco": ["Recife","Caruaru","Petrolina","Olinda","Campina Grande do Sul","Paulista","Jaboatão","Caruaru","Garanhuns"],
+    "Ceará": ["Fortaleza","Caucaia","Juazeiro do Norte","Maracanaú","Sobral","Crato","Itapipoca","Maranguape"],
+    "Goiás": ["Goiânia","Aparecida de Goiânia","Anápolis","Rio Verde","Luziânia","Águas Lindas de Goiás"],
+    "Pará": ["Belém","Ananindeua","Santarém","Marabá","Castanhal","Parauapebas"],
+    "Distrito Federal": ["Brasília","Taguatinga","Ceilândia","Samambaia","Sobradinho","Gama","Planaltina"],
+    "Amazonas": ["Manaus","Parintins","Itacoatiara","Manacapuru","Coari"],
+    "Santa Catarina": ["Florianópolis","Joinville","Blumenau","Chapecó","Criciúma","Itajaí","Jaraguá do Sul"],
+    "Maranhão": ["São Luís","Imperatriz","Timon","Caxias","Codó","Paço do Lumiar"]
+  }
+}

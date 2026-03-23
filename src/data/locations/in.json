@@ -1,0 +1,18 @@
+{
+  "countryCode": "IN",
+  "regions": ["Andhra Pradesh","Arunachal Pradesh","Assam","Bihar","Chhattisgarh","Goa","Gujarat","Haryana","Himachal Pradesh","Jammu and Kashmir","Jharkhand","Karnataka","Kerala","Ladakh","Madhya Pradesh","Maharashtra","Manipur","Meghalaya","Mizoram","Nagaland","NCT of Delhi","Odisha","Puducherry","Punjab","Rajasthan","Sikkim","Tamil Nadu","Telangana","Tripura","Uttar Pradesh","Uttarakhand","West Bengal"],
+  "subregions": {
+    "Maharashtra": ["Mumbai","Pune","Nagpur","Nashik","Aurangabad","Solapur","Thane","Navi Mumbai","Kolhapur","Amravati","Sangli","Jalgaon"],
+    "NCT of Delhi": ["New Delhi","North Delhi","South Delhi","East Delhi","West Delhi","Central Delhi","Noida","Gurgaon","Faridabad","Ghaziabad"],
+    "Karnataka": ["Bangalore","Mysore","Hubli","Mangalore","Belgaum","Davangere","Bellary","Bijapur","Shimoga","Tumkur"],
+    "Tamil Nadu": ["Chennai","Coimbatore","Madurai","Tiruchirappalli","Salem","Tirunelveli","Vellore","Erode","Thanjavur","Dindigul"],
+    "Uttar Pradesh": ["Lucknow","Kanpur","Varanasi","Agra","Allahabad","Meerut","Bareilly","Aligarh","Gorakhpur","Moradabad","Noida","Mathura"],
+    "Gujarat": ["Ahmedabad","Surat","Vadodara","Rajkot","Bhavnagar","Jamnagar","Gandhinagar","Anand","Junagadh","Gandhidham"],
+    "West Bengal": ["Kolkata","Howrah","Asansol","Siliguri","Durgapur","Bardhaman","Malda","Baharampur","Krishnanagar"],
+    "Rajasthan": ["Jaipur","Jodhpur","Kota","Bikaner","Ajmer","Udaipur","Bhilwara","Alwar","Sikar","Pali"],
+    "Telangana": ["Hyderabad","Warangal","Nizamabad","Karimnagar","Ramagundam","Khammam","Mehboobnagar"],
+    "Kerala": ["Thiruvananthapuram","Kochi","Kozhikode","Kannur","Kollam","Thrissur","Palakkad","Alappuzha"],
+    "Andhra Pradesh": ["Visakhapatnam","Vijayawada","Guntur","Nellore","Kurnool","Tirupati","Rajahmundry","Kakinada"],
+    "Bihar": ["Patna","Gaya","Bhagalpur","Muzaffarpur","Darbhanga","Bihar Sharif","Ara","Begusarai"]
+  }
+}

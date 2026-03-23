@@ -1,0 +1,18 @@
+{
+  "countryCode": "NG",
+  "regions": ["Abia","Adamawa","Akwa Ibom","Anambra","Bauchi","Bayelsa","Benue","Borno","Cross River","Delta","Ebonyi","Edo","Ekiti","Enugu","FCT Abuja","Gombe","Imo","Jigawa","Kaduna","Kano","Katsina","Kebbi","Kogi","Kwara","Lagos","Nasarawa","Niger","Ogun","Ondo","Osun","Oyo","Plateau","Rivers","Sokoto","Taraba","Yobe","Zamfara"],
+  "subregions": {
+    "Lagos": ["Lagos Island","Lagos Mainland","Ikeja","Surulere","Lekki","Victoria Island","Ikoyi","Apapa","Alimosho","Mushin","Oshodi","Isale Eko","Agege","Badagry","Epe"],
+    "FCT Abuja": ["Central Business District","Garki","Wuse","Maitama","Asokoro","Gwarinpa","Karu","Nyanya","Kubwa","Gwagwalada","Bwari"],
+    "Kano": ["Kano City","Gwarzo","Rano","Bichi","Wudil","Karaye","Dala","Fagge"],
+    "Rivers": ["Port Harcourt","Obio-Akpor","Eleme","Emohua","Ikwerre","Asari-Toru"],
+    "Oyo": ["Ibadan","Ogbomosho","Oyo","Saki","Iseyin","Igboho","Iseyin"],
+    "Kaduna": ["Kaduna","Zaria","Kafanchan","Kagoro","Saminaka"],
+    "Anambra": ["Awka","Onitsha","Nnewi","Ekwulobia","Ihiala"],
+    "Enugu": ["Enugu","Nsukka","Agbani","Oji River","Oji-River"],
+    "Delta": ["Asaba","Warri","Sapele","Ughelli","Ozoro"],
+    "Edo": ["Benin City","Auchi","Uromi","Ekpoma","Igueben"],
+    "Imo": ["Owerri","Orlu","Okigwe","Mbaise"],
+    "Plateau": ["Jos","Bukuru","Shendam","Langtang"]
+  }
+}

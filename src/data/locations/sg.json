@@ -1,0 +1,11 @@
+{
+  "countryCode": "SG",
+  "regions": ["Central Region","East Region","North Region","North-East Region","West Region"],
+  "subregions": {
+    "Central Region": ["Orchard","Marina Bay","Raffles Place","Tanjong Pagar","Chinatown","Clarke Quay","Bugis","Bras Basah","Novena","Bishan","Toa Payoh","Ang Mo Kio","Queenstown"],
+    "East Region": ["Tampines","Bedok","Pasir Ris","Changi","Geylang","Katong","Kallang","Aljunied","Paya Lebar"],
+    "North Region": ["Woodlands","Yishun","Sembawang","Admiralty","Mandai","Seletar"],
+    "North-East Region": ["Punggol","Sengkang","Hougang","Serangoon","Buangkok","Kovan"],
+    "West Region": ["Jurong East","Jurong West","Clementi","Buona Vista","Boon Lay","Choa Chu Kang","Bukit Panjang","Tengah"]
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "countryCode": "UA",
+  "regions": ["Cherkasy Oblast","Chernihiv Oblast","Chernivtsi Oblast","Dnipropetrovsk Oblast","Donetsk Oblast","Ivano-Frankivsk Oblast","Kharkiv Oblast","Kherson Oblast","Khmelnytsky Oblast","Kiev Oblast","Kirovohrad Oblast","Lviv Oblast","Lugansk Oblast","Mykolaiv Oblast","Odesa Oblast","Poltava Oblast","Rivne Oblast","Sumy Oblast","Ternopil Oblast","Vinnytsia Oblast","Volyn Oblast","Zaporizhzhia Oblast","Zakarpattia Oblast","Zhytomyr Oblast","Kyiv City"],
+  "subregions": {
+    "Kyiv City": ["Shevchenkivsky","Pecherskyi","Podilskyi","Obolonskyi","Sviatoshynskyi","Solomyanskyi","Holosiivskyi","Desnianskyi","Darnytskyi","Dniprovskyi"],
+    "Kharkiv Oblast": ["Kharkiv","Lozova","Chuhuiv","Izium","Balakliya","Kupiansk"],
+    "Dnipropetrovsk Oblast": ["Dnipro","Kryvyi Rih","Kamianske","Nikopol","Pavlohrad","Novomoskovsk"],
+    "Odesa Oblast": ["Odesa","Mykolaiv","Bilhorod-Dnistrovskyi","Izmail","Uman"],
+    "Lviv Oblast": ["Lviv","Drohobych","Stryi","Truskavets","Boryslav","Chervonohrad"],
+    "Donetsk Oblast": ["Kramatorsk","Sloviansk","Mariupol","Kostyantynivka","Pokrovsk"],
+    "Zaporizhzhia Oblast": ["Zaporizhzhia","Melitopol","Berdyansk","Energodar","Tokmak"],
+    "Vinnytsia Oblast": ["Vinnytsia","Zhmerynka","Mohyliv-Podilskyi","Kozyatyn"],
+    "Poltava Oblast": ["Poltava","Kremenchuk","Lubny","Myrhorod","Hadyach"],
+    "Zhytomyr Oblast": ["Zhytomyr","Berdychiv","Korosten","Novograd-Volynsky"],
+    "Volyn Oblast": ["Lutsk","Kovel","Novovolynsk","Volodymyr-Volynsky"],
+    "Rivne Oblast": ["Rivne","Dubno","Korets","Ostrog","Varash"],
+    "Ivano-Frankivsk Oblast": ["Ivano-Frankivsk","Kalush","Kolomyia","Bolekhiv","Dolyna"],
+    "Ternopil Oblast": ["Ternopil","Berezhany","Chortkiv","Kremenets","Zbarazh"],
+    "Chernivtsi Oblast": ["Chernivtsi","Khotyn","Vyzhnytsia","Storozhynets"],
+    "Khmelnytsky Oblast": ["Khmelnytsky","Kamianets-Podilskyi","Shepetivka","Slavuta"],
+    "Sumy Oblast": ["Sumy","Okhtyrka","Romny","Shostka","Konotop"],
+    "Chernihiv Oblast": ["Chernihiv","Nizhyn","Pryluky","Bakhmach","Borzna"],
+    "Cherkasy Oblast": ["Cherkasy","Uman","Korsun-Shevchenkivskyi","Kaniv","Smila"],
+    "Kirovohrad Oblast": ["Kropyvnytskyi","Oleksandriia","Kamianka","Novoukrainka"]
+  }
+}

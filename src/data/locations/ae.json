@@ -1,0 +1,13 @@
+{
+  "countryCode": "AE",
+  "regions": ["Abu Dhabi","Dubai","Sharjah","Ajman","Umm Al Quwain","Ras Al Khaimah","Fujairah"],
+  "subregions": {
+    "Dubai": ["Deira","Bur Dubai","Downtown Dubai","Dubai Marina","Jumeirah","Business Bay","Al Quoz","Dubai Silicon Oasis","International City","Al Barsha","Jumeirah Village Circle","Palm Jumeirah","Dubai Creek Harbour","Motor City","Al Nahda"],
+    "Abu Dhabi": ["Abu Dhabi City","Al Ain","Al Dhafra","Khalifa City","Mohammed Bin Zayed City","Al Reem Island","Yas Island","Saadiyat Island","Masdar City","Musaffah"],
+    "Sharjah": ["Al Qasimia","Al Majaz","Al Nabba","Al Taawun","Al Yarmook","University City","Industrial Area","Al Khan","Al Wahda","Muwaileh"],
+    "Ajman": ["Al Jurf","Al Nuaimia","Al Zahra","Al Rawda","Al Bustan","Al Hamidiya","Masfout"],
+    "Ras Al Khaimah": ["Al Nakheel","Al Qawasim Corniche","Dafan Al Khor","Al Ma'aba","Khuzam","Al Hamra","Mina Al Arab"],
+    "Fujairah": ["Fujairah City","Dibba Al Fujairah","Dibba Al Hisn","Kalba","Khor Fakkan","Masafi"],
+    "Umm Al Quwain": ["Umm Al Quwain City","Al Rashidiya","Al Salamah","Falaj Al Mualla"]
+  }
+}

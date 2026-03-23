@@ -1,0 +1,14 @@
+{
+  "countryCode": "AU",
+  "regions": ["Australian Capital Territory","New South Wales","Northern Territory","Queensland","South Australia","Tasmania","Victoria","Western Australia"],
+  "subregions": {
+    "New South Wales": ["Sydney","Newcastle","Wollongong","Central Coast","Maitland","Coffs Harbour","Wagga Wagga","Albury","Port Macquarie","Tamworth","Orange","Dubbo","Bathurst","Broken Hill"],
+    "Victoria": ["Melbourne","Geelong","Ballarat","Bendigo","Shepparton","Mildura","Warrnambool","Wangaratta","Wodonga","Horsham"],
+    "Queensland": ["Brisbane","Gold Coast","Sunshine Coast","Townsville","Cairns","Toowoomba","Rockhampton","Bundaberg","Mackay","Hervey Bay","Gladstone","Ipswich"],
+    "Western Australia": ["Perth","Fremantle","Mandurah","Bunbury","Geraldton","Kalgoorlie","Albany","Broome","Karratha"],
+    "South Australia": ["Adelaide","Mount Gambier","Whyalla","Murray Bridge","Port Augusta","Port Pirie","Port Lincoln","Victor Harbor"],
+    "Australian Capital Territory": ["Canberra","Belconnen","Woden","Tuggeranong","Gungahlin","Queanbeyan"],
+    "Tasmania": ["Hobart","Launceston","Devonport","Burnie","Ulverstone","Queenstown"],
+    "Northern Territory": ["Darwin","Alice Springs","Palmerston","Katherine","Nhulunbuy"]
+  }
+}

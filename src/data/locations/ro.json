@@ -1,0 +1,21 @@
+{
+  "countryCode": "RO",
+  "regions": ["Alba","Arad","Argeș","Bacău","Bihor","Bistrița-Năsăud","Botoșani","Brăila","Brașov","Bucharest","Buzău","Călărași","Cluj","Constanța","Covasna","Dâmbovița","Dolj","Galați","Giurgiu","Gorj","Harghita","Hunedoara","Ialomița","Iași","Ilfov","Maramureș","Mehedinți","Mureș","Neamț","Olt","Prahova","Sălaj","Satu Mare","Sibiu","Suceava","Teleorman","Timiș","Tulcea","Vâlcea","Vaslui","Vrancea"],
+  "subregions": {
+    "Bucharest": ["Sector 1","Sector 2","Sector 3","Sector 4","Sector 5","Sector 6"],
+    "Cluj": ["Cluj-Napoca","Turda","Dej","Câmpia Turzii","Gherla","Huedin"],
+    "Timiș": ["Timișoara","Lugoj","Sânnicolau Mare","Jimbolia","Buziaș"],
+    "Constanța": ["Constanța","Mangalia","Cernavodă","Medgidia","Năvodari","Eforie"],
+    "Iași": ["Iași","Pașcani","Hârlău","Târgu Frumos","Podu Iloaiei"],
+    "Brașov": ["Brașov","Săcele","Codlea","Râșnov","Zărnești","Predeal","Sinaia"],
+    "Prahova": ["Ploiești","Câmpina","Sinaia","Vălenii de Munte","Urlați","Mizil"],
+    "Dolj": ["Craiova","Băilești","Calafat","Filiaș","Segarcea"],
+    "Argeș": ["Pitești","Câmpulung","Curtea de Argeș","Costești","Mioveni"],
+    "Sibiu": ["Sibiu","Mediaș","Cisnădie","Copșa Mică","Avrig","Agnita"],
+    "Bacău": ["Bacău","Onești","Moinești","Comănești","Buhuși","Slănic Moldova"],
+    "Galați": ["Galați","Tecuci","Târgu Bujor","Berești"],
+    "Bihor": ["Oradea","Salonta","Beiuș","Marghita","Ștei","Aleșd"],
+    "Suceava": ["Suceava","Fălticeni","Câmpulung Moldovenesc","Gura Humorului","Vatra Dornei"],
+    "Mureș": ["Târgu Mureș","Reghin","Sighișoara","Luduș","Iernut"]
+  }
+}

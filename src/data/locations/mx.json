@@ -1,0 +1,22 @@
+{
+  "countryCode": "MX",
+  "regions": ["Aguascalientes","Baja California","Baja California Sur","Campeche","Chiapas","Chihuahua","Coahuila","Colima","Durango","Guanajuato","Guerrero","Hidalgo","Jalisco","Mexico City","Mexico State","Michoacán","Morelos","Nayarit","Nuevo León","Oaxaca","Puebla","Querétaro","Quintana Roo","San Luis Potosí","Sinaloa","Sonora","Tabasco","Tamaulipas","Tlaxcala","Veracruz","Yucatán","Zacatecas"],
+  "subregions": {
+    "Mexico City": ["Cuauhtémoc","Benito Juárez","Miguel Hidalgo","Venustiano Carranza","Iztapalapa","Gustavo A. Madero","Coyoacán","Álvaro Obregón","Tlalpan","Xochimilco","Azcapotzalco","Cuajimalpa"],
+    "Jalisco": ["Guadalajara","Zapopan","Tlaquepaque","Tonalá","Tlajomulco","Puerto Vallarta","Lagos de Moreno","Ocotlán","Ciudad Guzmán"],
+    "Nuevo León": ["Monterrey","San Nicolás de los Garza","Apodaca","Guadalupe","San Pedro Garza García","Escobedo","Santa Catarina","Linares","Montemorelos"],
+    "Mexico State": ["Ecatepec","Neza","Tlalnepantla","Toluca","Naucalpan","Chimalhuacán","Chalco","Atizapán","Cuautitlán Izcalli"],
+    "Puebla": ["Puebla City","Tehuacán","San Martín Texmelucan","Atlixco","Acatzingo","Izúcar de Matamoros"],
+    "Veracruz": ["Veracruz","Xalapa","Coatzacoalcos","Poza Rica","Orizaba","Tuxpan","Minatitlán"],
+    "Guanajuato": ["León","Irapuato","Celaya","Salamanca","Guanajuato City","Silao","Pénjamo"],
+    "Chihuahua": ["Chihuahua City","Ciudad Juárez","Delicias","Camargo","Cuauhtémoc","Ojinaga"],
+    "Baja California": ["Tijuana","Mexicali","Ensenada","Tecate","Playas de Rosarito"],
+    "Sonora": ["Hermosillo","Ciudad Obregón","Nogales","San Luis Río Colorado","Guaymas","Navojoa"],
+    "Tamaulipas": ["Reynosa","Matamoros","Nuevo Laredo","Tampico","Ciudad Victoria","Mante"],
+    "Coahuila": ["Torreón","Saltillo","Monclova","Piedras Negras","Acuña"],
+    "Oaxaca": ["Oaxaca City","Tuxtepec","Huajuapan","Juchitán","Salina Cruz"],
+    "Sinaloa": ["Culiacán","Mazatlán","Los Mochis","Guasave","Navolato"],
+    "Quintana Roo": ["Cancún","Playa del Carmen","Chetumal","Tulum","Cozumel","Bacalar"],
+    "Yucatán": ["Mérida","Valladolid","Progreso","Tizimín","Ticul"]
+  }
+}

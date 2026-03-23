@@ -1,0 +1,13 @@
+{
+  "countryCode": "PK",
+  "regions": ["Azad Kashmir","Balochistan","Gilgit-Baltistan","Islamabad Capital Territory","Khyber Pakhtunkhwa","Punjab","Sindh"],
+  "subregions": {
+    "Punjab": ["Lahore","Faisalabad","Rawalpindi","Gujranwala","Multan","Sialkot","Bahawalpur","Sargodha","Sheikhupura","Jhang","Okara","Gujrat","Rahim Yar Khan"],
+    "Sindh": ["Karachi","Hyderabad","Sukkur","Larkana","Nawabshah","Mirpurkhas","Thatta","Shikarpur","Jacobabad"],
+    "Islamabad Capital Territory": ["Islamabad","Blue Area","F-7","F-8","G-6","G-7","G-9","G-10","I-8","I-9"],
+    "Khyber Pakhtunkhwa": ["Peshawar","Mardan","Mingora","Kohat","Abbottabad","Mansehra","Swat","Dera Ismail Khan","Nowshera"],
+    "Balochistan": ["Quetta","Turbat","Khuzdar","Hub","Chaman","Gwadar","Sui","Dera Murad Jamali"],
+    "Azad Kashmir": ["Muzaffarabad","Mirpur","Rawalakot","Bagh","Kotli"],
+    "Gilgit-Baltistan": ["Gilgit","Skardu","Chilas","Ghanche","Astore"]
+  }
+}

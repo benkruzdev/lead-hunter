@@ -1,0 +1,20 @@
+{
+  "countryCode": "AR",
+  "regions": ["Buenos Aires","Buenos Aires (City)","Catamarca","Chaco","Chubut","Córdoba","Corrientes","Entre Ríos","Formosa","Jujuy","La Pampa","La Rioja","Mendoza","Misiones","Neuquén","Río Negro","Salta","San Juan","San Luis","Santa Cruz","Santa Fe","Santiago del Estero","Tierra del Fuego","Tucumán"],
+  "subregions": {
+    "Buenos Aires (City)": ["Palermo","San Telmo","Recoleta","Belgrano","Caballito","Flores","Almagro","Villa Crespo","Balvanera","Retiro","Puerto Madero","La Boca","Barracas","Villa Devoto","Mataderos"],
+    "Buenos Aires": ["La Plata","Mar del Plata","Quilmes","Lanús","Lomas de Zamora","General Roca","Bahía Blanca","Avellaneda","Tandil","San Isidro","Pilar","Tigre","Morón","Merlo","San Miguel"],
+    "Córdoba": ["Córdoba City","Villa María","Río Cuarto","San Francisco","Bell Ville","Alta Gracia","Villa Carlos Paz","Jesús María","Laboulaye"],
+    "Santa Fe": ["Rosario","Santa Fe City","San Lorenzo","Rafaela","Venado Tuerto","Reconquista","Cañada de Gómez"],
+    "Mendoza": ["Mendoza City","Godoy Cruz","Las Heras","Maipú","Luján de Cuyo","San Rafael","Guaymallén"],
+    "Tucumán": ["San Miguel de Tucumán","Yerba Buena","Tafí Viejo","Banda del Río Salí","Alderetes"],
+    "Salta": ["Salta City","Orán","Tartagal","General Güemes","San Ramón de la Nueva Orán"],
+    "Chaco": ["Resistencia","Fontana","Presidencia Roque Sáenz Peña","Villa Ángela","Barranqueras"],
+    "Misiones": ["Posadas","Eldorado","Oberá","Puerto Iguazú","Apóstoles"],
+    "Entre Ríos": ["Paraná","Concordia","Gualeguaychú","Gualeguay","Villaguay"],
+    "Neuquén": ["Neuquén City","San Martín de los Andes","Zapala","Centenario","Plottier"],
+    "Río Negro": ["Viedma","General Roca","Bariloche","San Carlos de Bariloche","El Bolsón"],
+    "Corrientes": ["Corrientes City","Goya","Paso de los Libres","Mercedes"],
+    "Jujuy": ["San Salvador de Jujuy","San Pedro de Jujuy","Palpalá","La Quiaca"]
+  }
+}

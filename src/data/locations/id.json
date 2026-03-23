@@ -1,0 +1,19 @@
+{
+  "countryCode": "ID",
+  "regions": ["Aceh","Bali","Bangka Belitung Islands","Banten","Bengkulu","Central Java","Central Kalimantan","Central Sulawesi","East Java","East Kalimantan","East Nusa Tenggara","Gorontalo","Jakarta","Jambi","Lampung","Maluku","North Kalimantan","North Maluku","North Sulawesi","North Sumatra","Papua","Riau","Riau Islands","South Kalimantan","South Sulawesi","South Sumatra","Southeast Sulawesi","West Java","West Kalimantan","West Nusa Tenggara","West Papua","West Sulawesi","West Sumatra","Yogyakarta"],
+  "subregions": {
+    "Jakarta": ["Central Jakarta","North Jakarta","East Jakarta","South Jakarta","West Jakarta","Thousand Islands"],
+    "West Java": ["Bandung","Bogor","Bekasi","Depok","Cimahi","Tasikmalaya","Sukabumi","Cirebon","Purwakarta","Karawang","Subang"],
+    "East Java": ["Surabaya","Malang","Sidoarjo","Pasuruan","Mojokerto","Probolinggo","Blitar","Kediri","Madiun","Jember","Banyuwangi"],
+    "Central Java": ["Semarang","Surakarta","Pekalongan","Tegal","Purwokerto","Kudus","Salatiga","Magelang","Pati","Rembang"],
+    "Bali": ["Denpasar","Badung","Gianyar","Tabanan","Buleleng","Klungkung","Bangli","Karangasem","Jembrana"],
+    "North Sumatra": ["Medan","Binjai","Tebing Tinggi","Pematangsiantar","Tanjungbalai","Padangsidimpuan","Sibolga","Gunungsitoli"],
+    "South Sulawesi": ["Makassar","Parepare","Palopo","Maros","Gowa","Takalar","Bone","Soppeng"],
+    "Banten": ["Tangerang","South Tangerang","Cilegon","Serang","Pandeglang","Lebak"],
+    "Riau": ["Pekanbaru","Dumai","Bengkalis","Siak","Kampar"],
+    "Lampung": ["Bandar Lampung","Metro","Lampung Selatan","Pesawaran"],
+    "West Java": ["Bandung","Bogor","Bekasi","Depok","Cimahi"],
+    "Yogyakarta": ["Yogyakarta City","Sleman","Bantul","Kulonprogo","Gunungkidul"],
+    "Papua": ["Jayapura","Merauke","Timika","Biak"]
+  }
+}

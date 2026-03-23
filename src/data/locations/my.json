@@ -1,0 +1,22 @@
+{
+  "countryCode": "MY",
+  "regions": ["Johor","Kedah","Kelantan","Kuala Lumpur","Labuan","Malacca","Negeri Sembilan","Pahang","Penang","Perak","Perlis","Putrajaya","Sabah","Sarawak","Selangor","Terengganu"],
+  "subregions": {
+    "Kuala Lumpur": ["City Centre","Bukit Bintang","Chow Kit","Bangsar","Damansara","Mont Kiara","Kepong","Wangsa Maju","Titiwangsa","Seputeh","Segambut"],
+    "Selangor": ["Petaling Jaya","Shah Alam","Klang","Subang Jaya","Puchong","Ampang","Sepang","Kuala Selangor"],
+    "Penang": ["George Town","Butterworth","Bayan Lepas","Batu Ferringhi","Bukit Mertajam","Seberang Perai","Air Itam"],
+    "Johor": ["Johor Bahru","Iskandar Puteri","Batu Pahat","Muar","Kluang","Segamat","Kota Tinggi","Mersing"],
+    "Perak": ["Ipoh","Taiping","Teluk Intan","Sitiawan","Lumut","Batu Gajah","Kuala Kangsar"],
+    "Sabah": ["Kota Kinabalu","Sandakan","Tawau","Lahad Datu","Keningau","Beaufort","Semporna"],
+    "Sarawak": ["Kuching","Miri","Sibu","Bintulu","Limbang","Sri Aman"],
+    "Malacca": ["Malacca City","Ayer Keroh","Alor Gajah","Jasin"],
+    "Negeri Sembilan": ["Seremban","Port Dickson","Nilai","Rembau"],
+    "Pahang": ["Kuantan","Temerloh","Bentong","Kuala Lipis","Raub"],
+    "Kelantan": ["Kota Bharu","Tanah Merah","Gua Musang","Pasir Mas"],
+    "Terengganu": ["Kuala Terengganu","Kemaman","Dungun"],
+    "Kedah": ["Alor Setar","Sungai Petani","Kulim","Langkawi"],
+    "Perlis": ["Kangar","Arau","Padang Besar"],
+    "Putrajaya": ["Precinct 1","Precinct 8","Precinct 9","Precinct 14","Precinct 16"],
+    "Labuan": ["Victoria","Labuan Town"]
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "countryCode": "IT",
+  "regions": ["Abruzzo","Aosta Valley","Apulia","Basilicata","Calabria","Campania","Emilia-Romagna","Friuli-Venezia Giulia","Lazio","Liguria","Lombardy","Marche","Molise","Piedmont","Sardinia","Sicily","Trentino-Alto Adige","Tuscany","Umbria","Veneto"],
+  "subregions": {
+    "Lombardy": ["Milan","Brescia","Bergamo","Monza","Como","Pavia","Varese","Cremona","Mantova","Lecco","Lodi","Sondrio"],
+    "Lazio": ["Rome","Latina","Frosinone","Viterbo","Rieti","Civitavecchia","Tivoli"],
+    "Campania": ["Naples","Salerno","Caserta","Benevento","Avellino","Pozzuoli","Torre del Greco","Giugliano in Campania"],
+    "Sicily": ["Palermo","Catania","Messina","Syracuse","Ragusa","Trapani","Agrigento","Caltanissetta","Enna"],
+    "Veneto": ["Venice","Verona","Padua","Vicenza","Treviso","Rovigo","Belluno"],
+    "Piedmont": ["Turin","Novara","Asti","Alessandria","Cuneo","Vercelli","Biella"],
+    "Emilia-Romagna": ["Bologna","Modena","Parma","Reggio Emilia","Ferrara","Ravenna","Forlì","Rimini","Piacenza"],
+    "Tuscany": ["Florence","Prato","Livorno","Pisa","Arezzo","Siena","Massa","Carrara","Lucca","Pistoia"],
+    "Apulia": ["Bari","Taranto","Foggia","Lecce","Andria","Barletta","Brindisi","Grottaglie"],
+    "Liguria": ["Genoa","Savona","La Spezia","Imperia","Sanremo"],
+    "Calabria": ["Reggio Calabria","Catanzaro","Cosenza","Crotone","Vibo Valentia"],
+    "Sardinia": ["Cagliari","Sassari","Quartu Sant'Elena","Nuoro","Oristano"],
+    "Friuli-Venezia Giulia": ["Trieste","Udine","Pordenone","Gorizia"],
+    "Trentino-Alto Adige": ["Trento","Bolzano","Rovereto","Merano"],
+    "Marche": ["Ancona","Pesaro","Ascoli Piceno","Macerata","Fano"],
+    "Abruzzo": ["L'Aquila","Pescara","Chieti","Teramo"],
+    "Umbria": ["Perugia","Terni","Foligno","Gubbio"],
+    "Basilicata": ["Potenza","Matera","Policoro"],
+    "Molise": ["Campobasso","Isernia","Termoli"],
+    "Aosta Valley": ["Aosta"]
+  }
+}

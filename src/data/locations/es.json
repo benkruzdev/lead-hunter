@@ -1,0 +1,23 @@
+{
+  "countryCode": "ES",
+  "regions": ["Andalusia","Aragon","Asturias","Balearic Islands","Basque Country","Canary Islands","Cantabria","Castile and León","Castile-La Mancha","Catalonia","Extremadura","Galicia","La Rioja","Madrid","Murcia","Navarre","Valencia"],
+  "subregions": {
+    "Madrid": ["Madrid","Móstoles","Alcalá de Henares","Fuenlabrada","Leganés","Getafe","Alcorcón","Torrejón de Ardoz","Alcobendas","Pozuelo de Alarcón","Boadilla del Monte","Las Rozas"],
+    "Catalonia": ["Barcelona","Hospitalet de Llobregat","Badalona","Terrassa","Sabadell","Lleida","Girona","Tarragona","Mataró","Santa Coloma de Gramenet","Reus"],
+    "Andalusia": ["Seville","Málaga","Córdoba","Granada","Almería","Huelva","Cádiz","Jaén","Jerez de la Frontera","Algeciras"],
+    "Valencia": ["Valencia","Alicante","Elche","Castellón de la Plana","Torrevieja","Benidorm","Alcoy","Torrent","Orihuela"],
+    "Basque Country": ["Bilbao","Vitoria-Gasteiz","San Sebastián","Barakaldo","Getxo","Irún","Basauri","Rentería"],
+    "Galicia": ["Vigo","A Coruña","Ourense","Lugo","Santiago de Compostela","Ferrol","Pontevedra"],
+    "Castile and León": ["Valladolid","Burgos","Salamanca","León","Zamora","Palencia","Ávila","Segovia","Soria"],
+    "Aragon": ["Zaragoza","Huesca","Teruel","Ejea de los Caballeros"],
+    "Canary Islands": ["Las Palmas de Gran Canaria","Santa Cruz de Tenerife","La Laguna","Arona","Telde","Arrecife","Puerto del Rosario"],
+    "Murcia": ["Murcia","Cartagena","Lorca","Molina de Segura","Alcantarilla","Yecla"],
+    "Castile-La Mancha": ["Albacete","Ciudad Real","Cuenca","Guadalajara","Toledo"],
+    "Extremadura": ["Badajoz","Cáceres","Mérida","Plasencia"],
+    "Asturias": ["Oviedo","Gijón","Avilés","Siero"],
+    "Navarre": ["Pamplona","Tudela","Barañáin","Burlada"],
+    "Balearic Islands": ["Palma","Ibiza","Mahón","Manacor"],
+    "Cantabria": ["Santander","Torrelavega","Camargo","Piélagos"],
+    "La Rioja": ["Logroño","Calahorra","Arnedo"]
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "countryCode": "RU",
+  "regions": ["Belgorod Oblast","Bryansk Oblast","Vladimir Oblast","Voronezh Oblast","Ivanovo Oblast","Kaluga Oblast","Kostroma Oblast","Kursk Oblast","Lipetsk Oblast","Moscow","Moscow Oblast","Orel Oblast","Ryazan Oblast","Smolensk Oblast","Tambov Oblast","Tver Oblast","Tula Oblast","Yaroslavl Oblast","Saint Petersburg","Leningrad Oblast","Novgorod Oblast","Pskov Oblast","Arkhangelsk Oblast","Vologda Oblast","Kaliningrad Oblast","Komi Republic","Murmansk Oblast","Nenets AO","Adygea Republic","Kalmykia Republic","Krasnodar Krai","Astrakhan Oblast","Volgograd Oblast","Rostov Oblast","Kabardino-Balkaria","Karachay-Cherkessia","North Ossetia","Ingushetia","Chechnya","Stavropol Krai","Dagestan","Bashkortostan","Mariy El","Mordovia Republic","Tatarstan","Udmurtia","Chuvashia","Kirov Oblast","Nizhny Novgorod Oblast","Orenburg Oblast","Penza Oblast","Perm Krai","Samara Oblast","Saratov Oblast","Ulyanovsk Oblast","Kurgan Oblast","Sverdlovsk Oblast","Tyumen Oblast","Chelyabinsk Oblast","Altai Krai","Altai Republic","Buryatia Republic","Novosibirsk Oblast","Omsk Oblast","Tomsk Oblast","Tuva Republic","Khakassia Republic","Zabaykalsky Krai","Primorsky Krai","Khabarovsk Krai","Amur Oblast","Kamchatka Krai","Magadan Oblast","Sakhalin Oblast","Jewish AO","Chukotka AO","Sakha Republic","Krasnoyarsk Krai"],
+  "subregions": {
+    "Moscow": ["Central","Presnensky","Arbat","Zamoskvorechye","Khamovniki","Taganka","Basmanny","Lefortovo","Dorogomilovo","Fili-Davydkovo","Khoroshevo-Mnevniki","Sokol","Aeroport","Begovoy","Savyolovsky","Maryina Roshcha","Meshansky","Tverskoy","Yakimanka","Krasnoselsky"],
+    "Saint Petersburg": ["Admiralteysky","Vasileostrovsky","Vyborgsky","Kalininsky","Kirovksy","Kolpinsky","Krasnogvardeysky","Krasnoselsky","Kronshtadtsky","Kurortny","Moskovsky","Nevsky","Petrogradsky","Petrodvortsovy","Primorsky","Pushkinsky","Sestroretsky","Frunzensky","Tsentralny"],
+    "Moscow Oblast": ["Balashikha","Khimki","Podolsk","Mytishchi","Korolev","Lyubertsy","Elektrostal","Krasnogorsk","Odintsovo","Serpukhov","Zheleznodorozhny","Shchyolkovo"],
+    "Tatarstan": ["Kazan","Naberezhnye Chelny","Nizhnekamsk","Almetyevsk","Zelenodolsk"],
+    "Sverdlovsk Oblast": ["Yekaterinburg","Nizhny Tagil","Pervouralsk","Kamensk-Uralsky","Serov"],
+    "Krasnodar Krai": ["Krasnodar","Sochi","Novorossiysk","Armavir","Gelendzhik","Anapa","Tuapse"],
+    "Novosibirsk Oblast": ["Novosibirsk","Berdsk","Ob","Iskitim","Krasnoobsk"],
+    "Rostov Oblast": ["Rostov-on-Don","Taganrog","Shakhty","Novocherkassk","Volgodonsk","Bataysk"],
+    "Nizhny Novgorod Oblast": ["Nizhny Novgorod","Dzerzhinsk","Arzamas","Sarov","Bor"],
+    "Bashkortostan": ["Ufa","Sterlitamak","Salavat","Neftekamsk","Oktyabrsky"],
+    "Chelyabinsk Oblast": ["Chelyabinsk","Magnitogorsk","Zlatoust","Miass","Kopeysk"],
+    "Samara Oblast": ["Samara","Tolyatti","Syzran","Novokuibyshevsk","Zhigulyovsk"],
+    "Omsk Oblast": ["Omsk","Tara","Issilkul","Kalachinsk"],
+    "Krasnoyarsk Krai": ["Krasnoyarsk","Norilsk","Abakan","Zheleznogorsk","Kansk"],
+    "Primorsky Krai": ["Vladivostok","Nakhodka","Ussuryisk","Arsenev","Artem"],
+    "Perm Krai": ["Perm","Berezniki","Solikamsk","Chaikovsky","Lysva"],
+    "Volgograd Oblast": ["Volgograd","Volzhsky","Kamyshin","Mikhaylovka","Uryupinsk"],
+    "Saratov Oblast": ["Saratov","Balakovo","Engles","Balashov","Marks"]
+  }
+}

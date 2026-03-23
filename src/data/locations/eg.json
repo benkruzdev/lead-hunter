@@ -1,0 +1,18 @@
+{
+  "countryCode": "EG",
+  "regions": ["Cairo","Giza","Alexandria","Dakahlia","Red Sea","Beheira","Fayoum","Gharbia","Ismailia","Menofia","Minya","Qalyubia","Suez","New Valley","Kafr el-Sheikh","Matrouh","Luxor","Qena","Aswan","Asyut","Beni Suef","Port Said","Damietta","North Sinai","South Sinai","Sharqia","Sohag"],
+  "subregions": {
+    "Cairo": ["Nasr City","Heliopolis","Maadi","Zamalek","Dokki","Mohandiseen","Ain Shams","Shubra","Helwan","New Cairo","October 6th","Katamiya"],
+    "Giza": ["Giza City","Boulaq El Dakrour","Embaba","Bulaq","Imbaba","Haram","Agouza","Faysal","Hadayek El Ahram","Sheikh Zayed","6 October City"],
+    "Alexandria": ["Downtown Alexandria","Miami","Raml","San Stefano","Smouha","Mandara","Sidi Bishr","Montaza","Agami","Borg El Arab","New Borg El Arab"],
+    "Dakahlia": ["Mansoura","Talkha","Belqas","Aga","Beni Obaid","Nabaroh","Sherbeen","Manzala"],
+    "Sharqia": ["Zagazig","Belbeis","Minya Al Qamh","10th of Ramadan","Abou Hammad","Hehia"],
+    "Qalyubia": ["Banha","Qalyub","Shubra El Kheima","El Obour","Khanka","Tukh"],
+    "Luxor": ["Luxor City","Esna","Armant","New Qurna"],
+    "Aswan": ["Aswan City","Kom Ombo","Edfu","Daraw"],
+    "Asyut": ["Asyut City","Sohag","Akhmim","Tahta","Al Badari"],
+    "Port Said": ["Port Said","Port Fuad"],
+    "Ismailia": ["Ismailia City","Abu Suweir","Fayid","Qantara"],
+    "Suez": ["Suez City","Ain Sukhna"]
+  }
+}

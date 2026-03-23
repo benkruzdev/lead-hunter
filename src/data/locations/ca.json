@@ -1,0 +1,19 @@
+{
+  "countryCode": "CA",
+  "regions": ["Alberta","British Columbia","Manitoba","New Brunswick","Newfoundland and Labrador","Northwest Territories","Nova Scotia","Nunavut","Ontario","Prince Edward Island","Quebec","Saskatchewan","Yukon"],
+  "subregions": {
+    "Ontario": ["Toronto","Ottawa","Mississauga","Brampton","Hamilton","London","Markham","Vaughan","Kitchener","Windsor","Richmond Hill","Burlington","Oakville","Oshawa","Barrie","Greater Sudbury"],
+    "Quebec": ["Montreal","Quebec City","Laval","Gatineau","Longueuil","Sherbrooke","Saguenay","Trois-Rivières","Lévis","Terrebonne"],
+    "British Columbia": ["Vancouver","Surrey","Burnaby","Richmond","Abbotsford","Coquitlam","Kelowna","Kamloops","Victoria","Nanaimo","Prince George"],
+    "Alberta": ["Calgary","Edmonton","Red Deer","Lethbridge","St. Albert","Medicine Hat","Grande Prairie","Airdrie","Spruce Grove"],
+    "Manitoba": ["Winnipeg","Brandon","Steinbach","Portage la Prairie","Thompson"],
+    "Saskatchewan": ["Saskatoon","Regina","Prince Albert","Moose Jaw","Swift Current","Yorkton"],
+    "Nova Scotia": ["Halifax","Dartmouth","Sydney","Truro","New Glasgow","Glace Bay"],
+    "New Brunswick": ["Saint John","Moncton","Fredericton","Miramichi","Bathurst"],
+    "Newfoundland and Labrador": ["St. John's","Corner Brook","Gander","Grand Falls-Windsor","Labrador City"],
+    "Prince Edward Island": ["Charlottetown","Summerside","Stratford","Cornwall"],
+    "Northwest Territories": ["Yellowknife","Inuvik","Hay River","Fort Smith"],
+    "Yukon": ["Whitehorse","Dawson City","Watson Lake","Carmacks"],
+    "Nunavut": ["Iqaluit","Rankin Inlet","Arviat","Cambridge Bay"]
+  }
+}

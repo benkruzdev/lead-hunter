@@ -1,0 +1,19 @@
+{
+  "countryCode": "FR",
+  "regions": ["Auvergne-Rhône-Alpes","Bourgogne-Franche-Comté","Brittany","Centre-Val de Loire","Corsica","Grand Est","Hauts-de-France","Île-de-France","Normandy","Nouvelle-Aquitaine","Occitanie","Pays de la Loire","Provence-Alpes-Côte d'Azur"],
+  "subregions": {
+    "Île-de-France": ["Paris","Boulogne-Billancourt","Saint-Denis","Argenteuil","Montreuil","Versailles","Nanterre","Créteil","Aulnay-sous-Bois","Rueil-Malmaison","Vitry-sur-Seine","Colombes"],
+    "Auvergne-Rhône-Alpes": ["Lyon","Grenoble","Saint-Étienne","Villeurbanne","Clermont-Ferrand","Grenoble","Annecy","Chambéry","Valence","Bourg-en-Bresse"],
+    "Provence-Alpes-Côte d'Azur": ["Marseille","Nice","Toulon","Aix-en-Provence","Antibes","Cannes","Avignon","La Seyne-sur-Mer","Toulon","Hyères"],
+    "Hauts-de-France": ["Lille","Amiens","Roubaix","Tourcoing","Dunkirk","Calais","Valenciennes","Béthune","Lens"],
+    "Nouvelle-Aquitaine": ["Bordeaux","Limoges","Pau","Bayonne","Angoulême","Poitiers","La Rochelle","Périgueux"],
+    "Occitanie": ["Toulouse","Montpellier","Nîmes","Perpignan","Béziers","Narbonne","Carcassonne","Albi"],
+    "Grand Est": ["Strasbourg","Reims","Metz","Nancy","Mulhouse","Colmar","Châlons-en-Champagne","Épinal"],
+    "Pays de la Loire": ["Nantes","Le Mans","Angers","Saint-Nazaire","Laval","La Roche-sur-Yon"],
+    "Normandy": ["Rouen","Caen","Le Havre","Cherbourg","Évreux","Alençon","Dieppe"],
+    "Brittany": ["Rennes","Brest","Quimper","Lorient","Vannes","Saint-Malo","Saint-Brieuc"],
+    "Bourgogne-Franche-Comté": ["Dijon","Besançon","Chalon-sur-Saône","Auxerre","Mâcon","Belfort"],
+    "Centre-Val de Loire": ["Orléans","Tours","Bourges","Chartres","Blois","Châteauroux"],
+    "Corsica": ["Ajaccio","Bastia","Porto-Vecchio","Corte","Calvi"]
+  }
+}

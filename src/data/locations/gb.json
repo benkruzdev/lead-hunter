@@ -1,0 +1,10 @@
+{
+  "countryCode": "GB",
+  "regions": ["England","Scotland","Wales","Northern Ireland"],
+  "subregions": {
+    "England": ["London","Birmingham","Manchester","Leeds","Liverpool","Sheffield","Bristol","Newcastle","Nottingham","Leicester","Coventry","Bradford","Glasgow","Southampton","Portsmouth","Oxford","Cambridge","Brighton","Reading","Derby","Wolverhampton","Stoke-on-Trent","Plymouth","Sunderland"],
+    "Scotland": ["Glasgow","Edinburgh","Aberdeen","Dundee","Inverness","Stirling","Perth","Paisley","East Kilbride","Livingston","Hamilton","Kirkcaldy"],
+    "Wales": ["Cardiff","Swansea","Newport","Wrexham","Barry","Neath","Bridgend","Cwmbran","Merthyr Tydfil","Rhondda"],
+    "Northern Ireland": ["Belfast","Londonderry","Newry","Armagh","Ballymena","Lisburn","Newtownabbey","Bangor","Castlereagh","Coleraine"]
+  }
+}

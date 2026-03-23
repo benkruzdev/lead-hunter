@@ -1,0 +1,22 @@
+{
+  "countryCode": "PL",
+  "regions": ["Greater Poland","Kuyavian-Pomeranian","Lesser Poland","Łódź","Lower Silesian","Lublin","Lubusz","Masovian","Opole","Podlaskie","Pomeranian","Silesian","Subcarpathian","Świętokrzyskie","Warmian-Masurian","West Pomeranian"],
+  "subregions": {
+    "Masovian": ["Warsaw","Radom","Płock","Siedlce","Ostrołęka","Wołomin","Marki","Pruszków","Otwock"],
+    "Silesian": ["Katowice","Sosnowiec","Gliwice","Zabrze","Bytom","Rybnik","Tychy","Dąbrowa Górnicza","Chorzów","Bielsko-Biała"],
+    "Lesser Poland": ["Kraków","Tarnów","Nowy Sącz","Oświęcim","Chrzanów"],
+    "Greater Poland": ["Poznań","Kalisz","Gniezno","Konin","Leszno","Ostrów Wielkopolski"],
+    "Łódź": ["Łódź","Piotrków Trybunalski","Pabianice","Zgierz","Tomaszów Mazowiecki","Bełchatów"],
+    "Lower Silesian": ["Wrocław","Legnica","Wałbrzych","Lubin","Świdnica","Jelenia Góra"],
+    "Pomeranian": ["Gdańsk","Gdynia","Słupsk","Sopot","Rumia","Tczew"],
+    "Kuyavian-Pomeranian": ["Bydgoszcz","Toruń","Włocławek","Grudziądz","Inowrocław"],
+    "Lublin": ["Lublin","Zamość","Chełm","Biała Podlaska","Puławy"],
+    "West Pomeranian": ["Szczecin","Koszalin","Kołobrzeg","Stargard","Świnoujście"],
+    "Podlaskie": ["Białystok","Łomża","Suwałki","Augustów"],
+    "Subcarpathian": ["Rzeszów","Przemyśl","Krosno","Stalowa Wola","Sanok"],
+    "Warmian-Masurian": ["Olsztyn","Elbląg","Ostróda","Iława","Ełk"],
+    "Lubusz": ["Zielona Góra","Gorzów Wielkopolski","Nowa Sól","Żary"],
+    "Opole": ["Opole","Kędzierzyn-Koźle","Nysa","Brzeg"],
+    "Świętokrzyskie": ["Kielce","Ostrowiec Świętokrzyski","Starachowice","Skarżysko-Kamienna"]
+  }
+}

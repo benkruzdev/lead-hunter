@@ -1,0 +1,20 @@
+{
+  "countryCode": "GR",
+  "regions": ["Attica","Central Greece","Central Macedonia","Crete","Eastern Macedonia and Thrace","Epirus","Ionian Islands","North Aegean","Peloponnese","South Aegean","Thessaly","Western Greece","Western Macedonia","Mount Athos"],
+  "subregions": {
+    "Attica": ["Athens","Piraeus","Kallithea","Peristeri","Acharnes","Nikaia","Ilion","Glyfada","Kifissia","Marousi","Pallini","Cholargos","Nea Smyrni","Holargos"],
+    "Central Macedonia": ["Thessaloniki","Serres","Kilkis","Katerini","Veria","Naoussa","Polygyros","Giannitsa"],
+    "Crete": ["Heraklion","Chania","Rethymno","Agios Nikolaos","Ierapetra","Sitia"],
+    "Thessaly": ["Larissa","Volos","Trikala","Karditsa","Almyros"],
+    "Central Greece": ["Lamia","Livadeia","Amfissa","Thiva","Chalcis"],
+    "East Macedonia and Thrace": ["Kavala","Komotini","Xanthi","Alexandroupoli","Drama","Orestiada"],
+    "Peloponnese": ["Kalamata","Tripoli","Sparti","Corinth","Patras","Argos","Nafplio"],
+    "Epirus": ["Ioannina","Preveza","Arta","Igoumenitsa"],
+    "Western Greece": ["Patras","Messolonghi","Agrinion","Nafpaktos"],
+    "Ionian Islands": ["Corfu","Lefkada","Argostoli","Zakynthos","Ithaca"],
+    "South Aegean": ["Hermoupolis","Ermoupolis","Rhodes","Kos","Mykonos","Santorini","Naxos"],
+    "North Aegean": ["Mytilene","Chios","Samos","Ikaria"],
+    "Western Macedonia": ["Kozani","Kastoria","Florina","Grevena"],
+    "Mount Athos": ["Karyes"]
+  }
+}

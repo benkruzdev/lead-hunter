@@ -1,0 +1,14 @@
+{
+  "countryCode": "BD",
+  "regions": ["Barishal","Chattogram","Dhaka","Khulna","Mymensingh","Rajshahi","Rangpur","Sylhet"],
+  "subregions": {
+    "Dhaka": ["Dhaka","Narayanganj","Gazipur","Narsingdi","Munshiganj","Manikganj","Tangail","Faridpur","Madaripur","Rajbari","Shariatpur","Gopalganj","Kishoreganj"],
+    "Chattogram": ["Chattogram","Cox's Bazar","Comilla","Feni","Noakhali","Lakshmipur","Chandpur","Brahmanbaria","Rangamati","Bandarban","Khagrachhari"],
+    "Rajshahi": ["Rajshahi","Bogura","Naogaon","Natore","Sirajganj","Pabna","Chapainawabganj","Joypurhat"],
+    "Khulna": ["Khulna","Jessore","Satkhira","Bagerhat","Chuadanga","Kushtia","Meherpur","Magura","Narail","Jhenaidah"],
+    "Sylhet": ["Sylhet","Moulvibazar","Habiganj","Sunamganj"],
+    "Barishal": ["Barishal","Bhola","Patuakhali","Barguna","Jhalokati","Pirojpur"],
+    "Rangpur": ["Rangpur","Dinajpur","Gaibandha","Kurigram","Lalmonirhat","Nilphamari","Panchagarh","Thakurgaon"],
+    "Mymensingh": ["Mymensingh","Jamalpur","Netrokona","Sherpur"]
+  }
+}

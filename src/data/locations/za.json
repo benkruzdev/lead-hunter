@@ -1,0 +1,15 @@
+{
+  "countryCode": "ZA",
+  "regions": ["Eastern Cape","Free State","Gauteng","KwaZulu-Natal","Limpopo","Mpumalanga","North West","Northern Cape","Western Cape"],
+  "subregions": {
+    "Gauteng": ["Johannesburg","Pretoria","Soweto","Ekurhuleni","Sandton","Randburg","Midrand","Centurion","Roodepoort","Germiston","Boksburg","East Rand","Benoni","Kempton Park"],
+    "Western Cape": ["Cape Town","Stellenbosch","Paarl","Somerset West","George","Knysna","Mossel Bay","Worcester","Franschhoek","Hermanus","Bellville"],
+    "KwaZulu-Natal": ["Durban","Pietermaritzburg","Richards Bay","Newcastle","Ladysmith","Empangeni","Port Shepstone","Pinetown","Amanzimtoti","Tongaat"],
+    "Eastern Cape": ["Port Elizabeth","East London","Mthatha","King William's Town","Queenstown","Uitenhage","Grahamstown","Bhisho"],
+    "Limpopo": ["Polokwane","Tzaneen","Louis Trichardt","Mokopane","Bela-Bela","Musina","Giyani"],
+    "Mpumalanga": ["Nelspruit","Witbank","Secunda","Middelburg","Standerton","Barberton","Ermelo"],
+    "Free State": ["Bloemfontein","Welkom","Phuthaditjhaba","Sasolburg","Botshabelo","Kroonstad"],
+    "North West": ["Rustenburg","Klerksdorp","Potchefstroom","Mafikeng","Brits","Orkney","Vryburg"],
+    "Northern Cape": ["Kimberley","Upington","Springbok","De Aar","Kuruman","Kathu"]
+  }
+}

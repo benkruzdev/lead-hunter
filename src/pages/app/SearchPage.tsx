@@ -794,33 +794,24 @@ export default function SearchPage() {
               className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-foreground"
             >
               <MapPin className="w-3.5 h-3.5 text-primary" />
-              {t(countryEntry?.regionLabelKey ?? "searchPage.city")}
-              <span className="ml-auto text-[10px] font-normal normal-case tracking-normal text-muted-foreground">
-                {locationData ? t("searchPage.cityHint") : t("searchPage.districtFreeHint")}
-              </span>
+              {t(countryEntry?.regionLabelKey ?? "searchPage.region")}
+              {locationData && (
+                <span className="ml-auto text-[10px] font-normal normal-case tracking-normal text-muted-foreground">
+                  {t("searchPage.cityHint")}
+                </span>
+              )}
             </Label>
-            {locationData ? (
-              <SearchableSelect
-                id="city-select"
-                data-onboarding="city-select"
-                value={city}
-                onValueChange={setCity}
-                options={locationData.regions}
-                placeholder={t("searchPage.selectCity")}
-                searchPlaceholder={t("searchPage.searchCity")}
-                emptyText={t("searchPage.noCityFound")}
-                clearLabel={t("searchPage.clearSelection")}
-              />
-            ) : (
-              <Input
-                id="city-select"
-                data-onboarding="city-select"
-                type="text"
-                placeholder={t("searchPage.cityPlaceholderFree")}
-                value={city}
-                onChange={e => setCity(e.target.value)}
-              />
-            )}
+            <SearchableSelect
+              id="city-select"
+              data-onboarding="city-select"
+              value={city}
+              onValueChange={setCity}
+              options={locationData?.regions ?? []}
+              placeholder={t("searchPage.selectRegion")}
+              searchPlaceholder={t("searchPage.searchCity")}
+              emptyText={t("searchPage.noCityFound")}
+              clearLabel={t("searchPage.clearSelection")}
+            />
           </div>
 
           {/* District / Subregion */}
@@ -830,36 +821,31 @@ export default function SearchPage() {
               className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-foreground"
             >
               <MapPin className="w-3.5 h-3.5 text-primary" />
-              {t(countryEntry?.subregionLabelKey ?? "searchPage.district")}
-              {city && (
+              {t(countryEntry?.subregionLabelKey ?? "searchPage.subregion")}
+              {city && availableDistricts.length > 0 && (
                 <span className="ml-auto text-[10px] font-normal normal-case tracking-normal text-muted-foreground">
                   {t("searchPage.districtOptional")}
                 </span>
               )}
             </Label>
-            {locationData ? (
-              <SearchableSelect
-                id="district-select"
-                data-onboarding="district-select"
-                value={district}
-                onValueChange={setDistrict}
-                options={availableDistricts}
-                placeholder={city ? `${city} ${t("searchPage.selectDistrict")}` : t("searchPage.selectCityFirst")}
-                searchPlaceholder={t("searchPage.searchDistrict")}
-                emptyText={t("searchPage.noDistrictFound")}
-                clearLabel={t("searchPage.clearSelection")}
-                disabled={!city}
-              />
-            ) : (
-              <Input
-                id="district-select"
-                data-onboarding="district-select"
-                type="text"
-                placeholder={t("searchPage.districtPlaceholderFree")}
-                value={district}
-                onChange={e => setDistrict(e.target.value)}
-              />
-            )}
+            <SearchableSelect
+              id="district-select"
+              data-onboarding="district-select"
+              value={district}
+              onValueChange={setDistrict}
+              options={availableDistricts}
+              placeholder={
+                !city
+                  ? t("searchPage.selectCityFirst")
+                  : availableDistricts.length === 0
+                    ? t("searchPage.noSubregionData")
+                    : t("searchPage.selectDistrict")
+              }
+              searchPlaceholder={t("searchPage.searchDistrict")}
+              emptyText={t("searchPage.noDistrictFound")}
+              clearLabel={t("searchPage.clearSelection")}
+              disabled={!city || availableDistricts.length === 0}
+            />
           </div>
 
           {/* Category */}

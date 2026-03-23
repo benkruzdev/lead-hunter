@@ -1,0 +1,18 @@
+{
+  "countryCode": "NL",
+  "regions": ["Drenthe","Flevoland","Friesland","Gelderland","Groningen","Limburg","North Brabant","North Holland","Overijssel","South Holland","Utrecht","Zeeland"],
+  "subregions": {
+    "North Holland": ["Amsterdam","Haarlem","Alkmaar","Zaandam","Hilversum","Heerhugowaard","Purmerend","Hoorn","Amstelveen","Den Helder"],
+    "South Holland": ["Rotterdam","The Hague","Leiden","Dordrecht","Zoetermeer","Delft","Westland","Gouda","Spijkenisse","Alphen aan den Rijn"],
+    "Utrecht": ["Utrecht","Amersfoort","Nieuwegein","Veenendaal","Zeist","Soest","Houten","IJsselstein","Woerden"],
+    "North Brabant": ["Eindhoven","Tilburg","Breda","'s-Hertogenbosch","Helmond","Roosendaal","Bergen op Zoom","Oss","Waalwijk"],
+    "Gelderland": ["Nijmegen","Arnhem","Apeldoorn","Ede","Doetinchem","Zutphen","Tiel","Harderwijk","Wageningen"],
+    "Overijssel": ["Zwolle","Deventer","Enschede","Hengelo","Almelo","Kampen"],
+    "Limburg": ["Maastricht","Venlo","Heerlen","Roermond","Weert","Sittard","Kerkrade"],
+    "Groningen": ["Groningen","Veendam","Emmen","Assen"],
+    "Friesland": ["Leeuwarden","Sneek","Harlingen","Heerenveen"],
+    "Drenthe": ["Assen","Emmen","Meppel","Hoogeveen"],
+    "Flevoland": ["Almere","Lelystad","Zeewolde","Emmeloord"],
+    "Zeeland": ["Middelburg","Vlissingen","Goes","Terneuzen"]
+  }
+}
