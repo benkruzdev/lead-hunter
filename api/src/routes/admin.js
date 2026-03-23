@@ -687,13 +687,13 @@ router.get('/costs', requireAuth, requireAdmin, async (req, res) => {
         const AVG_TEXT_SEARCH_CALLS_PER_SESSION = 2; // estimated avg (up to 3 possible)
         const DETAILS_PER_PAGE = PAGE_SIZE; // max details per page view
 
-        // ── Load system_settings for credits_per_page ──────────────────────────
+        // ── Load system_settings — credits_per_page column = per-record rate ──
         const { data: settings } = await supabaseAdmin
             .from('system_settings')
             .select('credits_per_page, credits_per_enrichment, credits_per_lead')
             .eq('id', 1)
             .single();
-        const creditsPerPage = settings?.credits_per_page ?? 10;
+        const creditsPerRecord = settings?.credits_per_page ?? 1;   // 1 credit = 1 business record
         const creditsPerEnrichment = settings?.credits_per_enrichment ?? 1;
 
         // ── Search sessions summary ─────────────────────────────────────────────
@@ -869,7 +869,7 @@ router.get('/costs', requireAuth, requireAdmin, async (req, res) => {
                 price_details_usd: PRICE_PLACE_DETAILS,
             },
             credits: {
-                per_page: creditsPerPage,
+                per_record: creditsPerRecord,   // renamed: reflects record-based billing model
                 per_enrichment: creditsPerEnrichment,
                 issued_30d: creditsIssued30d,
                 consumed_30d: creditsConsumed30d,

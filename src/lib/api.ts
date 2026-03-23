@@ -950,9 +950,8 @@ export interface SearchPageResponse {
     alreadyViewed: boolean;
     /**
      * Authoritative backend signal for whether more pages exist.
-     * When present, replaces result-count heuristics. Enables fair per-record
-     * billing: a short final page signals hasMore=false and its actual length
-     * determines the charge, not a fixed creditsPerPage.
+     * A short final page signals hasMore=false; its actual record count
+     * determines the credit charge (not a fixed page rate).
      */
     hasMore?: boolean;
 }
@@ -971,18 +970,12 @@ export async function performSearch(params: SearchParams): Promise<SearchRespons
 /**
  * Get specific page of search results
  * GET /api/search/:sessionId/page/:pageNumber
- * 
- * Cost:
- * - 10 credits if page not viewed before
+ *
+ * Cost (record-based):
+ * - N credits, where N = newly returned businesses on this page (max 20)
  * - 0 credits if page already viewed
- * 
- * Throws 402 error if insufficient credits:
- * {
- *   error: 'Insufficient credits',
- *   message: 'Yeterli krediniz yok',
- *   required: 10,
- *   available: 5
- * }
+ * - 0 credits if 0 results returned
+ * Throws 402 if insufficient credits.
  */
 export async function getSearchPage(
     sessionId: string,
@@ -1034,9 +1027,17 @@ export async function getSearchSession(sessionId: string): Promise<{ session: Se
  * GET /api/search/credit-cost
  */
 export async function getSearchCreditCost(): Promise<{
+    /** Canonical: cost for 1 newly-returned business record. */
+    credits_per_record: number;
+    /** Worst-case cost for a full batch of 20 results. Frontend: "up to N credits". */
+    max_credits_per_batch: number;
+    /**
+     * Legacy alias = max_credits_per_batch (batch ceiling, NOT per-record rate).
+     * Kept for backward compat. Prefer credits_per_record for new code.
+     */
     credits_per_page: number;
     credits_per_enrichment: number;
-    credits_per_lead: number;
+    credits_per_lead?: number;
 }> {
     return apiRequest('/api/search/credit-cost');
 }

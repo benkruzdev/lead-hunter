@@ -13,7 +13,7 @@ const EVENT_TYPES = [
     { value: 'admin_deduction', label: 'Admin Kredi Düşme' },
     { value: 'order_complete', label: 'Ödeme Onayı' },
     { value: 'search_started', label: 'Arama Başlatıldı' },
-    { value: 'page_view_paid', label: 'Sayfa Görüntüleme (Ücretli)' },
+    { value: 'page_view_paid', label: 'Kayıt Yükleme (Ücretli)' },
     { value: 'enrichment_success', label: 'Zenginleştirme Başarılı' },
     { value: 'enrichment_failed', label: 'Zenginleştirme Başarısız' },
     { value: 'export_created', label: 'Dışa Aktarma' },

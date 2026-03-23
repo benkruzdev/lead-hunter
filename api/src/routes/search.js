@@ -40,13 +40,19 @@ async function getGoogleMapsApiKey() {
     return data.google_maps_api_key;
 }
 
-async function getCreditsPerPage() {
+/**
+ * Load the per-record credit rate from system_settings.
+ * The DB column is still named `credits_per_page` — no schema migration required.
+ * Runtime semantics: 1 credit = 1 newly-returned business record.
+ * A full batch (20 results) → 20 credits. A 13-result batch → 13 credits.
+ */
+async function getCreditsPerRecord() {
     const { data, error } = await supabaseAdmin
         .from('system_settings')
-        .select('credits_per_page')
+        .select('credits_per_page')   // column name kept; value is interpreted as per-record rate
         .eq('id', 1)
         .single();
-    if (error || data?.credits_per_page == null) return 10;
+    if (error || data?.credits_per_page == null) return 1;
     return data.credits_per_page;
 }
 
@@ -646,11 +652,11 @@ router.get('/:sessionId/page/:pageNumber', requireAuth, async (req, res) => {
         const viewedPages = Array.isArray(session.viewed_pages) ? session.viewed_pages : [];
         const alreadyViewed = viewedPages.includes(page);
 
-        // creditsPerPage from settings is our per-record rate (1 credit = 1 business unlocked).
-        // Most searches return PAGE_SIZE records → cost = creditsPerPage.
-        // Short final pages return fewer → cost = actual returned count.
-        // Balance check and deduction always use the actual charge amount — no overcharge, no refund.
-        const creditsPerRecord = await getCreditsPerPage();
+        // Billing model: 1 credit = 1 newly-returned business record.
+        // Full batch (20 results) → 20 credits. Partial batch (e.g. 13) → 13 credits.
+        // alreadyViewed page → 0 credits. Zero results → 0 credits.
+        // Balance gate and deduction always use exact returned count — no overcharge, no refund.
+        const creditsPerRecord = await getCreditsPerRecord();
 
         const now = new Date().toISOString();
         const queryKey = session.query_key;
@@ -877,22 +883,46 @@ router.get('/credit-cost', requireAuth, async (req, res) => {
     try {
         const { data, error } = await supabaseAdmin
             .from('system_settings')
+            // credits_per_page column stores the per-record rate (1 credit = 1 business)
             .select('credits_per_page, credits_per_enrichment, credits_per_lead')
             .eq('id', 1)
             .single();
 
         if (error || !data) {
-            return res.json({ credits_per_page: 10, credits_per_enrichment: 1, credits_per_lead: 1 });
+            // Record-based billing defaults:
+            //   credits_per_record    — 1 credit = 1 newly-returned business (canonical)
+            //   max_credits_per_batch — worst-case cost for a full 20-result batch
+            //   credits_per_page      — legacy alias = max_credits_per_batch (NOT per-record)
+            //                          kept so old consumers expecting page-level cost stay safe
+            return res.json({
+                credits_per_record:    1,
+                max_credits_per_batch: 20,   // frontend shows "up to 20 credits"
+                credits_per_page:      20,   // legacy alias: batch ceiling, NOT per-record cost
+                credits_per_enrichment: 1,
+                credits_per_lead: 1,
+            });
         }
 
+        // DB value = per-record rate. max_credits_per_batch = creditsPerRecord × 20.
+        // credits_per_page is returned as the batch ceiling — NOT per-record — for legacy compat.
+        const creditsPerRecord   = data.credits_per_page ?? 1;
+        const maxCreditsPerBatch = creditsPerRecord * 20;   // e.g. 1 × 20 = 20
+
         res.json({
-            credits_per_page: data.credits_per_page ?? 10,
+            credits_per_record:    creditsPerRecord,       // canonical: 1 credit = 1 record
+            max_credits_per_batch: maxCreditsPerBatch,     // "up to N credits" per batch
+            credits_per_page:      maxCreditsPerBatch,     // legacy: batch cost alias (NOT per-record)
             credits_per_enrichment: data.credits_per_enrichment ?? 1,
-            credits_per_lead: data.credits_per_lead ?? 1,
+            credits_per_lead:      data.credits_per_lead ?? 1,
         });
     } catch (err) {
         console.error('[Search] Credit cost fetch error:', err);
-        res.json({ credits_per_page: 10, credits_per_enrichment: 1 });
+        res.json({
+            credits_per_record:    1,
+            max_credits_per_batch: 20,
+            credits_per_page:      20,
+            credits_per_enrichment: 1,
+        });
     }
 });
 

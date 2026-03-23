@@ -386,8 +386,10 @@ export default function SearchPage() {
   const [isLoadingMore, setIsLoadingMore] = useState(false); // separate from main isSearching
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // Credit cost info (used in load-more button label)
-  const [creditsPerPage, setCreditsPerPage]             = useState(10);
+  // maxCreditsPerBatch: worst-case credit cost for one result batch (up to 20 records).
+  // Sourced from /credit-cost → max_credits_per_batch. Used in the load-more CTA label.
+  // Actual charge is always ≤ this — exact number of newly returned businesses.
+  const [maxCreditsPerBatch, setMaxCreditsPerBatch]     = useState(20);
   const [creditsPerEnrichment, setCreditsPerEnrichment] = useState(1);
   // Tracks which page numbers have already been viewed (fetched) in this session.
   // Pages in this set were already paid for — Load More won't charge for them again.
@@ -507,7 +509,7 @@ export default function SearchPage() {
       setSelectedIds([]);
 
       getSearchCreditCost().then(costs => {
-        setCreditsPerPage(costs.credits_per_page);
+        setMaxCreditsPerBatch(costs.max_credits_per_batch ?? costs.credits_per_page ?? 20);
         setCreditsPerEnrichment(costs.credits_per_enrichment);
       }).catch(() => { /* keep defaults */ });
 
@@ -601,7 +603,7 @@ export default function SearchPage() {
       console.debug('[DEBUG][SearchPage] handleSearch:success', { seq, results: (response.results as any[]).length, total: response.totalResults, hasMore: initialHasMore, sessionId: response.sessionId });
 
       getSearchCreditCost().then(costs => {
-        setCreditsPerPage(costs.credits_per_page);
+        setMaxCreditsPerBatch(costs.max_credits_per_batch ?? costs.credits_per_page ?? 20);
         setCreditsPerEnrichment(costs.credits_per_enrichment);
       }).catch(() => { /* keep defaults */ });
 
@@ -1229,7 +1231,7 @@ export default function SearchPage() {
                 ) : (
                   <>
                     <ChevronDown className="w-4 h-4" />
-                    {t("searchPage.loadMoreCta", { cost: creditsPerPage })}
+                    {t("searchPage.loadMoreCta", { cost: maxCreditsPerBatch })}
                   </>
                 )}
               </Button>

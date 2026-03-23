@@ -457,7 +457,7 @@ export default function AdminPackagesPage() {
                                     rows={4}
                                     value={form.features}
                                     onChange={e => handleField("features", e.target.value)}
-                                    placeholder={"1.000 kredi\nArama başına 10 kredi\nÜcretsiz zenginleştirme"}
+                                    placeholder={"1.000 kredi\nKayıt başına 1 kredi\nÜcretsiz zenginleştirme"}
                                     className="field-input resize-none"
                                 />
                                 <p className="mt-1 text-xs text-muted-foreground">Her satır ayrı bir özellik olarak kaydedilir.</p>

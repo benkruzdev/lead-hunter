@@ -31,7 +31,8 @@ interface CostData {
         price_details_usd: number;
     };
     credits: {
-        per_page: number;
+        per_record?: number;          // new: record-based model (backend v2+)
+        per_page?: number;            // legacy: kept for backward compat during rollout
         per_enrichment: number;
         issued_30d: number;
         consumed_30d: number;
@@ -255,9 +256,9 @@ export default function AdminCostPanelPage() {
                         <CardContent>
                             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                                 <StatCard
-                                    label="Kredi / Sayfa"
-                                    value={data.credits.per_page}
-                                    sub="system_settings'ten"
+                                    label="Kredi / Kayıt"
+                                    value={data.credits.per_record ?? data.credits.per_page ?? 1}
+                                    sub="Yeni dönen işletme başına"
                                 />
                                 <StatCard
                                     label="Satılan Kredi (30g)"

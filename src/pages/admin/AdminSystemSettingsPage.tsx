@@ -100,17 +100,17 @@ export default function AdminSystemSettingsPage() {
                     <CardContent className="space-y-4">
                         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                             <div className="space-y-2">
-                                <Label htmlFor="credits_per_page">Sayfa Başı Kredi</Label>
+                                <Label htmlFor="credits_per_page">Kayıt Başı Kredi</Label>
                                 <Input
                                     id="credits_per_page"
                                     type="number"
                                     min="0"
                                     value={form.credits_per_page}
                                     onChange={(e) => setForm(prev => ({ ...prev, credits_per_page: e.target.value }))}
-                                    placeholder="10"
+                                    placeholder="1"
                                 />
                                 <p className="text-xs text-muted-foreground">
-                                    Yeni bir arama sayfası yüklendiğinde düşülen kredi
+                                    Aramada yeni dönen her işletme kaydı başına düşülen kredi
                                 </p>
                             </div>
 
