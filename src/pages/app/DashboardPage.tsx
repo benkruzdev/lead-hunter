@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "@/contexts/AuthContext";
+import { COUNTRY_BY_CODE } from "@/config/countries";
 import {
   getSearchSessions,
   getLeadLists,
@@ -30,6 +31,18 @@ type ExportItem = {
   leadCount: number;
   createdAt: string;
 };
+
+/**
+ * Returns a flag emoji + space prefix for non-TR sessions.
+ * TR sessions (and legacy sessions without country_code) return empty string
+ * so existing Turkish users see no visual change.
+ */
+function getCountryPrefix(countryCode?: string | null): string {
+  const code = countryCode ?? 'TR';
+  if (code === 'TR') return '';
+  const entry = COUNTRY_BY_CODE.get(code);
+  return entry ? `${entry.flag} ` : '';
+}
 
 function sevenDaysAgo(): Date {
   const d = new Date();
@@ -247,7 +260,7 @@ export default function DashboardPage() {
               {t("dashboard.lastSearch")}
             </div>
             <div className="font-semibold">
-              {lastSession.province}
+              {getCountryPrefix(lastSession.country_code)}{lastSession.province}
               {lastSession.district ? ` / ${lastSession.district}` : ""} —{" "}
               {lastSession.category}
             </div>
@@ -303,7 +316,7 @@ export default function DashboardPage() {
                   <Search className="w-3.5 h-3.5 mt-0.5 text-muted-foreground flex-shrink-0" />
                   <div className="min-w-0">
                     <div className="text-xs font-medium truncate">
-                      {s.province}
+                      {getCountryPrefix(s.country_code)}{s.province}
                       {s.district ? ` / ${s.district}` : ""}
                     </div>
                     <div className="text-xs text-muted-foreground truncate">

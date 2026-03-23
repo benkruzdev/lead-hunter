@@ -72,7 +72,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import turkeyData from "@/data/turkey.json";
+import { getLocationData } from "@/lib/locationData";
 import { useToast } from "@/hooks/use-toast";
 import { ExportTemplateDialog } from "@/components/app/ExportTemplateDialog";
 import { templates, mapItemToRecord, generateCSV, downloadCSV } from "@/lib/exportTemplates";
@@ -257,10 +257,7 @@ function SearchableSelect({
 }
 
 // ─── Country selector (Popover + Command) ────────────────────────────────────
-// comingSoon entries are visible but truly non-selectable:
-// • aria-disabled keeps them out of keyboard navigation
-// • onSelect is a no-op so even direct cmdk keyboard selection is blocked
-// • state is never mutated → no broken search is triggered
+// All visible countries are fully selectable — no comingSoon gating.
 interface CountrySelectProps {
   value: string;                     // ISO code of selected country
   onValueChange: (code: string) => void;
@@ -268,8 +265,6 @@ interface CountrySelectProps {
   searchPlaceholder?: string;
   emptyText?: string;
   clearLabel?: string;
-  comingSoonBadge?: string;
-  comingSoonTooltip?: string;
 }
 function CountrySelect({
   value,
@@ -278,8 +273,6 @@ function CountrySelect({
   searchPlaceholder = "Search…",
   emptyText = "No results",
   clearLabel = "Clear",
-  comingSoonBadge = "Coming Soon",
-  comingSoonTooltip = "This country will be supported soon.",
 }: CountrySelectProps) {
   const [open, setOpen] = useState(false);
   const selectedEntry = COUNTRY_BY_CODE.get(value);
@@ -323,43 +316,21 @@ function CountrySelect({
                 </CommandItem>
               )}
               {VISIBLE_COUNTRIES.map(entry => {
-                const isComingSoon = entry.status === "comingSoon";
                 const display = `${entry.flag} ${entry.name}`;
                 return (
-                  <Tooltip key={entry.code} delayDuration={isComingSoon ? 400 : 99999}>
-                    <TooltipTrigger asChild>
-                      <CommandItem
-                        value={display}
-                        aria-disabled={isComingSoon}
-                        onSelect={() => {
-                          // comingSoon countries are hard-blocked — no state mutation
-                          if (isComingSoon) return;
-                          onValueChange(entry.code === value ? "" : entry.code);
-                          setOpen(false);
-                        }}
-                        className={
-                          isComingSoon
-                            ? "opacity-50 cursor-not-allowed select-none"
-                            : ""
-                        }
-                      >
-                        <Check
-                          className={"mr-2 h-4 w-4 " + (value === entry.code ? "opacity-100" : "opacity-0")}
-                        />
-                        <span className="flex-1">{display}</span>
-                        {isComingSoon && (
-                          <span className="ml-2 text-[10px] font-medium bg-muted text-muted-foreground rounded px-1.5 py-0.5">
-                            {comingSoonBadge}
-                          </span>
-                        )}
-                      </CommandItem>
-                    </TooltipTrigger>
-                    {isComingSoon && (
-                      <TooltipContent side="right" className="text-xs max-w-[180px]">
-                        {comingSoonTooltip}
-                      </TooltipContent>
-                    )}
-                  </Tooltip>
+                  <CommandItem
+                    key={entry.code}
+                    value={display}
+                    onSelect={() => {
+                      onValueChange(entry.code === value ? "" : entry.code);
+                      setOpen(false);
+                    }}
+                  >
+                    <Check
+                      className={"mr-2 h-4 w-4 " + (value === entry.code ? "opacity-100" : "opacity-0")}
+                    />
+                    <span className="flex-1">{display}</span>
+                  </CommandItem>
                 );
               })}
             </CommandGroup>
@@ -388,9 +359,10 @@ export default function SearchPage() {
   const [district, setDistrict] = useState("");
   const [availableDistricts, setAvailableDistricts] = useState<string[]>([]);
 
-  // Derived helpers
+  // Derived helpers — locationData is non-null when a structured dataset exists.
+  // null → free-text city + district inputs (Google handles geo-context).
   const countryEntry = COUNTRY_BY_CODE.get(country);
-  const isTurkey = country === "TR";
+  const locationData = getLocationData(country);
   // ── Search filters ──
   const [category, setCategory] = useState("");
   const [keyword, setKeyword] = useState("");
@@ -449,14 +421,13 @@ export default function SearchPage() {
 
   // ─── Effects ───────────────────────────────────────────────────────────────
   useEffect(() => {
-    if (!isTurkey) {
-      // For non-Turkey countries: no structured district list; keep city free-text
+    if (!locationData) {
+      // No structured dataset for this country — free-text inputs, no dropdown
       setAvailableDistricts([]);
       return;
     }
     if (city) {
-      const selectedProvince = turkeyData.provinces.find((p) => p.name === city);
-      const districts = selectedProvince?.districts || [];
+      const districts = locationData.subregions[city] || [];
       setAvailableDistricts(districts);
       if (pendingDistrict && districts.includes(pendingDistrict)) {
         setDistrict(pendingDistrict);
@@ -472,7 +443,7 @@ export default function SearchPage() {
       setDistrict("");
       setPendingDistrict(null);
     }
-  }, [city, pendingDistrict, isTurkey]);
+  }, [city, pendingDistrict, locationData]);
 
   // When country changes: clear city/district so the form stays coherent
   useEffect(() => {
@@ -644,8 +615,11 @@ export default function SearchPage() {
   const handleExportConfirm = (templateId: "basic" | "salesCrm" | "outreach") => {
     const template = templates[templateId];
     const selectedItems = results.filter(item => selectedIds.includes(item.id));
-    // Pass city as location context for export templates
-    const records = selectedItems.map(item => mapItemToRecord(item, template, city));
+    const records = selectedItems.map(item => mapItemToRecord(item, template, {
+      city,
+      country: countryEntry?.name,
+      countryCode: country || undefined,
+    }));
     const csvContent = generateCSV(records, template.columns);
     const timestamp = new Date().toISOString().split("T")[0];
     const filename = `leads_${templateId}_${timestamp}.csv`;
@@ -810,8 +784,6 @@ export default function SearchPage() {
               searchPlaceholder={t("searchPage.searchCountry")}
               emptyText={t("searchPage.noCountryFound")}
               clearLabel={t("searchPage.clearSelection")}
-              comingSoonBadge={t("searchPage.comingSoonBadge")}
-              comingSoonTooltip={t("searchPage.comingSoonTooltip")}
             />
           </div>
 
@@ -822,18 +794,18 @@ export default function SearchPage() {
               className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-foreground"
             >
               <MapPin className="w-3.5 h-3.5 text-primary" />
-              {t("searchPage.city")}
+              {t(countryEntry?.regionLabelKey ?? "searchPage.city")}
               <span className="ml-auto text-[10px] font-normal normal-case tracking-normal text-muted-foreground">
-                {isTurkey ? t("searchPage.cityHint") : t("searchPage.districtFreeHint")}
+                {locationData ? t("searchPage.cityHint") : t("searchPage.districtFreeHint")}
               </span>
             </Label>
-            {isTurkey ? (
+            {locationData ? (
               <SearchableSelect
                 id="city-select"
                 data-onboarding="city-select"
                 value={city}
                 onValueChange={setCity}
-                options={turkeyData.provinces.map(p => p.name)}
+                options={locationData.regions}
                 placeholder={t("searchPage.selectCity")}
                 searchPlaceholder={t("searchPage.searchCity")}
                 emptyText={t("searchPage.noCityFound")}
@@ -858,14 +830,14 @@ export default function SearchPage() {
               className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-foreground"
             >
               <MapPin className="w-3.5 h-3.5 text-primary" />
-              {t("searchPage.district")}
+              {t(countryEntry?.subregionLabelKey ?? "searchPage.district")}
               {city && (
                 <span className="ml-auto text-[10px] font-normal normal-case tracking-normal text-muted-foreground">
                   {t("searchPage.districtOptional")}
                 </span>
               )}
             </Label>
-            {isTurkey ? (
+            {locationData ? (
               <SearchableSelect
                 id="district-select"
                 data-onboarding="district-select"
@@ -1120,19 +1092,22 @@ export default function SearchPage() {
                         {(() => {
                           const d = item.district?.trim();
                           const c = city?.trim();
+                          const cn = countryEntry?.name;
                           const label = formatLocation(d, c);
                           return (
                             <span
                               className="block truncate leading-snug"
-                              title={label}
+                              title={[d, c, cn].filter(Boolean).join(", ") || label}
                             >
-                              {d && c ? (
-                                <>
-                                  <span className="text-sm text-muted-foreground">{d}</span>
-                                  <span className="block text-xs text-muted-foreground/60">{c}</span>
-                                </>
+                              {d ? (
+                                <span className="text-sm text-muted-foreground">{d}</span>
+                              ) : c ? (
+                                <span className="text-sm text-muted-foreground">{c}</span>
                               ) : (
                                 <span className="text-sm text-muted-foreground">{label}</span>
+                              )}
+                              {cn && (
+                                <span className="block text-[11px] text-muted-foreground/50">{cn}</span>
                               )}
                             </span>
                           );
@@ -1310,6 +1285,11 @@ export default function SearchPage() {
                       {detailItem.address ||
                         [detailItem.district, city].filter(Boolean).join(", ") ||
                         t("searchPage.noLocationInfo")}
+                      {countryEntry?.name && (
+                        <span className="block text-xs text-muted-foreground/60 mt-0.5">
+                          {countryEntry.name}
+                        </span>
+                      )}
                     </span>
                   </div>
                 </div>
@@ -1611,9 +1591,10 @@ export default function SearchPage() {
                 } catch (error: any) {
                   console.error("[SearchPage] Add to list failed:", error);
                   if (error.status === 402) {
-                    const requiredText = error.required ? ` ${error.required} kredi gerekli,` : "";
-                    const availableText = error.available !== undefined ? ` ${error.available} kredi mevcut.` : "";
-                    setListDialogError(t("leadLists.insufficientCredits") + requiredText + availableText);
+                    const parts = [t("leadLists.insufficientCredits")];
+                    if (error.required != null) parts.push(t("searchPage.creditErrorRequired", { required: error.required }));
+                    if (error.available != null) parts.push(t("searchPage.creditErrorAvailable", { available: error.available }));
+                    setListDialogError(parts.join(" "));
                   } else {
                     setListDialogError(t("leadLists.addFailed"));
                   }

@@ -1,15 +1,27 @@
-// Export template definitions and CSV generation utilities
-// social_links read from real enrichment data (item.social_links)
+/**
+ * Export template definitions and CSV generation utilities.
+ *
+ * mapItemToRecord accepts a locationCtx object so exports can include
+ * country-aware context (city, country name, country code) without
+ * breaking existing callers that still pass city as a plain string.
+ */
 
 export interface ExportTemplate {
     id: 'basic' | 'salesCrm' | 'outreach';
     columns: string[];
 }
 
+/** Location context passed from SearchPage into export mapping. */
+export interface ExportLocationCtx {
+    city?: string;
+    country?: string;      // display name from COUNTRY_BY_CODE
+    countryCode?: string;  // ISO 3166-1 alpha-2
+}
+
 export const templates: Record<string, ExportTemplate> = {
     basic: {
         id: 'basic',
-        columns: ['name', 'category', 'district', 'phone', 'website'],
+        columns: ['name', 'category', 'district', 'city', 'country', 'phone', 'website'],
     },
     salesCrm: {
         id: 'salesCrm',
@@ -17,12 +29,29 @@ export const templates: Record<string, ExportTemplate> = {
     },
     outreach: {
         id: 'outreach',
-        columns: ['name', 'website', 'instagram', 'facebook', 'linkedin', 'x', 'tiktok', 'youtube', 'outreach_ready', 'category', 'city'],
+        columns: ['name', 'website', 'instagram', 'facebook', 'linkedin', 'x', 'tiktok', 'youtube', 'outreach_ready', 'category', 'city', 'country'],
     },
 };
 
-// Map a lead list item to a flat record based on template
-export function mapItemToRecord(item: any, template: ExportTemplate, city?: string): Record<string, string> {
+/**
+ * Map a lead list item to a flat record based on template columns.
+ *
+ * @param item         - Lead data object
+ * @param template     - Export template definition
+ * @param locationCtx  - Location context: city, country display name, countryCode
+ *                       For backward compat, also accepts a plain string (treated as city).
+ */
+export function mapItemToRecord(
+    item: any,
+    template: ExportTemplate,
+    locationCtx?: ExportLocationCtx | string
+): Record<string, string> {
+    // Backward-compat: old callers passing city as a plain string
+    const ctx: ExportLocationCtx =
+        typeof locationCtx === 'string'
+            ? { city: locationCtx }
+            : (locationCtx ?? {});
+
     const record: Record<string, string> = {};
     const socialLinks: Record<string, string> = item.social_links || {};
 
@@ -36,6 +65,15 @@ export function mapItemToRecord(item: any, template: ExportTemplate, city?: stri
                 break;
             case 'district':
                 record[col] = item.district || '';
+                break;
+            case 'city':
+                record[col] = ctx.city || '';
+                break;
+            case 'country':
+                record[col] = ctx.country || '';
+                break;
+            case 'country_code':
+                record[col] = ctx.countryCode || '';
                 break;
             case 'phone':
                 record[col] = item.phone || '';
@@ -68,9 +106,6 @@ export function mapItemToRecord(item: any, template: ExportTemplate, city?: stri
                 record[col] = socialCount >= 2 ? 'yes' : (item.email ? 'yes' : 'no');
                 break;
             }
-            case 'city':
-                record[col] = city || '';
-                break;
             default:
                 record[col] = '';
         }
@@ -79,42 +114,32 @@ export function mapItemToRecord(item: any, template: ExportTemplate, city?: stri
     return record;
 }
 
-// Generate CSV content from records with UTF-8 BOM for Excel compatibility
+/** Generate CSV content from records with UTF-8 BOM for Excel compatibility. */
 export function generateCSV(records: Record<string, string>[], columns: string[]): string {
-    // UTF-8 BOM for Excel
     const BOM = '\uFEFF';
-
-    // CSV header
     const header = columns.join(',');
-
-    // CSV rows
-    const rows = records.map(record => {
-        return columns.map(col => {
+    const rows = records.map(record =>
+        columns.map(col => {
             const value = record[col] || '';
-            // Escape values containing commas, quotes, or newlines
             if (value.includes(',') || value.includes('"') || value.includes('\n')) {
                 return `"${value.replace(/"/g, '""')}"`;
             }
             return value;
-        }).join(',');
-    });
-
+        }).join(',')
+    );
     return BOM + [header, ...rows].join('\n');
 }
 
-// Trigger CSV download in browser
+/** Trigger CSV download in browser. */
 export function downloadCSV(content: string, filename: string): void {
     const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
-
     link.setAttribute('href', url);
     link.setAttribute('download', filename);
     link.style.visibility = 'hidden';
-
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-
     URL.revokeObjectURL(url);
 }

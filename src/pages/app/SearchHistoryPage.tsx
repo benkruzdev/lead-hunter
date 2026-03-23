@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { getSearchSessions, SearchSession } from "@/lib/api";
+import { COUNTRY_BY_CODE } from "@/config/countries";
 import { Button } from "@/components/ui/button";
 import {
     Clock,
@@ -29,19 +30,29 @@ import { formatDistanceToNow } from "date-fns";
 import { tr } from "date-fns/locale";
 import { useTranslation } from "react-i18next";
 
-// ─── Location formatter (global-ready) ────────────────────────────────────────
-// subregion = district/ilçe, region = city/province
-// "Akyurt, Ankara" | "Ankara" | "—"
+// ─── Location formatter (global-ready) ─────────────────────────────────────────────────
+// Prepends country flag for non-TR sessions; TR and legacy sessions (no country_code)
+// render exactly as before — no visual noise for existing Turkish users.
 function formatSessionLocation(
     region: string | null | undefined,
-    subregion: string | null | undefined
+    subregion: string | null | undefined,
+    countryCode?: string | null
 ): string {
     const r = region?.trim();
     const s = subregion?.trim();
-    if (s && r) return `${s}, ${r}`;
-    if (r) return r;
-    if (s) return s;
-    return "—";
+    let location: string;
+    if (s && r) location = `${s}, ${r}`;
+    else if (r) location = r;
+    else if (s) location = s;
+    else location = "—";
+
+    // Prepend flag only for non-TR sessions (TR is the default / majority of existing data)
+    const code = countryCode ?? 'TR';
+    if (code !== 'TR') {
+        const entry = COUNTRY_BY_CODE.get(code);
+        if (entry) location = `${entry.flag} ${location}`;
+    }
+    return location;
 }
 
 // ─── Two-axis scoring model ────────────────────────────────────────────────────
@@ -248,7 +259,8 @@ export default function SearchHistoryPage() {
                     const signal = getUsageSignal(session);
                     const location = formatSessionLocation(
                         session.province,
-                        session.district
+                        session.district,
+                        session.country_code
                     );
                     const pagesViewed = session.viewed_pages.length;
 

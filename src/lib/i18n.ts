@@ -702,7 +702,7 @@ const resources = {
                     freshnessTooltip: 'Veri tazeliği backend ile ölçülecek.',
                 },
                 emptyTitle: 'İşletme Aramaya Başlayın',
-                emptyDescription: 'Şehir ve kategori seçerek Türkiye genelindeki işletmeleri arayın. Sonuçlardan lead listenizi oluşturun.',
+                emptyDescription: 'Ülke, şehir ve kategori seçerek dünyanın her yerindeki işletmeleri arayın. Sonuçlardan lead listenizi oluşturun.',
                 detailAddress: 'Adres',
                 detailPhone: 'Telefon',
                 detailWebsite: 'Website',
@@ -793,6 +793,9 @@ const resources = {
                 // Credit error interpolation (add-to-list dialog)
                 creditErrorRequired: '{{required}} kredi gerekli,',
                 creditErrorAvailable: '{{available}} kredi mevcut.',
+                // Country-specific location field labels (used via CountryEntry.regionLabelKey)
+                regionLabelTR: 'İl',
+                subregionLabelTR: 'İlçe',
             },
             leadQuality: {
                 new: {
@@ -1741,6 +1744,9 @@ const resources = {
                 // Credit error interpolation (add-to-list dialog)
                 creditErrorRequired: '{{required}} credits needed,',
                 creditErrorAvailable: '{{available}} available.',
+                // Country-specific location field labels (used via CountryEntry.regionLabelKey)
+                regionLabelTR: 'Province',
+                subregionLabelTR: 'District',
             },
             leadQuality: {
                 new: {

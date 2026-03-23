@@ -436,7 +436,7 @@ router.get('/users/:id/activity', requireAuth, requireAdmin, async (req, res) =>
             // Last 5 searches
             supabaseAdmin
                 .from('search_sessions')
-                .select('id, province, district, category, keyword, total_results, created_at')
+                .select('id, country_code, province, district, category, keyword, total_results, created_at')
                 .eq('user_id', id)
                 .order('created_at', { ascending: false })
                 .limit(5),

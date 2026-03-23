@@ -7,16 +7,20 @@
  *   'hidden'     — never shown in the selector.
  *
  * hasSubregions:
- *   true  — structured region/subregion datasets available (e.g. turkey.json).
- *           City field uses a searchable dropdown; district field uses dropdown.
+ *   true  — structured region/subregion dataset exists (e.g. TR → tr.json).
+ *           City field uses a searchable dropdown; district uses a dropdown too.
  *   false — no structured dataset; city and district are professional free-text
  *           inputs with clear placeholders. Search still works via Google.
  *
+ * regionLabelKey / subregionLabelKey (optional):
+ *   i18n keys for the City and District field labels, allowing country-specific
+ *   terminology (e.g. "Province" vs "City" vs "State"). When absent, the generic
+ *   searchPage.city / searchPage.district keys are used.
+ *
  * To activate a new country with structured data:
- *   1. Add a data file (e.g. src/data/germany.json) with the same schema as turkey.json.
+ *   1. Add a dataset to src/lib/locationData.ts (import + register).
  *   2. Set hasSubregions: true here.
- *   3. Import and route the file in SearchPage's city/district logic.
- *   Everything else (search, cache, session, history) adapts automatically.
+ *   Everything else (search, cache, session, history, labels) adapts automatically.
  */
 export interface CountryEntry {
   /** ISO 3166-1 alpha-2 */
@@ -25,15 +29,34 @@ export interface CountryEntry {
   name: string;
   /** Emoji flag */
   flag: string;
-  /** Whether structured region/subregion dropdown data is available */
+  /**
+   * Single capability signal: true when a structured location dataset exists
+   * for this country. This is the only flag needed — dataset presence in
+   * locationData.ts is the complementary runtime check.
+   */
   hasSubregions: boolean;
   /** Coverage status — 'hidden' entries are excluded from the selector */
   status: 'active' | 'comingSoon' | 'hidden';
+  /**
+   * Optional i18n key for the first-level location field label.
+   * Falls back to searchPage.city when absent.
+   */
+  regionLabelKey?: string;
+  /**
+   * Optional i18n key for the second-level location field label.
+   * Falls back to searchPage.district when absent.
+   */
+  subregionLabelKey?: string;
 }
 
 export const COUNTRIES: CountryEntry[] = [
   // ── Active with structured subregion data ──────────────────────────────────
-  { code: 'TR', name: 'Türkiye',        flag: '🇹🇷', hasSubregions: true,  status: 'active' },
+  {
+    code: 'TR', name: 'Türkiye', flag: '🇹🇷',
+    hasSubregions: true, status: 'active',
+    regionLabelKey: 'searchPage.regionLabelTR',
+    subregionLabelKey: 'searchPage.subregionLabelTR',
+  },
 
   // ── Active via free-text fallback (Google handles geo-context) ─────────────
   { code: 'US', name: 'United States',  flag: '🇺🇸', hasSubregions: false, status: 'active' },
