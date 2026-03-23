@@ -52,6 +52,7 @@ import {
   Info,
   Check,
   ChevronsUpDown,
+  ChevronDown,
 } from "lucide-react";
 import {
   Tooltip,
@@ -526,6 +527,8 @@ export default function SearchPage() {
         return;
       }
       setResults(searchResponse.results);
+      // totalResults kept for internal compatibility (session record, history).
+      // It is NOT the driver of pagination UX — hasMore below is.
       const total = searchResponse.totalResults ?? session.total_results;
       setTotalResults(total);
       // Seed viewedPages from the session so the button label knows which pages
@@ -535,8 +538,11 @@ export default function SearchPage() {
       const alreadyViewed = Array.isArray(session.viewed_pages) ? session.viewed_pages : [1];
       setViewedPages(new Set(alreadyViewed));
       setNextPage(2);
-      setHasMore(searchResponse.results.length < total);
-      console.debug('[DEBUG][SearchPage] loadSession:success', { sid, results: searchResponse.results.length, total });
+      // Backend hasMore flag is authoritative; result-count heuristic is only a fallback.
+      // Do NOT use totalResults here — it may be capped, stale, or unavailable.
+      const restoredHasMore = searchResponse.hasMore ?? (searchResponse.results.length >= resultsPerPage);
+      setHasMore(restoredHasMore);
+      console.debug('[DEBUG][SearchPage] loadSession:success', { sid, results: searchResponse.results.length, total, hasMore: restoredHasMore });
     } catch (error: any) {
       if (seq !== reqSeq.current) {
         console.debug('[DEBUG][SearchPage] loadSession:catch stale — discarding', { seq });
@@ -585,11 +591,14 @@ export default function SearchPage() {
       setResults(response.results as any[]);
       setTotalResults(response.totalResults);
       setNextPage(2);
-      setHasMore((response.results as any[]).length < response.totalResults);
+      // Prefer the backend's authoritative hasMore flag when available.
+      // Fall back to heuristic: a full page implies more may exist.
+      const initialHasMore = response.hasMore ?? ((response.results as any[]).length >= resultsPerPage);
+      setHasMore(initialHasMore);
       setHasSearched(true);
       // Page 1 was just served — mark it viewed so the credit label shows correctly.
       setViewedPages(new Set([1]));
-      console.debug('[DEBUG][SearchPage] handleSearch:success', { seq, results: (response.results as any[]).length, total: response.totalResults, sessionId: response.sessionId });
+      console.debug('[DEBUG][SearchPage] handleSearch:success', { seq, results: (response.results as any[]).length, total: response.totalResults, hasMore: initialHasMore, sessionId: response.sessionId });
 
       getSearchCreditCost().then(costs => {
         setCreditsPerPage(costs.credits_per_page);
@@ -683,8 +692,11 @@ export default function SearchPage() {
       setNextPage(pageToFetch + 1);
       // Mark this page as viewed so the credit label updates correctly.
       setViewedPages(prev => new Set([...prev, pageToFetch]));
-      const totalPages = Math.max(1, Math.ceil(totalResults / resultsPerPage));
-      setHasMore(pageToFetch < totalPages);
+      // Prefer backend hasMore flag; fall back to heuristic: a full page → assume more.
+      // A short page (< resultsPerPage) signals the end of results — stop showing the button.
+      const pageHasMore = response.hasMore ?? ((response.results as any[]).length >= resultsPerPage);
+      setHasMore(pageHasMore);
+      console.debug('[DEBUG][SearchPage] doLoadMore:hasMore', { pageToFetch, returned: (response.results as any[]).length, creditCost: response.creditCost, pageHasMore });
       if (response.creditCost > 0) {
         refreshProfile();
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.credits });
@@ -972,11 +984,7 @@ export default function SearchPage() {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-3 border-b bg-muted/30">
             <div className="flex items-center gap-3 flex-wrap">
               <span className="text-sm font-semibold text-foreground">
-                {t("searchPage.resultsTotal", { count: totalResults })}
-              </span>
-              <span className="text-muted-foreground/40 select-none">·</span>
-              <span className="text-sm text-muted-foreground">
-                {t("searchPage.resultsShowing", { count: results.length })}
+                {t("searchPage.loadedCount", { count: results.length })}
               </span>
               {selectedIds.length > 0 && (
                 <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 text-primary text-xs font-semibold px-2.5 py-0.5">
@@ -1200,24 +1208,36 @@ export default function SearchPage() {
 
           {/* Load More */}
           {hasMore && (
-            <div className="flex justify-center items-center gap-3 p-4 border-t bg-muted/10">
+            <div className="flex flex-col items-center gap-2 p-5 border-t bg-muted/10">
               <Button
                 variant="outline"
                 size="sm"
                 disabled={isLoadingMore}
                 onClick={handleLoadMore}
+                className="gap-2 px-5"
               >
                 {isLoadingMore ? (
                   <>
-                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                    <Loader2 className="w-4 h-4 animate-spin" />
                     {t("searchPage.loading")}
                   </>
+                ) : viewedPages.has(nextPage) ? (
+                  <>
+                    <ChevronDown className="w-4 h-4" />
+                    {t("searchPage.loadMoreFree")}
+                  </>
                 ) : (
-                  viewedPages.has(nextPage)
-                    ? <>{t("searchPage.loadMore")}</>
-                    : <>{t("searchPage.loadMoreWithCost", { cost: creditsPerPage })}</>
+                  <>
+                    <ChevronDown className="w-4 h-4" />
+                    {t("searchPage.loadMoreCta", { cost: creditsPerPage })}
+                  </>
                 )}
               </Button>
+              {!viewedPages.has(nextPage) && !isLoadingMore && (
+                <p className="text-[11px] text-muted-foreground/60 text-center max-w-xs leading-relaxed">
+                  {t("searchPage.loadMoreFairness")}
+                </p>
+              )}
             </div>
           )}
         </div>

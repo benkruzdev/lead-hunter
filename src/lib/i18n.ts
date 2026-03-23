@@ -738,10 +738,14 @@ const resources = {
                 // Results bar
                 resultsTotal: '{{count}} sonuç',
                 resultsShowing: '{{count}} gösteriliyor',
+                loadedCount: '{{count}} işletme keşfedildi',
                 selectedPill: '{{count}} seçili',
                 addToList: 'Seçilenleri Listeye Ekle',
-                loadMore: 'Daha Fazla Yükle',
+                loadMore: 'Devam et',
                 loadMoreWithCost: 'Daha Fazla Yükle ({{cost}} kredi)',
+                loadMoreFree: 'Devam et',
+                loadMoreCta: 'En fazla {{cost}} krediyle yeni işletmeler keşfet',
+                loadMoreFairness: 'Yalnızca yeni yüklenen işletmeler kredi kullanır. Daha az sonuç gelirse yalnızca o kadarı ödersiniz.',
                 loading: 'Yükleniyor…',
                 // Table headers
                 colBusiness: 'İşletme',
@@ -1703,10 +1707,14 @@ const resources = {
                 // Results bar
                 resultsTotal: '{{count}} results',
                 resultsShowing: '{{count}} showing',
+                loadedCount: '{{count}} businesses unlocked',
                 selectedPill: '{{count}} selected',
                 addToList: 'Add to List',
-                loadMore: 'Load More',
+                loadMore: 'Continue',
                 loadMoreWithCost: 'Load More ({{cost}} credits)',
+                loadMoreFree: 'Continue',
+                loadMoreCta: 'Discover more · up to {{cost}} credits',
+                loadMoreFairness: 'Only newly loaded businesses use credits. If fewer results come back, you’re only charged for those.',
                 loading: 'Loading…',
                 // Table headers
                 colBusiness: 'Business',

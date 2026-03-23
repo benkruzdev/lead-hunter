@@ -935,6 +935,11 @@ export interface SearchResponse {
     results: SearchResult[];
     totalResults: number;
     currentPage: number;
+    /**
+     * When the backend provides this flag, it is the authoritative signal for
+     * whether more pages exist. Falls back to result-count heuristics when absent.
+     */
+    hasMore?: boolean;
 }
 
 export interface SearchPageResponse {
@@ -943,6 +948,13 @@ export interface SearchPageResponse {
     totalResults: number;
     creditCost: number;
     alreadyViewed: boolean;
+    /**
+     * Authoritative backend signal for whether more pages exist.
+     * When present, replaces result-count heuristics. Enables fair per-record
+     * billing: a short final page signals hasMore=false and its actual length
+     * determines the charge, not a fixed creditsPerPage.
+     */
+    hasMore?: boolean;
 }
 
 /**
