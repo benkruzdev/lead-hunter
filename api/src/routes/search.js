@@ -147,12 +147,14 @@ function mapPlace(place) {
 
 /**
  * Perform Places Text Search (New) with optional rating filter.
- * Returns all unique place IDs (up to 60).
+ * Returns all unique place IDs.
+ * Safety ceiling is 200 — large enough for a real candidate pool,
+ * not so large as to run uncontrolled Google API costs.
  */
-async function collectPlaceIdsFiltered(apiKey, query, minRating, countryCode, maxResults = 60) {
+async function collectPlaceIdsFiltered(apiKey, query, minRating, countryCode, maxResults = 200) {
     const placeIds = [];
     let pageToken = undefined;
-    const maxPages = Math.ceil(Math.min(maxResults, 60) / PAGE_SIZE);
+    const maxPages = Math.ceil(maxResults / PAGE_SIZE);
 
     // Map countryCode to a sensible languageCode for display names.
     // Default to 'tr' for TR (existing behaviour), 'en' for all others.
@@ -361,6 +363,8 @@ router.post('/', requireAuth, async (req, res) => {
                         results: pageRow.results_json,
                         totalResults: existingSession.total_results,
                         currentPage: 1,
+                        // authoritative hasMore: pool has more candidates beyond page 1
+                        hasMore: (Array.isArray(pageRow.place_ids) ? pageRow.place_ids.length : (pageRow.results_json || []).length) >= PAGE_SIZE,
                         fromCache: true,
                     });
                 }
@@ -386,6 +390,8 @@ router.post('/', requireAuth, async (req, res) => {
                 results,
                 totalResults: existingSession.total_results,
                 currentPage: 1,
+                // hasMore: more candidates beyond page 1 means the pool is larger than one page
+                hasMore: allIds.length > PAGE_SIZE,
             });
         }
 
@@ -460,6 +466,8 @@ router.post('/', requireAuth, async (req, res) => {
                     results: page1Row.results_json,
                     totalResults,
                     currentPage: 1,
+                    // authoritative hasMore: pool has candidates beyond the first page
+                    hasMore: allPlaceIds.length > PAGE_SIZE,
                     fromCache: true,
                 });
             }
@@ -580,6 +588,8 @@ router.post('/', requireAuth, async (req, res) => {
             results: page1Results,
             totalResults,
             currentPage: 1,
+            // authoritative hasMore: pool has candidates beyond the first page
+            hasMore: allPlaceIds.length > PAGE_SIZE,
             fromCache,
         });
 
@@ -614,49 +624,41 @@ router.get('/:sessionId/page/:pageNumber', requireAuth, async (req, res) => {
             return res.status(404).json({ error: 'Search session not found' });
         }
 
-        const totalPages = Math.max(1, Math.ceil(session.total_results / PAGE_SIZE));
+        // ── Page-range validation ────────────────────────────────────────────
+        // Use the actual candidate pool (all_place_ids or session.place_ids),
+        // NOT total_results — that may be stale or from a 60-item-capped session.
+        let candidatePoolSize = session.total_results || 0; // safe fallback
+        if (session.query_key) {
+            const { data: qcRowForCount } = await supabaseAdmin
+                .from('search_query_cache')
+                .select('all_place_ids')
+                .eq('query_key', session.query_key)
+                .maybeSingle();
+            if (qcRowForCount?.all_place_ids) candidatePoolSize = qcRowForCount.all_place_ids.length;
+        } else if (Array.isArray(session.place_ids)) {
+            candidatePoolSize = session.place_ids.length;
+        }
+        const totalPages = Math.max(1, Math.ceil(candidatePoolSize / PAGE_SIZE));
         if (page > totalPages) {
             return res.status(404).json({ error: 'Page not found', message: 'Requested page is out of range' });
         }
 
         const viewedPages = Array.isArray(session.viewed_pages) ? session.viewed_pages : [];
         const alreadyViewed = viewedPages.includes(page);
-        const creditsPerPage = await getCreditsPerPage();
-        const creditCost = alreadyViewed ? 0 : creditsPerPage;
 
-        // Deduct credits BEFORE fetch (lock the page-view intent).
-        // viewed_pages is updated AFTER successful fetch to avoid
-        // "credits deducted but page never loaded" inconsistency.
-        if (!alreadyViewed) {
-            const { data: profile } = await supabaseAdmin
-                .from('profiles')
-                .select('credits')
-                .eq('id', userId)
-                .single();
-
-            if ((profile?.credits || 0) < creditCost) {
-                return res.status(402).json({
-                    error: 'Insufficient credits',
-                    message: 'Yeterli krediniz yok',
-                    required: creditCost,
-                    available: profile?.credits || 0,
-                });
-            }
-
-            const { error: deductError } = await supabaseAdmin
-                .rpc('decrement_credits', { user_id: userId, amount: creditCost });
-
-            if (deductError) {
-                console.error('[Search] Credit deduction failed:', deductError);
-                return res.status(500).json({ error: 'Failed to deduct credits' });
-            }
-            // NOTE: viewed_pages written after successful content fetch below
-        }
+        // creditsPerPage from settings is our per-record rate (1 credit = 1 business unlocked).
+        // Most searches return PAGE_SIZE records → cost = creditsPerPage.
+        // Short final pages return fewer → cost = actual returned count.
+        // Balance check and deduction always use the actual charge amount — no overcharge, no refund.
+        const creditsPerRecord = await getCreditsPerPage();
 
         const now = new Date().toISOString();
         const queryKey = session.query_key;
 
         // ── Cache-first page fetch ───────────────────────────────────────────
+        // For cache hits we know the exact result set BEFORE touching any credits.
+        // This lets us compute the exact charge, check balance against it, and
+        // deduct exactly — no overcharge, no refund needed on this path.
         if (queryKey) {
             const { data: pageRow } = await supabaseAdmin
                 .from('search_query_pages')
@@ -672,8 +674,39 @@ router.get('/:sessionId/page/:pageNumber', requireAuth, async (req, res) => {
                     .rpc('increment_page_cache_hit', { p_query_key: queryKey, p_page_number: page })
                     .then(() => {}).catch(() => {});
 
-                // Write viewed_pages + event after confirming we have results
-                if (!alreadyViewed && creditCost > 0) {
+                const pageResults = pageRow.results_json || [];
+                // Exact cost: 1 credit per returned business (capped at PAGE_SIZE).
+                const exactCost = alreadyViewed ? 0 : Math.min(pageResults.length, PAGE_SIZE);
+
+                if (!alreadyViewed && exactCost > 0) {
+                    // Balance check against the actual charge — not a full-page estimate.
+                    const { data: profile } = await supabaseAdmin
+                        .from('profiles')
+                        .select('credits')
+                        .eq('id', userId)
+                        .single();
+
+                    if ((profile?.credits || 0) < exactCost) {
+                        return res.status(402).json({
+                            error: 'Insufficient credits',
+                            message: 'Yeterli krediniz yok',
+                            required: exactCost,
+                            available: profile?.credits || 0,
+                        });
+                    }
+
+                    const { error: deductError } = await supabaseAdmin
+                        .rpc('decrement_credits', { user_id: userId, amount: exactCost });
+
+                    if (deductError) {
+                        console.error('[Search] Credit deduction failed:', deductError);
+                        return res.status(500).json({ error: 'Failed to deduct credits' });
+                    }
+                }
+
+                const hasMore = (page * PAGE_SIZE) < candidatePoolSize;
+
+                if (!alreadyViewed && pageResults.length > 0) {
                     supabaseAdmin.from('search_sessions')
                         .update({ viewed_pages: [...viewedPages, page] })
                         .eq('id', sessionId)
@@ -681,24 +714,27 @@ router.get('/:sessionId/page/:pageNumber', requireAuth, async (req, res) => {
                     logEvent(supabaseAdmin, {
                         level: 'info', source: 'search', event_type: 'page_view_paid',
                         actor_user_id: userId, target_type: 'search_session', target_id: sessionId,
-                        message: `Ödeyerek sayfa görüntülendi: sayfa ${page}`,
-                        credit_delta: -creditCost,
-                        metadata: { session_id: sessionId, page, credits_per_page: creditsPerPage },
+                        message: `Ödeyerek sayfa görüntülendi: sayfa ${page} (${pageResults.length} işletme)`,
+                        credit_delta: -exactCost,
+                        metadata: { session_id: sessionId, page, results_returned: pageResults.length, credits_charged: exactCost },
                     }).catch(() => {});
                 }
 
                 return res.json({
-                    results: pageRow.results_json,
+                    results: pageResults,
                     currentPage: page,
                     totalResults: session.total_results,
-                    creditCost,
+                    creditCost: exactCost,
                     alreadyViewed,
+                    hasMore,
                     fromCache: true,
                 });
             }
         }
 
         // ── Cache miss — fetch from Google (place_cache first) ───────────────
+        // Billing model: balance-gate → fetch → charge exact returned count.
+        // No precharge, no refund on any normal path.
         const apiKey = await getGoogleMapsApiKey();
 
         // Determine which place IDs belong to this page
@@ -722,6 +758,31 @@ router.get('/:sessionId/page/:pageNumber', requireAuth, async (req, res) => {
             pageIds = session.place_ids.slice(start, start + PAGE_SIZE);
         }
 
+        // ── Billing step 1: pessimistic balance gate ─────────────────────────
+        // Check the user can afford the maximum this page could cost (pageIds.length).
+        // Short final pages already have fewer IDs → the gate is naturally lower.
+        // This is NOT a deduction — it prevents fetching when the user clearly can't pay.
+        const maxCost = alreadyViewed ? 0 : Math.min(pageIds.length, PAGE_SIZE);
+
+        if (!alreadyViewed && maxCost > 0) {
+            const { data: profile } = await supabaseAdmin
+                .from('profiles')
+                .select('credits')
+                .eq('id', userId)
+                .single();
+
+            if ((profile?.credits || 0) < maxCost) {
+                return res.status(402).json({
+                    error: 'Insufficient credits',
+                    message: 'Yeterli krediniz yok',
+                    // `required` is the worst-case cost. Actual charge ≤ this.
+                    required: maxCost,
+                    available: profile?.credits || 0,
+                });
+            }
+        }
+
+        // ── Billing step 2: fetch ────────────────────────────────────────────
         let results = [];
         if (pageIds.length > 0) {
             results = await fetchPlaceDetailsWithCache(apiKey, pageIds);
@@ -729,34 +790,39 @@ router.get('/:sessionId/page/:pageNumber', requireAuth, async (req, res) => {
             console.warn('[Search] No API key and no cached place IDs for page fetch');
         }
 
-        // Compensation guard: credits were deducted but fetch returned nothing.
-        // Attempt refund synchronously so we can report actual outcome to client.
-        if (results.length === 0 && !alreadyViewed && creditCost > 0) {
-            console.warn('[Search] Empty results after credit deduction — attempting compensation refund', {
-                userId, sessionId, page, creditCost,
+        // ── Billing step 3: charge exactly what was returned ─────────────────
+        // actualCost = results.length. No overcharge, no refund on any normal path:
+        //   - full page (20 results)       → charge 20
+        //   - short final page (13 IDs)    → maxCost was 13, charge 13
+        //   - Google failure, 0 returned  → charge 0, return 502 cleanly
+        //   - partial Google failure       → charge only returned count
+        const actualCost = alreadyViewed ? 0 : Math.min(results.length, PAGE_SIZE);
+
+        if (!alreadyViewed && results.length === 0 && maxCost > 0) {
+            // Fetch returned nothing; nothing was charged — safe to return error.
+            console.warn('[Search] Cache-miss fetch returned 0 results — no credits charged', {
+                userId, sessionId, page, pageIdCount: pageIds.length,
             });
-            let compensationSucceeded = false;
-            try {
-                const { error: refundErr } = await supabaseAdmin
-                    .rpc('decrement_credits', { user_id: userId, amount: -creditCost });
-                if (refundErr) {
-                    console.error('[Search] Compensation refund failed (RPC error):', refundErr);
-                } else {
-                    compensationSucceeded = true;
-                    console.info('[Search] Compensation refund succeeded', { userId, creditCost });
-                }
-            } catch (refundEx) {
-                console.error('[Search] Compensation refund threw:', refundEx);
-            }
             return res.status(502).json({
                 error: 'No results returned',
-                message: compensationSucceeded
-                    ? 'Sayfa verisi alınamadı. Krediniz iade edildi.'
-                    : 'Sayfa verisi alınamadı. Kredi iadesi denendi ancak doğrulanamadı; lütfen destek ile iletişime geçin.',
-                compensation_attempted: true,
-                compensation_succeeded: compensationSucceeded,
+                message: 'Sayfa verisi alınamadı. Krediniz düşülmedi.',
+                credits_charged: 0,
             });
         }
+
+        if (!alreadyViewed && actualCost > 0) {
+            const { error: deductError } = await supabaseAdmin
+                .rpc('decrement_credits', { user_id: userId, amount: actualCost });
+
+            if (deductError) {
+                // Deduction failed after we already served content. Log prominently.
+                console.error('[Search] Credit deduction failed after fetch:', deductError);
+                return res.status(500).json({ error: 'Failed to deduct credits' });
+            }
+        }
+
+        const hasMore = (page * PAGE_SIZE) < candidatePoolSize;
+
 
         // Write this page to page cache if we have a query_key
         if (queryKey && results.length > 0) {
@@ -775,7 +841,7 @@ router.get('/:sessionId/page/:pageNumber', requireAuth, async (req, res) => {
         }
 
         // Write viewed_pages + event AFTER successful fetch
-        if (!alreadyViewed && creditCost > 0) {
+        if (!alreadyViewed && results.length > 0) {
             supabaseAdmin.from('search_sessions')
                 .update({ viewed_pages: [...viewedPages, page] })
                 .eq('id', sessionId)
@@ -783,9 +849,9 @@ router.get('/:sessionId/page/:pageNumber', requireAuth, async (req, res) => {
             logEvent(supabaseAdmin, {
                 level: 'info', source: 'search', event_type: 'page_view_paid',
                 actor_user_id: userId, target_type: 'search_session', target_id: sessionId,
-                message: `Ödeyerek sayfa görüntülendi: sayfa ${page}`,
-                credit_delta: -creditCost,
-                metadata: { session_id: sessionId, page, credits_per_page: creditsPerPage },
+                message: `Ödeyerek sayfa görüntülendi: sayfa ${page} (${results.length} işletme)`,
+                credit_delta: -actualCost,
+                metadata: { session_id: sessionId, page, candidates: pageIds.length, results_returned: results.length, credits_charged: actualCost },
             }).catch(() => {});
         }
 
@@ -793,8 +859,9 @@ router.get('/:sessionId/page/:pageNumber', requireAuth, async (req, res) => {
             results,
             currentPage: page,
             totalResults: session.total_results,
-            creditCost,
+            creditCost: actualCost,
             alreadyViewed,
+            hasMore,
             fromCache: false,
         });
 
