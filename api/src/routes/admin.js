@@ -723,16 +723,17 @@ router.get('/costs', requireAuth, requireAdmin, async (req, res) => {
 
         // ── Places API call estimates ───────────────────────────────────────────
         // Text Search calls:
-        //   Each session → up to 3 TextSearch calls, avg 2
+        //   Each session → 1 base query + up to 2 expansion variants (district-off, keyword-off),
+        //   so 1–3 Text Search calls per session; expansion variants only fire when pool is shallow
         const estimatedTextSearchCalls = sessionCount30d * AVG_TEXT_SEARCH_CALLS_PER_SESSION;
 
         // Place Details calls:
         //   - First page (every session): up to PAGE_SIZE details
         //   - Paid pages (viewed_pages > 1): up to PAGE_SIZE details each
-        //   - minReviews filter: fetches ALL place_ids for filtering (up to 60 extra Details on top of page-1)
+        //   - minReviews filter: fetches all candidate IDs for filtering (pool size varies)
         const detailsFromFirstPages = sessionCount30d * DETAILS_PER_PAGE;
         const detailsFromPaidPages = paidPageViews30d * DETAILS_PER_PAGE;
-        const detailsFromMinReviewsFilter = sessionsWithMinReviews * 60; // fetches all 60 to filter
+        const detailsFromMinReviewsFilter = sessionsWithMinReviews * 60; // rough estimate; actual pool size varies
         const estimatedPlaceDetailsCalls = detailsFromFirstPages + detailsFromPaidPages + detailsFromMinReviewsFilter;
 
         // ── Cost estimates (USD) ───────────────────────────────────────────────

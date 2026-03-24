@@ -199,15 +199,91 @@ async function collectPlaceIdsFiltered(apiKey, query, minRating, countryCode, ma
         placeIds.push(...ids);
         pageToken = data.nextPageToken || null;
 
-        // [DIAG][SearchCollector] Temporary — 60-result investigation. Remove after root cause confirmed.
-        console.log('[DIAG][SearchCollector] iteration', i, '| query:', query, '| countryCode:', countryCode,
-            '| returned:', ids.length, '| hasNextPageToken:', !!pageToken,
-            '| accumulated placeIds:', placeIds.length);
-
         if (!pageToken || placeIds.length >= maxResults) break;
     }
 
     return { placeIds, total: placeIds.length };
+}
+
+// ── Controlled search expansion orchestrator ──────────────────────────────────
+// Runs up to 3 deterministic query variants (base, district-off, keyword-off),
+// deduplicates IDs in stable first-seen order, and stops early once the pool
+// is large enough. Downstream billing/session/cache/page flow is unchanged.
+//
+// Thresholds (conservative first version):
+//   EXPANSION_TARGET   — pool size considered "healthy enough" to stop early
+//   EXPANSION_MIN_GAIN — min new IDs a fallback must contribute to continue
+//
+const EXPANSION_TARGET   = 80;  // stop adding variants once pool ≥ this
+const EXPANSION_MIN_GAIN = 10;  // skip subsequent variants if gain < this
+
+/**
+ * Deduplicate placeId arrays in stable first-seen order.
+ */
+function dedupeIds(arrays) {
+    const seen = new Set();
+    const result = [];
+    for (const arr of arrays) {
+        for (const id of arr) {
+            if (!seen.has(id)) {
+                seen.add(id);
+                result.push(id);
+            }
+        }
+    }
+    return result;
+}
+
+/**
+ * Collect an expanded candidate pool by running up to 3 deterministic query
+ * variants and merging the results in stable first-seen dedup order.
+ *
+ * Variant policy (first version):
+ *   1. Base query         — always runs
+ *   2. District-off query — only if district is present AND pool is still shallow
+ *   3. Keyword-off query  — only if keyword is present AND pool is still shallow
+ *
+ * Returns a deduplicated ordered array of placeIds for the downstream pipeline.
+ */
+async function collectExpandedCandidatePool(apiKey, { province, district, category, keyword, minRating, countryCode }) {
+    const allBatches = [];
+
+    // 1. Base query — always
+    const baseQuery = buildSearchQuery(province, district, category, keyword, countryCode);
+    const { placeIds: baseIds } = await collectPlaceIdsFiltered(apiKey, baseQuery, minRating, countryCode);
+    allBatches.push(baseIds);
+    let pool = dedupeIds(allBatches);
+    console.log('[Search] Expansion base:', baseQuery, '| collected:', baseIds.length, '| pool:', pool.length);
+
+    if (pool.length >= EXPANSION_TARGET) return pool;
+
+    // 2. District-off variant — only if district exists and pool is still shallow
+    if (district) {
+        const districtOffQuery = buildSearchQuery(province, null, category, keyword, countryCode);
+        const { placeIds: districtOffIds } = await collectPlaceIdsFiltered(apiKey, districtOffQuery, minRating, countryCode);
+        const before = pool.length;
+        allBatches.push(districtOffIds);
+        pool = dedupeIds(allBatches);
+        const gain = pool.length - before;
+        console.log('[Search] Expansion district-off:', districtOffQuery, '| gained:', gain, '| pool:', pool.length);
+
+        if (pool.length >= EXPANSION_TARGET) return pool;
+        // Weak variant — skip remaining variants if this added almost nothing new
+        if (gain < EXPANSION_MIN_GAIN) return pool;
+    }
+
+    // 3. Keyword-off variant — only if keyword exists and pool still shallow
+    if (keyword) {
+        const keywordOffQuery = buildSearchQuery(province, district, category, null, countryCode);
+        const { placeIds: keywordOffIds } = await collectPlaceIdsFiltered(apiKey, keywordOffQuery, minRating, countryCode);
+        const before = pool.length;
+        allBatches.push(keywordOffIds);
+        pool = dedupeIds(allBatches);
+        const gain = pool.length - before;
+        console.log('[Search] Expansion keyword-off:', keywordOffQuery, '| gained:', gain, '| pool:', pool.length);
+    }
+
+    return pool;
 }
 
 /**
@@ -495,42 +571,32 @@ router.post('/', requireAuth, async (req, res) => {
 
         console.log('[Search] Cache miss — hitting Google. Query:', queryKey);
 
-        const query = buildSearchQuery(province, district, category, keyword, countryCode);
-        const { placeIds } = await collectPlaceIdsFiltered(apiKey, query, minRating, countryCode);
+        // Collect expanded candidate pool via controlled multi-variant orchestrator.
+        // The orchestrator runs the base query first, then up to two deterministic
+        // fallback variants (district-off, keyword-off) — only if the pool is shallow.
+        // All downstream (billing / session / cache / page) contracts are unchanged.
+        const allCandidateIds = await collectExpandedCandidatePool(apiKey, {
+            province, district, category, keyword, minRating, countryCode,
+        });
 
         // Apply minReviews filter: fetch details for all, filter, keep IDs ordered
-        let filteredIds = placeIds;
+        let filteredIds = allCandidateIds;
         let page1Results;
 
         if (minReviews) {
-            const allDetails = await fetchPlaceDetailsWithCache(apiKey, placeIds);
+            const allDetails = await fetchPlaceDetailsWithCache(apiKey, allCandidateIds);
             const filtered = allDetails.filter(r => r.reviews >= minReviews);
             filteredIds = filtered.map(r => r.id);
             page1Results = filtered.slice(0, PAGE_SIZE);
         } else {
-            const page1Ids = placeIds.slice(0, PAGE_SIZE);
+            const page1Ids = allCandidateIds.slice(0, PAGE_SIZE);
             page1Results = await fetchPlaceDetailsWithCache(apiKey, page1Ids);
         }
 
         totalResults = filteredIds.length;
         allPlaceIds = filteredIds;
 
-        // [DIAG][SearchFresh] Temporary — 60-result investigation. Remove after root cause confirmed.
-        console.log('[DIAG][SearchFresh] post-collection |',
-            'queryKey:', queryKey,
-            '| placeIds.length:', placeIds.length,
-            '| filteredIds.length:', filteredIds.length,
-            '| totalResults:', totalResults,
-            '| page1Results.length:', page1Results.length,
-            '| minReviewsApplied:', !!minReviews);
-
         const expiry = cacheExpiry();
-
-        // [DIAG][SearchFresh] Temporary — cache/session write sizes.
-        console.log('[DIAG][SearchFresh] query_cache write |',
-            'query_key:', queryKey,
-            '| all_place_ids.length:', allPlaceIds.length,
-            '| total_results:', totalResults);
 
         // 4. Write/update query cache
         await supabaseAdmin
@@ -564,12 +630,6 @@ router.post('/', requireAuth, async (req, res) => {
                 hit_count: 0,
             }, { onConflict: 'query_key,page_number', ignoreDuplicates: false })
             .then(() => {}).catch(err => console.error('[Cache] page_cache write error:', err));
-
-        // [DIAG][SearchFresh] Temporary — session write sizes.
-        console.log('[DIAG][SearchFresh] session write |',
-            'query_key:', queryKey,
-            '| place_ids.length:', allPlaceIds.length,
-            '| total_results:', totalResults);
 
         // 6. Create session
         let session, sessionError;
@@ -658,7 +718,10 @@ router.get('/:sessionId/page/:pageNumber', requireAuth, async (req, res) => {
 
         // ── Page-range validation ────────────────────────────────────────────
         // Use the actual candidate pool (all_place_ids or session.place_ids),
-        // NOT total_results — that may be stale or from a 60-item-capped session.
+        // NOT total_results — that may be stale or from a pre-expansion session.
+        const viewedPages = Array.isArray(session.viewed_pages) ? session.viewed_pages : [];
+        const alreadyViewed = viewedPages.includes(page);
+
         let candidatePoolSize = session.total_results || 0; // safe fallback
         if (session.query_key) {
             const { data: qcRowForCount } = await supabaseAdmin
@@ -671,24 +734,10 @@ router.get('/:sessionId/page/:pageNumber', requireAuth, async (req, res) => {
             candidatePoolSize = session.place_ids.length;
         }
 
-        // [DIAG][SearchPage] Temporary — 60-result investigation. Remove after root cause confirmed.
-        const _poolSource = session.query_key
-            ? (candidatePoolSize !== (session.total_results || 0) ? 'query_cache' : 'session.total_results')
-            : (Array.isArray(session.place_ids) ? 'session.place_ids' : 'session.total_results');
-        console.log('[DIAG][SearchPage] candidatePool |',
-            'sessionId:', sessionId, '| page:', page,
-            '| candidatePoolSize:', candidatePoolSize,
-            '| source:', _poolSource,
-            '| session.total_results:', session.total_results,
-            '| session.place_ids.length:', Array.isArray(session.place_ids) ? session.place_ids.length : 'n/a',
-            '| alreadyViewed:', viewedPages.includes(page));
         const totalPages = Math.max(1, Math.ceil(candidatePoolSize / PAGE_SIZE));
         if (page > totalPages) {
             return res.status(404).json({ error: 'Page not found', message: 'Requested page is out of range' });
         }
-
-        const viewedPages = Array.isArray(session.viewed_pages) ? session.viewed_pages : [];
-        const alreadyViewed = viewedPages.includes(page);
 
         // Billing model: 1 credit = 1 newly-returned business record.
         // Full batch (20 results) → 20 credits. Partial batch (e.g. 13) → 13 credits.
