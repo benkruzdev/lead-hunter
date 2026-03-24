@@ -666,10 +666,11 @@ router.patch('/users/:id', requireAuth, requireAdmin, async (req, res) => {
  *
  * Estimation logic (derived from search.js code, NOT from live telemetry):
  *   Per new search session:
- *     - Text Search calls: collectPlaceIdsFiltered runs up to ceil(60/20)=3 TextSearch calls.
- *       We can't tell from DB how many pages it actually fetched, so we use AVG=2.
- *       If session.min_reviews is set, we also fetched details for ALL placeIds:
- *         that costs an extra up to 60 Place Details calls on top of page-1 calls.
+ *     - Text Search calls: the expansion orchestrator runs 1 base query + up to 2 conditional
+ *       fallback variants (district-off, keyword-off); variants only fire when the pool is shallow.
+ *       Total: 1–3 Text Search calls per session. AVG_TEXT_SEARCH_CALLS_PER_SESSION=2 is used
+ *       as a conservative estimate.
+ *       If session.min_reviews is set, details for all candidate IDs are fetched for filtering.
  *     - Place Details (first page, always free to user): always 1 batch of up to 20 details calls.
  *   Per paid page view recorded in viewed_pages[]:
  *     - Place Details: 1 batch of up to 20 details calls (we use PAGE_SIZE=20 as upper bound).

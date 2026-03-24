@@ -799,13 +799,6 @@ router.get('/:sessionId/page/:pageNumber', requireAuth, async (req, res) => {
 
                 const hasMore = (page * PAGE_SIZE) < candidatePoolSize;
 
-                // [DIAG][SearchPage] Temporary — 60-result investigation. Remove after root cause confirmed.
-                console.log('[DIAG][SearchPage] cache-hit |',
-                    'sessionId:', sessionId, '| page:', page,
-                    '| pageResults.length:', pageResults.length,
-                    '| candidatePoolSize:', candidatePoolSize,
-                    '| hasMore:', hasMore, '| alreadyViewed:', alreadyViewed);
-
                 if (!alreadyViewed && pageResults.length > 0) {
                     supabaseAdmin.from('search_sessions')
                         .update({ viewed_pages: [...viewedPages, page] })
@@ -922,14 +915,6 @@ router.get('/:sessionId/page/:pageNumber', requireAuth, async (req, res) => {
         }
 
         const hasMore = (page * PAGE_SIZE) < candidatePoolSize;
-
-        // [DIAG][SearchPage] Temporary — 60-result investigation. Remove after root cause confirmed.
-        console.log('[DIAG][SearchPage] page fetch result |',
-            'sessionId:', sessionId, '| page:', page,
-            '| pageIds.length:', pageIds.length,
-            '| results.length:', results.length,
-            '| candidatePoolSize:', candidatePoolSize,
-            '| hasMore:', hasMore);
 
         // Write this page to page cache if we have a query_key
         if (queryKey && results.length > 0) {
