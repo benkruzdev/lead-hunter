@@ -199,6 +199,11 @@ async function collectPlaceIdsFiltered(apiKey, query, minRating, countryCode, ma
         placeIds.push(...ids);
         pageToken = data.nextPageToken || null;
 
+        // [DIAG][SearchCollector] Temporary — 60-result investigation. Remove after root cause confirmed.
+        console.log('[DIAG][SearchCollector] iteration', i, '| query:', query, '| countryCode:', countryCode,
+            '| returned:', ids.length, '| hasNextPageToken:', !!pageToken,
+            '| accumulated placeIds:', placeIds.length);
+
         if (!pageToken || placeIds.length >= maxResults) break;
     }
 
@@ -510,7 +515,22 @@ router.post('/', requireAuth, async (req, res) => {
         totalResults = filteredIds.length;
         allPlaceIds = filteredIds;
 
+        // [DIAG][SearchFresh] Temporary — 60-result investigation. Remove after root cause confirmed.
+        console.log('[DIAG][SearchFresh] post-collection |',
+            'queryKey:', queryKey,
+            '| placeIds.length:', placeIds.length,
+            '| filteredIds.length:', filteredIds.length,
+            '| totalResults:', totalResults,
+            '| page1Results.length:', page1Results.length,
+            '| minReviewsApplied:', !!minReviews);
+
         const expiry = cacheExpiry();
+
+        // [DIAG][SearchFresh] Temporary — cache/session write sizes.
+        console.log('[DIAG][SearchFresh] query_cache write |',
+            'query_key:', queryKey,
+            '| all_place_ids.length:', allPlaceIds.length,
+            '| total_results:', totalResults);
 
         // 4. Write/update query cache
         await supabaseAdmin
@@ -544,6 +564,12 @@ router.post('/', requireAuth, async (req, res) => {
                 hit_count: 0,
             }, { onConflict: 'query_key,page_number', ignoreDuplicates: false })
             .then(() => {}).catch(err => console.error('[Cache] page_cache write error:', err));
+
+        // [DIAG][SearchFresh] Temporary — session write sizes.
+        console.log('[DIAG][SearchFresh] session write |',
+            'query_key:', queryKey,
+            '| place_ids.length:', allPlaceIds.length,
+            '| total_results:', totalResults);
 
         // 6. Create session
         let session, sessionError;
@@ -644,6 +670,18 @@ router.get('/:sessionId/page/:pageNumber', requireAuth, async (req, res) => {
         } else if (Array.isArray(session.place_ids)) {
             candidatePoolSize = session.place_ids.length;
         }
+
+        // [DIAG][SearchPage] Temporary — 60-result investigation. Remove after root cause confirmed.
+        const _poolSource = session.query_key
+            ? (candidatePoolSize !== (session.total_results || 0) ? 'query_cache' : 'session.total_results')
+            : (Array.isArray(session.place_ids) ? 'session.place_ids' : 'session.total_results');
+        console.log('[DIAG][SearchPage] candidatePool |',
+            'sessionId:', sessionId, '| page:', page,
+            '| candidatePoolSize:', candidatePoolSize,
+            '| source:', _poolSource,
+            '| session.total_results:', session.total_results,
+            '| session.place_ids.length:', Array.isArray(session.place_ids) ? session.place_ids.length : 'n/a',
+            '| alreadyViewed:', viewedPages.includes(page));
         const totalPages = Math.max(1, Math.ceil(candidatePoolSize / PAGE_SIZE));
         if (page > totalPages) {
             return res.status(404).json({ error: 'Page not found', message: 'Requested page is out of range' });
@@ -711,6 +749,13 @@ router.get('/:sessionId/page/:pageNumber', requireAuth, async (req, res) => {
                 }
 
                 const hasMore = (page * PAGE_SIZE) < candidatePoolSize;
+
+                // [DIAG][SearchPage] Temporary — 60-result investigation. Remove after root cause confirmed.
+                console.log('[DIAG][SearchPage] cache-hit |',
+                    'sessionId:', sessionId, '| page:', page,
+                    '| pageResults.length:', pageResults.length,
+                    '| candidatePoolSize:', candidatePoolSize,
+                    '| hasMore:', hasMore, '| alreadyViewed:', alreadyViewed);
 
                 if (!alreadyViewed && pageResults.length > 0) {
                     supabaseAdmin.from('search_sessions')
@@ -829,6 +874,13 @@ router.get('/:sessionId/page/:pageNumber', requireAuth, async (req, res) => {
 
         const hasMore = (page * PAGE_SIZE) < candidatePoolSize;
 
+        // [DIAG][SearchPage] Temporary — 60-result investigation. Remove after root cause confirmed.
+        console.log('[DIAG][SearchPage] page fetch result |',
+            'sessionId:', sessionId, '| page:', page,
+            '| pageIds.length:', pageIds.length,
+            '| results.length:', results.length,
+            '| candidatePoolSize:', candidatePoolSize,
+            '| hasMore:', hasMore);
 
         // Write this page to page cache if we have a query_key
         if (queryKey && results.length > 0) {
