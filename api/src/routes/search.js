@@ -206,16 +206,16 @@ async function collectPlaceIdsFiltered(apiKey, query, minRating, countryCode, ma
 }
 
 // ── Controlled search expansion orchestrator ──────────────────────────────────
-// Runs up to 3 deterministic query variants (base, district-off, keyword-off),
-// deduplicates IDs in stable first-seen order, and stops early once the pool
-// is large enough. Downstream billing/session/cache/page flow is unchanged.
+// Runs up to 4 deterministic query variants, deduplicates IDs in stable
+// first-seen order, and stops early once the pool is large enough.
+// Downstream billing/session/cache/page flow is unchanged.
 //
-// Thresholds (conservative first version):
+// Thresholds:
 //   EXPANSION_TARGET   — pool size considered "healthy enough" to stop early
-//   EXPANSION_MIN_GAIN — min new IDs a fallback must contribute to continue
+//   EXPANSION_MIN_GAIN — min new IDs a fallback must add to continue (keyword path only)
 //
 const EXPANSION_TARGET   = 80;  // stop adding variants once pool ≥ this
-const EXPANSION_MIN_GAIN = 10;  // skip subsequent variants if gain < this
+const EXPANSION_MIN_GAIN = 10;  // skip keyword-off if gain < this (not used on no-keyword path)
 
 /**
  * Deduplicate placeId arrays in stable first-seen order.
@@ -235,13 +235,18 @@ function dedupeIds(arrays) {
 }
 
 /**
- * Collect an expanded candidate pool by running up to 3 deterministic query
+ * Collect an expanded candidate pool by running up to 4 deterministic query
  * variants and merging the results in stable first-seen dedup order.
  *
- * Variant policy (first version):
- *   1. Base query         — always runs
- *   2. District-off query — only if district is present AND pool is still shallow
- *   3. Keyword-off query  — only if keyword is present AND pool is still shallow
+ * Variant policy:
+ *   1. Base query              — always runs
+ *   2. District-off query      — only if district is present AND pool is still shallow
+ *   3a. Keyword-off query      — only if keyword is present AND pool is still shallow
+ *       (min-gain bail-out applies: if district-off gained < EXPANSION_MIN_GAIN, stop)
+ *   3b. District-focused query — only if NO keyword AND district is present AND pool is still shallow
+ *       Uses district as the location anchor (no province prefix), surfacing results
+ *       Google returns for the district name alone. Min-gain bail-out does NOT apply here
+ *       so broad no-keyword searches always get this extra pass before giving up.
  *
  * Returns a deduplicated ordered array of placeIds for the downstream pipeline.
  */
@@ -258,22 +263,24 @@ async function collectExpandedCandidatePool(apiKey, { province, district, catego
     if (pool.length >= EXPANSION_TARGET) return pool;
 
     // 2. District-off variant — only if district exists and pool is still shallow
+    let districtOffGain = 0;
     if (district) {
         const districtOffQuery = buildSearchQuery(province, null, category, keyword, countryCode);
         const { placeIds: districtOffIds } = await collectPlaceIdsFiltered(apiKey, districtOffQuery, minRating, countryCode);
         const before = pool.length;
         allBatches.push(districtOffIds);
         pool = dedupeIds(allBatches);
-        const gain = pool.length - before;
-        console.log('[Search] Expansion district-off:', districtOffQuery, '| gained:', gain, '| pool:', pool.length);
+        districtOffGain = pool.length - before;
+        console.log('[Search] Expansion district-off:', districtOffQuery, '| gained:', districtOffGain, '| pool:', pool.length);
 
         if (pool.length >= EXPANSION_TARGET) return pool;
-        // Weak variant — skip remaining variants if this added almost nothing new
-        if (gain < EXPANSION_MIN_GAIN) return pool;
     }
 
-    // 3. Keyword-off variant — only if keyword exists and pool still shallow
     if (keyword) {
+        // 3a. Keyword-off variant — only if keyword exists and pool still shallow.
+        // Apply min-gain bail-out: if district-off was weak, keyword-off is unlikely to help.
+        if (districtOffGain < EXPANSION_MIN_GAIN && district) return pool;
+
         const keywordOffQuery = buildSearchQuery(province, district, category, null, countryCode);
         const { placeIds: keywordOffIds } = await collectPlaceIdsFiltered(apiKey, keywordOffQuery, minRating, countryCode);
         const before = pool.length;
@@ -281,6 +288,20 @@ async function collectExpandedCandidatePool(apiKey, { province, district, catego
         pool = dedupeIds(allBatches);
         const gain = pool.length - before;
         console.log('[Search] Expansion keyword-off:', keywordOffQuery, '| gained:', gain, '| pool:', pool.length);
+    } else if (district) {
+        // 3b. District-focused variant — no-keyword broad search only.
+        // Uses district as the sole location anchor (province prefix omitted) so Google
+        // applies a tighter geographic scope, often surfacing different results than
+        // `province district category` or `province category`.
+        // Min-gain bail-out is intentionally skipped: broad no-keyword searches need
+        // this extra pass even when district-off was overlapping.
+        const districtFocusedQuery = buildSearchQuery(district, null, category, null, countryCode);
+        const { placeIds: districtFocusedIds } = await collectPlaceIdsFiltered(apiKey, districtFocusedQuery, minRating, countryCode);
+        const before = pool.length;
+        allBatches.push(districtFocusedIds);
+        pool = dedupeIds(allBatches);
+        const gain = pool.length - before;
+        console.log('[Search] Expansion district-focused:', districtFocusedQuery, '| gained:', gain, '| pool:', pool.length);
     }
 
     return pool;
