@@ -292,28 +292,79 @@ export default function BillingPage() {
   const locale = lang.startsWith('tr') ? dateFnsTr : enUS;
   const isLoading = isLoadingPackages || isLoadingProviders;
 
+  // Per-credit cost helper
+  const perCreditCost = (pkg: NormalizedPackage): string => {
+    const price = getDisplayPrice(pkg);
+    if (!pkg.credits || !price) return '';
+    const cost = price / pkg.credits;
+    return cost.toLocaleString(lang.startsWith('tr') ? 'tr-TR' : 'en-US', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+  };
+
+  // Neutral volume label based on credit count
+  const volumeLabel = (credits: number): string => {
+    if (lang.startsWith('tr')) {
+      if (credits >= 500) return 'Yüksek hacimli aramalar için';
+      if (credits >= 200) return 'Düzenli kullanım için';
+      return 'Başlangıç ve deneme için';
+    }
+    if (credits >= 500) return 'For high-volume searches';
+    if (credits >= 200) return 'For regular use';
+    return 'For getting started';
+  };
+
   return (
-    <div className="space-y-10 animate-fade-in max-w-5xl">
+    <div className="space-y-12 animate-fade-in max-w-5xl">
 
-      {/* ── Page header ──────────────────────────────────────────────────── */}
-      <div>
-        <h2 className="text-2xl font-bold tracking-tight">{t('billing.title')}</h2>
-        <p className="text-muted-foreground mt-1 text-sm max-w-xl">{t('billing.pageDescription')}</p>
+      {/* ── Page hero ─────────────────────────────────────────────────────── */}
+      <div className="pb-2 border-b">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h2 className="text-2xl font-bold tracking-tight">{t('billing.title')}</h2>
+            <p className="text-muted-foreground mt-1.5 text-sm max-w-lg leading-relaxed">
+              {lang.startsWith('tr')
+                ? 'Tüm paketlerde aynı LeadHunter deneyimine erişirsiniz. Paketler arasındaki tek fark satın alınan kredi miktarıdır.'
+                : 'All packages include the same LeadHunter experience. The only difference is the number of credits you purchase.'}
+            </p>
+          </div>
+          {/* Region badge */}
+          <div className="shrink-0 flex items-center gap-1.5 mt-1 text-xs text-muted-foreground bg-muted/50 border rounded-full px-3 py-1.5">
+            {region.isTurkeyContext
+              ? <><span>🇹🇷</span><span className="font-medium">TRY · Türkiye</span></>
+              : <><Globe className="w-3 h-3" /><span className="font-medium">USD · International</span></>
+            }
+          </div>
+        </div>
 
-        {/* Region + pricing context hint */}
-        <div className="flex items-center gap-1.5 mt-2 text-xs text-muted-foreground">
-          {region.isTurkeyContext
-            ? <><span>🇹🇷</span><span>TRY fiyatlandırma · Türkiye</span></>
-            : <><Globe className="w-3 h-3" /><span>USD pricing · International</span></>
-          }
+        {/* Trust line */}
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 mt-4 text-xs text-muted-foreground">
+          <span className="flex items-center gap-1.5">
+            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+            {lang.startsWith('tr') ? 'Tüm paketlerde aynı özellikler' : 'Same features in every package'}
+          </span>
+          <span className="flex items-center gap-1.5">
+            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+            {lang.startsWith('tr') ? 'Şeffaf ve adil ücretlendirme' : 'Transparent, fair billing'}
+          </span>
+          <span className="flex items-center gap-1.5">
+            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+            {lang.startsWith('tr') ? 'Gizli plan farkı yok' : 'No hidden plan differences'}
+          </span>
         </div>
       </div>
 
       {/* ── Packages ─────────────────────────────────────────────────────── */}
       <section>
-        <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-4">
-          {t('billing.packages')}
-        </h3>
+        <div className="flex items-baseline justify-between mb-5">
+          <h3 className="text-sm font-semibold uppercase tracking-widest text-muted-foreground">
+            {t('billing.packages')}
+          </h3>
+          <span className="text-xs text-muted-foreground">
+            {lang.startsWith('tr') ? 'Kredi satın al · tek seferlik' : 'Top up credits · one-time'}
+          </span>
+        </div>
 
         {isLoading && (
           <div className="flex items-center justify-center py-16 gap-2 text-muted-foreground">
@@ -345,60 +396,62 @@ export default function BillingPage() {
             {packages.map(pkg => (
               <div
                 key={pkg.id}
-                className={`relative flex flex-col rounded-2xl border p-6 transition-shadow ${
+                className={`relative flex flex-col rounded-2xl border transition-all ${
                   pkg.isFeatured
-                    ? 'border-primary ring-1 ring-primary/20 shadow-[0_4px_20px_hsl(var(--primary)/0.1)] bg-primary/[0.02]'
-                    : 'bg-card hover:shadow-sm'
+                    ? 'border-primary ring-1 ring-primary/20 shadow-[0_8px_32px_hsl(var(--primary)/0.12)] bg-primary/[0.025] p-7'
+                    : 'bg-card hover:shadow-md hover:border-border/80 p-6'
                 }`}
               >
-                {/* Featured badge — only when admin has set is_featured */}
+                {/* Featured badge */}
                 {pkg.isFeatured && (
-                  <div className="absolute -top-3 left-5">
-                    <span className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-primary text-primary-foreground text-[11px] font-semibold shadow-sm">
-                      <Zap className="w-2.5 h-2.5" />
+                  <div className="absolute -top-3.5 left-1/2 -translate-x-1/2">
+                    <span className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-primary text-primary-foreground text-[11px] font-semibold shadow-md tracking-wide">
+                      <Zap className="w-3 h-3" />
                       {t('billing.popular')}
                     </span>
                   </div>
                 )}
 
-                {/* Name */}
-                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
+                {/* Package name */}
+                <p className={`text-[11px] font-bold uppercase tracking-widest mb-4 ${
+                  pkg.isFeatured ? 'text-primary' : 'text-muted-foreground'
+                }`}>
                   {pkg.displayName}
                 </p>
 
-                {/* Price */}
+                {/* Price — dominant */}
                 <div className="flex items-baseline gap-1 mb-1">
-                  <span className="text-4xl font-bold tracking-tight">
+                  <span className="text-[2.75rem] font-bold tracking-tight leading-none">
                     {currencySymbol}{fmtPrice(getDisplayPrice(pkg))}
                   </span>
                 </div>
-                <p className="text-sm text-muted-foreground mb-4">
-                  {pkg.credits.toLocaleString()} {t('billing.credits')}
+
+                {/* Credits */}
+                <p className="text-base font-semibold mt-2">
+                  {pkg.credits.toLocaleString()}
+                  <span className="text-sm font-normal text-muted-foreground ml-1.5">{t('billing.credits')}</span>
                 </p>
 
-                {/* Description */}
-                {pkg.description && (
-                  <p className="text-xs text-muted-foreground leading-relaxed mb-4 border-t pt-3">
-                    {pkg.description}
+                {/* Per-credit cost */}
+                {perCreditCost(pkg) && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {currencySymbol}{perCreditCost(pkg)} {lang.startsWith('tr') ? '/ kredi' : '/ credit'}
                   </p>
                 )}
 
-                {/* Features */}
-                {pkg.features.length > 0 && (
-                  <ul className="space-y-1.5 mb-5 flex-1">
-                    {pkg.features.map((f, i) => (
-                      <li key={i} className="flex items-start gap-2 text-xs text-muted-foreground">
-                        <Check className="w-3 h-3 mt-0.5 shrink-0 text-primary" />
-                        <span>{f}</span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
+                {/* Divider */}
+                <div className="my-5 border-t" />
+
+                {/* Volume hint — neutral, honest */}
+                <p className="text-xs text-muted-foreground leading-relaxed flex-1">
+                  {volumeLabel(pkg.credits)}
+                </p>
 
                 {/* CTA */}
-                <div className="mt-auto pt-2">
+                <div className="mt-6">
                   <Button
-                    className="w-full gap-2 text-sm"
+                    className="w-full gap-2"
+                    size={pkg.isFeatured ? 'default' : 'sm'}
                     variant={pkg.isFeatured ? 'default' : 'outline'}
                     onClick={() => handleBuyClick(pkg)}
                     disabled={!region.canUseCard && !region.bankTransferEnabled}
@@ -413,11 +466,40 @@ export default function BillingPage() {
         )}
       </section>
 
+      {/* ── How credits work ─────────────────────────────────────────────── */}
+      {!isLoading && !packagesError && packages.length > 0 && (
+        <section className="rounded-2xl border bg-muted/30 p-6">
+          <h4 className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-4">
+            {lang.startsWith('tr') ? 'Krediler nasıl çalışır?' : 'How credits work'}
+          </h4>
+          <div className="grid sm:grid-cols-2 gap-x-10 gap-y-3">
+            {(lang.startsWith('tr') ? [
+              { icon: <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0 mt-px" />, text: 'Yalnızca yeni açılan işletme kayıtları kredi kullanır.' },
+              { icon: <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0 mt-px" />, text: 'Daha önce gördüğünüz sayfalar tekrar ücretlendirilmez.' },
+              { icon: <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0 mt-px" />, text: 'Son sayfada yalnızca gelen kayıt adedince kredi düşer.' },
+              { icon: <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0 mt-px" />, text: 'Sonuç yoksa hiç kredi kullanılmaz.' },
+            ] : [
+              { icon: <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0 mt-px" />, text: 'Only newly revealed business records consume credits.' },
+              { icon: <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0 mt-px" />, text: 'Pages you have already viewed are never charged again.' },
+              { icon: <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0 mt-px" />, text: 'Partial last pages are charged only for records returned.' },
+              { icon: <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0 mt-px" />, text: 'Zero results means zero credits used.' },
+            ]).map((item, i) => (
+              <div key={i} className="flex items-start gap-2.5 text-sm text-muted-foreground">
+                {item.icon}
+                <span className="leading-snug">{item.text}</span>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
       {/* ── Order history ────────────────────────────────────────────────── */}
       <section>
-        <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-4">
-          {t('billing.orderHistory')}
-        </h3>
+        <div className="flex items-baseline justify-between mb-5">
+          <h3 className="text-sm font-semibold uppercase tracking-widest text-muted-foreground">
+            {t('billing.orderHistory')}
+          </h3>
+        </div>
 
         {isLoadingOrders && (
           <div className="flex items-center gap-2 py-8 text-muted-foreground justify-center">
@@ -444,28 +526,28 @@ export default function BillingPage() {
           <div className="rounded-xl border bg-card overflow-hidden">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b bg-muted/30">
-                  <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">{t('billing.packageName')}</th>
-                  <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">{t('billing.amount')}</th>
-                  <th className="text-right px-4 py-3 text-xs font-medium text-muted-foreground">{t('billing.credits')}</th>
-                  <th className="px-4 py-3 text-xs font-medium text-muted-foreground">{t('billing.status')}</th>
-                  <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">{t('billing.orderDate')}</th>
+                <tr className="border-b bg-muted/40">
+                  <th className="text-left px-5 py-3.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{t('billing.packageName')}</th>
+                  <th className="text-left px-5 py-3.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{t('billing.amount')}</th>
+                  <th className="text-right px-5 py-3.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{t('billing.credits')}</th>
+                  <th className="px-5 py-3.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{t('billing.status')}</th>
+                  <th className="text-left px-5 py-3.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{t('billing.orderDate')}</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y">
                 {orders.map(order => (
-                  <tr key={order.id} className="border-b last:border-0 hover:bg-muted/20 transition-colors">
-                    <td className="px-4 py-3 font-medium">{order.packageName}</td>
-                    <td className="px-4 py-3 tabular-nums">
+                  <tr key={order.id} className="hover:bg-muted/20 transition-colors">
+                    <td className="px-5 py-4 font-medium text-sm">{order.packageName}</td>
+                    <td className="px-5 py-4 tabular-nums text-sm">
                       {order.currency === 'USD' ? '$' : '₺'}{Number(order.amount).toLocaleString()}
                     </td>
-                    <td className="px-4 py-3 text-right tabular-nums">{(order.credits ?? 0).toLocaleString()}</td>
-                    <td className="px-4 py-3">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium border ${statusStyle(order.status)}`}>
+                    <td className="px-5 py-4 text-right tabular-nums text-sm font-medium">{(order.credits ?? 0).toLocaleString()}</td>
+                    <td className="px-5 py-4">
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${statusStyle(order.status)}`}>
                         {t(`billing.orderStatus.${order.status}`, { defaultValue: order.status })}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-xs text-muted-foreground">
+                    <td className="px-5 py-4 text-xs text-muted-foreground">
                       {formatDistanceToNow(new Date(order.createdAt ?? order.created_at), { addSuffix: true, locale })}
                     </td>
                   </tr>
