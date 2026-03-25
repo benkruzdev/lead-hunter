@@ -279,7 +279,11 @@ async function collectExpandedCandidatePool(apiKey, { province, district, catego
     if (keyword) {
         // 3a. Keyword-off variant — only if keyword exists and pool still shallow.
         // Apply min-gain bail-out: if district-off was weak, keyword-off is unlikely to help.
-        if (districtOffGain < EXPANSION_MIN_GAIN && district) return pool;
+        // Guarded exception: if the pool is still shallow (< 2 pages worth of results),
+        // try keyword-off once even when district-off gain was low — early bail-out is
+        // too aggressive in this combination and leaves the pool unnecessarily thin.
+        const poolIsShallow = pool.length < 40; // 2 × PAGE_SIZE
+        if (districtOffGain < EXPANSION_MIN_GAIN && district && !poolIsShallow) return pool;
 
         const keywordOffQuery = buildSearchQuery(province, district, category, null, countryCode);
         const { placeIds: keywordOffIds } = await collectPlaceIdsFiltered(apiKey, keywordOffQuery, minRating, countryCode);
