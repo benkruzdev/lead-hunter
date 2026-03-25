@@ -8,7 +8,6 @@ export async function requireAuth(req, res, next) {
         const authHeader = req.headers.authorization;
 
         if (!authHeader || !authHeader.startsWith('Bearer ')) {
-            console.log('[requireAuth] Missing or invalid Authorization header:', authHeader);
             return res.status(401).json({
                 error: 'Unauthorized',
                 message: 'Missing or invalid Authorization header'
@@ -16,8 +15,6 @@ export async function requireAuth(req, res, next) {
         }
 
         const token = authHeader.replace('Bearer ', '');
-        console.log('[requireAuth] Validating token (length: %d)', token.length);
-
         const { user, error } = await verifyUserToken(token);
 
         if (error || !user) {
@@ -27,8 +24,6 @@ export async function requireAuth(req, res, next) {
                 message: error || 'Invalid token'
             });
         }
-
-        console.log('[requireAuth] Token valid for user:', user.id);
         // Attach user to request object
         req.user = user;
         next();
@@ -54,7 +49,6 @@ export async function requireAdmin(req, res, next) {
             });
         }
 
-        console.log('[requireAdmin] AUTH USER:', JSON.stringify(req.user, null, 2));
         const userId = req.user?.id;
 
         if (!userId) {
@@ -65,8 +59,6 @@ export async function requireAdmin(req, res, next) {
             });
         }
 
-        console.log('[requireAdmin] Looking up admin role for user ID:', userId);
-
         const { supabaseAdmin } = await import('../config/supabase.js');
         const { data: profile, error } = await supabaseAdmin
             .from('profiles')
@@ -74,17 +66,14 @@ export async function requireAdmin(req, res, next) {
             .eq('id', userId)
             .single();
 
-        console.log('[requireAdmin] ADMIN LOOKUP - id:', userId, 'profile:', profile, 'error:', error);
-
         if (error || !profile || profile.role !== 'admin') {
-            console.error('[requireAdmin] Access denied - role check failed');
+            console.error('[requireAdmin] Access denied for user:', userId);
             return res.status(403).json({
                 error: 'Forbidden',
                 message: 'Admin access required'
             });
         }
 
-        console.log('[requireAdmin] Admin verified successfully');
         next();
     } catch (err) {
         console.error('Admin middleware error:', err);

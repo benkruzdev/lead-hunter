@@ -484,15 +484,11 @@ export default function SearchPage() {
   // ─── Handlers ──────────────────────────────────────────────────────────────
   const loadSession = useCallback(async (sid: string) => {
     const seq = ++reqSeq.current;
-    console.debug('[DEBUG][SearchPage] loadSession:start', { sid, seq });
     setIsSearching(true);
     setErrorMessage(null);
     try {
       const { session } = await getSearchSession(sid);
-      if (seq !== reqSeq.current) {
-        console.debug('[DEBUG][SearchPage] loadSession:stale — discarding', { seq, current: reqSeq.current });
-        return;
-      }
+      if (seq !== reqSeq.current) return;
 
       // Restore country — old sessions without country_code default to TR
       const restoredCountry = session.country_code ?? "TR";
@@ -524,10 +520,7 @@ export default function SearchPage() {
         countryCode: restoredCountry,
       });
 
-      if (seq !== reqSeq.current) {
-        console.debug('[DEBUG][SearchPage] loadSession:stale after performSearch — discarding', { seq, current: reqSeq.current });
-        return;
-      }
+      if (seq !== reqSeq.current) return;
       setResults(searchResponse.results);
       // totalResults kept for internal compatibility (session record, history).
       // It is NOT the driver of pagination UX — hasMore below is.
@@ -544,22 +537,16 @@ export default function SearchPage() {
       // Do NOT use totalResults here — it may be capped, stale, or unavailable.
       const restoredHasMore = searchResponse.hasMore ?? (searchResponse.results.length >= resultsPerPage);
       setHasMore(restoredHasMore);
-      console.debug('[DEBUG][SearchPage] loadSession:success', { sid, results: searchResponse.results.length, total, hasMore: restoredHasMore });
     } catch (error: any) {
-      if (seq !== reqSeq.current) {
-        console.debug('[DEBUG][SearchPage] loadSession:catch stale — discarding', { seq });
-        return;
-      }
-      console.error('[DEBUG][SearchPage] loadSession:catch', { sid, status: error?.status, message: error?.message });
+      if (seq !== reqSeq.current) return;
+      console.error('[SearchPage] loadSession failed:', { sid, status: error?.status, message: error?.message });
       if (error.status === 410) {
         navigate("/app/history", { replace: true });
       } else {
         setErrorMessage(t("searchPage.sessionLoadFailed"));
       }
     } finally {
-      const willClear = seq === reqSeq.current;
-      console.debug('[DEBUG][SearchPage] loadSession:finally', { seq, willClearSpinner: willClear });
-      if (willClear) setIsSearching(false);
+      if (seq === reqSeq.current) setIsSearching(false);
     }
   }, [navigate, t]);
 
@@ -569,7 +556,6 @@ export default function SearchPage() {
 
   const handleSearch = async () => {
     const seq = ++reqSeq.current;
-    console.debug('[DEBUG][SearchPage] handleSearch:start', { seq, city, category });
     setIsSearching(true);
     setErrorMessage(null);
     setSelectedIds([]);     // clear selection on new search
@@ -585,10 +571,7 @@ export default function SearchPage() {
         countryCode: country,
       });
 
-      if (seq !== reqSeq.current) {
-        console.debug('[DEBUG][SearchPage] handleSearch:stale — discarding', { seq, current: reqSeq.current });
-        return;
-      }
+      if (seq !== reqSeq.current) return;
       setSessionId(response.sessionId);
       setResults(response.results as any[]);
       setTotalResults(response.totalResults);
@@ -600,7 +583,6 @@ export default function SearchPage() {
       setHasSearched(true);
       // Page 1 was just served — mark it viewed so the credit label shows correctly.
       setViewedPages(new Set([1]));
-      console.debug('[DEBUG][SearchPage] handleSearch:success', { seq, results: (response.results as any[]).length, total: response.totalResults, hasMore: initialHasMore, sessionId: response.sessionId });
 
       getSearchCreditCost().then(costs => {
         setMaxCreditsPerBatch(costs.max_credits_per_batch ?? costs.credits_per_page ?? 20);
@@ -610,16 +592,11 @@ export default function SearchPage() {
       refreshProfile();
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.credits });
     } catch (error: any) {
-      if (seq !== reqSeq.current) {
-        console.debug('[DEBUG][SearchPage] handleSearch:catch stale — discarding', { seq });
-        return;
-      }
-      console.error('[DEBUG][SearchPage] handleSearch:catch', { seq, status: error?.status, message: error?.message });
+      if (seq !== reqSeq.current) return;
+      console.error('[SearchPage] handleSearch failed:', { seq, status: error?.status, message: error?.message });
       setErrorMessage(t("searchPage.searchFailed"));
     } finally {
-      const willClear = seq === reqSeq.current;
-      console.debug('[DEBUG][SearchPage] handleSearch:finally', { seq, willClearSpinner: willClear });
-      if (willClear) setIsSearching(false);
+      if (seq === reqSeq.current) setIsSearching(false);
     }
   };
 
@@ -640,25 +617,11 @@ export default function SearchPage() {
 
   // ── Load More ──
   const handleLoadMore = () => {
-    console.debug('[DEBUG][SearchPage] handleLoadMore:clicked', {
-      sessionId,
-      isLoadingMore,
-      detailOpen: !!detailItem,
-      detailId: detailItem?.id ?? null,
-      nextPage,
-    });
-    if (!sessionId || isLoadingMore) {
-      console.debug('[DEBUG][SearchPage] handleLoadMore:blocked', { hasSessionId: !!sessionId, isLoadingMore });
-      return;
-    }
+    if (!sessionId || isLoadingMore) return;
 
     if (detailItem) {
-      console.debug('[DEBUG][SearchPage] handleLoadMore:detail-open — closing sheet, scheduling deferred load');
       setDetailItem(null);
-      setTimeout(() => {
-        console.debug('[DEBUG][SearchPage] handleLoadMore:deferred-fire');
-        doLoadMore();
-      }, 0);
+      setTimeout(() => { doLoadMore(); }, 0);
     } else {
       doLoadMore();
     }
@@ -667,28 +630,18 @@ export default function SearchPage() {
   // Inner async worker — separated so both the immediate and deferred paths
   // share the same logic without duplicating the try/finally cleanup.
   const doLoadMore = async () => {
-    console.debug('[DEBUG][SearchPage] doLoadMore:start', { sessionId, isLoadingMore, nextPage });
-    if (!sessionId || isLoadingMore) {
-      console.debug('[DEBUG][SearchPage] doLoadMore:blocked-early', { hasSessionId: !!sessionId, isLoadingMore });
-      return;
-    }
+    if (!sessionId || isLoadingMore) return;
 
     const pageToFetch = nextPage;
     const seq = ++loadMoreSeq.current;
     setIsLoadingMore(true);
     setErrorMessage(null);
-    console.debug('[DEBUG][SearchPage] doLoadMore:getSearchPage', { pageToFetch, seq });
     try {
       const response = await getSearchPage(sessionId, pageToFetch);
-      console.debug('[DEBUG][SearchPage] doLoadMore:response', { pageToFetch, seq, resultCount: (response.results as any[]).length, creditCost: response.creditCost });
-      if (seq !== loadMoreSeq.current) {
-        console.debug('[DEBUG][SearchPage] doLoadMore:stale — discarding', { seq, current: loadMoreSeq.current });
-        return;
-      }
+      if (seq !== loadMoreSeq.current) return;
       setResults(prev => {
         const existingIds = new Set(prev.map(r => r.id));
         const newItems = (response.results as any[]).filter(r => !existingIds.has(r.id));
-        console.debug('[DEBUG][SearchPage] doLoadMore:dedup', { incoming: (response.results as any[]).length, appended: newItems.length, skipped: (response.results as any[]).length - newItems.length });
         return [...prev, ...newItems];
       });
       setNextPage(pageToFetch + 1);
@@ -698,7 +651,6 @@ export default function SearchPage() {
       // A short page (< resultsPerPage) signals the end of results — stop showing the button.
       const pageHasMore = response.hasMore ?? ((response.results as any[]).length >= resultsPerPage);
       setHasMore(pageHasMore);
-      console.debug('[DEBUG][SearchPage] doLoadMore:hasMore', { pageToFetch, returned: (response.results as any[]).length, creditCost: response.creditCost, pageHasMore });
       if (response.creditCost > 0) {
         refreshProfile();
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.credits });

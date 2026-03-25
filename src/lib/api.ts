@@ -68,10 +68,8 @@ supabase.auth.onAuthStateChange((event, session) => {
         event === 'USER_UPDATED'
     ) {
         sessionSnapshot = session ?? null;
-        console.debug('[DEBUG][apiRequest] authStateChange:update', { event, hasSession: !!sessionSnapshot });
     } else if (event === 'SIGNED_OUT') {
         sessionSnapshot = null;
-        console.debug('[DEBUG][apiRequest] authStateChange:clear', { event });
     }
 });
 
@@ -86,18 +84,15 @@ async function apiRequest<T>(
     options: RequestInit = {}
 ): Promise<T> {
     const method = (options.method ?? 'GET').toUpperCase();
-    console.debug('[DEBUG][apiRequest] start', { endpoint, method });
 
     // ── 1. getSession — snapshot or fallback ────────────────────────────────
     let session: any;
     if (sessionSnapshot !== null) {
         // Fast path: use the live auth state snapshot (no Supabase I/O).
         session = sessionSnapshot;
-        console.debug('[DEBUG][apiRequest] getSession:snapshot', { endpoint, hasSession: !!session });
     } else {
         // Slow path: snapshot not yet populated (e.g. very first request before
         // INITIAL_SESSION fires). Fall back to a deduped, timed-out getSession().
-        console.debug('[DEBUG][apiRequest] getSession:fallback', { endpoint, reuse: !!inFlightGetSession });
         const sessionTimeout = makeTimeoutPromise(REQUEST_TIMEOUT_MS);
         try {
             const result = await Promise.race([
@@ -107,7 +102,6 @@ async function apiRequest<T>(
             session = result.data.session;
             // Seed the snapshot so the next request gets the fast path.
             if (session) sessionSnapshot = session;
-            console.debug('[DEBUG][apiRequest] getSession:done', { endpoint, hasSession: !!session });
         } finally {
             sessionTimeout.cancel();
         }
@@ -124,12 +118,10 @@ async function apiRequest<T>(
 
     // ── 2. fetch with AbortController (genuine network cancel) ──────────────
     const fullUrl = `${API_URL}${endpoint}`;
-    console.debug('[DEBUG][apiRequest] fetch:start', { url: fullUrl, method });
 
     const controller = new AbortController();
     const fetchTimeout = makeTimeoutPromise(REQUEST_TIMEOUT_MS);
     const abortOnTimeout = fetchTimeout.promise.catch((err) => {
-        console.warn('[DEBUG][apiRequest] fetch:timeout — aborting', { url: fullUrl });
         controller.abort();
         throw err;
     });
@@ -144,15 +136,12 @@ async function apiRequest<T>(
             }),
             abortOnTimeout,
         ]);
-        console.debug('[DEBUG][apiRequest] fetch:done', { url: fullUrl, status: response.status, ok: response.ok });
     } catch (e: any) {
         if (e?.name === 'AbortError' || e?.status === 408) {
-            console.warn('[DEBUG][apiRequest] fetch:aborted/timeout', { url: fullUrl, name: e?.name, status: e?.status });
             const err = new Error('İstek zaman aşımına uğradı. Lütfen tekrar deneyin.') as any;
             err.status = 408;
             throw err;
         }
-        console.warn('[DEBUG][apiRequest] fetch:error', { url: fullUrl, name: e?.name, message: e?.message });
         throw e;
     } finally {
         fetchTimeout.cancel();
@@ -163,7 +152,6 @@ async function apiRequest<T>(
             error: 'Request failed',
             message: response.statusText,
         }));
-        console.warn('[DEBUG][apiRequest] response:non-ok', { url: fullUrl, status: response.status, error: error.error, message: error.message });
         const err = new Error(error.message || error.error || 'Request failed') as any;
         err.status = response.status;
         if (error.required !== undefined) err.required = error.required;
@@ -172,7 +160,6 @@ async function apiRequest<T>(
     }
 
     const data = await response.json();
-    console.debug('[DEBUG][apiRequest] complete', { endpoint, status: response.status });
     return data;
 }
 
