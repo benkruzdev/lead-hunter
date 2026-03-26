@@ -1947,7 +1947,7 @@ router.post('/packages', requireAuth, requireAdmin, async (req, res) => {
 router.patch('/packages/:id', requireAuth, requireAdmin, async (req, res) => {
     try {
         const { id } = req.params;
-        const { name, display_name_tr, display_name_en, credits, price_try, price_usd, is_active, sort_order, description, features } = req.body;
+        const { name, display_name_tr, display_name_en, credits, price_try, price_usd, is_active, is_featured, sort_order, description, features } = req.body;
 
         const updates = {};
         if (name !== undefined) updates.name = name.trim();
@@ -1969,6 +1969,7 @@ router.patch('/packages/:id', requireAuth, requireAdmin, async (req, res) => {
             updates.price_usd = v;
         }
         if (is_active !== undefined) updates.is_active = Boolean(is_active);
+        if (is_featured !== undefined) updates.is_featured = Boolean(is_featured);
         if (sort_order !== undefined) updates.sort_order = parseInt(sort_order) || 0;
         if (description !== undefined) updates.description = description || null;
         if (features !== undefined) updates.features = Array.isArray(features) ? features : null;
