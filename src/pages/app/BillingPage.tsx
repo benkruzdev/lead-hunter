@@ -1,4 +1,4 @@
-﻿import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import {
@@ -292,51 +292,25 @@ export default function BillingPage() {
   const locale = lang.startsWith('tr') ? dateFnsTr : enUS;
   const isLoading = isLoadingPackages || isLoadingProviders;
 
-  // Per-credit cost helper
-  const perCreditCost = (pkg: NormalizedPackage): string => {
-    const price = getDisplayPrice(pkg);
-    if (!pkg.credits || !price) return '';
-    const cost = price / pkg.credits;
-    return cost.toLocaleString(lang.startsWith('tr') ? 'tr-TR' : 'en-US', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    });
-  };
-
 
 
   return (
-    <div className="space-y-10 animate-fade-in max-w-5xl">
+    <div className="space-y-10 animate-fade-in max-w-6xl">
 
       {/* ── Hero ─────────────────────────────────────────────────────────── */}
-      <div className="relative rounded-2xl border bg-card overflow-hidden">
-        {/* Accent bar */}
-        <div className="absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r from-primary/60 via-primary to-primary/60" />
-        <div className="px-8 py-7">
-          <div className="flex items-start justify-between gap-6">
-            <div className="min-w-0">
-              <h2 className="text-2xl font-bold tracking-tight">{t('billing.title')}</h2>
-              <p className="text-muted-foreground mt-2 text-sm max-w-lg leading-relaxed">
-                {lang.startsWith('tr')
-                  ? 'Tüm paketlerde aynı LeadHunter deneyimine erişirsiniz. Paketler arasındaki tek fark satın alınan kredi miktarıdır.'
-                  : 'All packages include the same LeadHunter experience. The only difference is the number of credits you purchase.'}
-              </p>
-            </div>
-            {/* Region badge */}
-            <div className="shrink-0 flex items-center gap-1.5 text-xs text-muted-foreground bg-muted/60 border rounded-full px-3 py-1.5 mt-0.5">
-              {region.isTurkeyContext
-                ? <><span>🇹🇷</span><span className="font-medium">TRY · Türkiye</span></>
-                : <><Globe className="w-3 h-3" /><span className="font-medium">USD · International</span></>
-              }
-            </div>
-          </div>
-
-          {/* Trust pills */}
-          <div className="flex flex-wrap items-center gap-x-6 gap-y-2 mt-5 pt-5 border-t">
+      <div className="flex items-start justify-between gap-8 pb-6 border-b">
+        <div>
+          <h2 className="text-2xl font-bold tracking-tight">{t('billing.title')}</h2>
+          <p className="text-muted-foreground mt-2 text-sm max-w-2xl leading-relaxed">
+            {lang.startsWith('tr')
+              ? 'Tüm paketlerde aynı LeadHunter deneyimine erişirsiniz. Tek fark satın alınan kredi miktarıdır.'
+              : 'All packages include the same LeadHunter experience. The only difference is how many credits you purchase.'}
+          </p>
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 mt-4">
             {[
               lang.startsWith('tr') ? 'Tüm paketlerde aynı erişim' : 'Same access in every package',
               lang.startsWith('tr') ? 'Şeffaf ve adil ücretlendirme' : 'Transparent, fair billing',
-              lang.startsWith('tr') ? 'Gizli plan farkı yok'         : 'No hidden plan differences',
+              lang.startsWith('tr') ? 'Gizli plan farkı yok' : 'No hidden plan differences',
             ].map((label, i) => (
               <span key={i} className="flex items-center gap-1.5 text-xs text-muted-foreground">
                 <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
@@ -344,6 +318,12 @@ export default function BillingPage() {
               </span>
             ))}
           </div>
+        </div>
+        <div className="shrink-0 flex items-center gap-1.5 text-xs text-muted-foreground bg-muted/50 border rounded-full px-3 py-1.5 mt-1">
+          {region.isTurkeyContext
+            ? <><span>🇹🇷</span><span className="font-medium">TRY · Türkiye</span></>
+            : <><Globe className="w-3 h-3" /><span className="font-medium">USD · International</span></>
+          }
         </div>
       </div>
 
@@ -380,9 +360,9 @@ export default function BillingPage() {
         )}
 
         {!isLoading && !packagesError && packages.length > 0 && (
-          <div className={`grid gap-5 ${
-            packages.length === 1 ? 'max-w-xs'
-            : packages.length === 2 ? 'sm:grid-cols-2 max-w-xl'
+          <div className={`grid gap-6 ${
+            packages.length === 1 ? 'grid-cols-1 max-w-sm'
+            : packages.length === 2 ? 'sm:grid-cols-2'
             : 'sm:grid-cols-3'
           }`}>
             {packages.map(pkg => (
@@ -390,16 +370,11 @@ export default function BillingPage() {
                 key={pkg.id}
                 className={`relative flex flex-col rounded-2xl border transition-shadow ${
                   pkg.isFeatured
-                    ? 'border-primary/60 ring-2 ring-primary/15 shadow-lg bg-card'
-                    : 'bg-card border-border hover:shadow-md'
+                    ? 'border-primary/50 ring-2 ring-primary/10 shadow-xl bg-card'
+                    : 'bg-card border-border hover:border-border/80 hover:shadow-md'
                 }`}
               >
-                {/* Featured stripe */}
-                {pkg.isFeatured && (
-                  <div className="h-[2px] rounded-t-2xl bg-gradient-to-r from-primary/40 via-primary to-primary/40" />
-                )}
-
-                <div className={`flex flex-col flex-1 ${pkg.isFeatured ? 'p-7' : 'p-6'}`}>
+                <div className="flex flex-col flex-1 p-7">
                   {/* Featured badge */}
                   {pkg.isFeatured && (
                     <div className="flex justify-center mb-5">
@@ -425,17 +400,10 @@ export default function BillingPage() {
                   </div>
 
                   {/* Credits */}
-                  <p className="text-sm font-semibold text-muted-foreground mt-2.5">
-                    {pkg.credits.toLocaleString()}
-                    <span className="font-normal ml-1">{t('billing.credits')}</span>
+                  <p className="mt-2.5">
+                    <span className="text-sm font-bold">{pkg.credits.toLocaleString()}</span>
+                    <span className="text-sm text-muted-foreground ml-1">{t('billing.credits')}</span>
                   </p>
-
-                  {/* Per-credit cost */}
-                  {perCreditCost(pkg) && (
-                    <p className="text-xs text-muted-foreground/70 mt-1">
-                      {currencySymbol}{perCreditCost(pkg)}{lang.startsWith('tr') ? ' / kredi' : ' / credit'}
-                    </p>
-                  )}
 
                   {/* Admin-managed description — only when set */}
                   {pkg.description && (
@@ -468,40 +436,36 @@ export default function BillingPage() {
             ))}
           </div>
         )}
-      </section>
-
-      {/* ── How credits work ─────────────────────────────────────────────── */}
-      {!isLoading && !packagesError && packages.length > 0 && (
-        <section className="flex flex-col sm:flex-row gap-4 sm:gap-10 rounded-2xl border bg-muted/20 px-7 py-6">
-          <div className="shrink-0">
-            <p className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground whitespace-nowrap">
+        {!isLoading && !packagesError && packages.length > 0 && (
+          <div className="mt-8 pt-6 border-t">
+            <p className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground mb-4">
               {lang.startsWith('tr') ? 'Krediler nasıl çalışır?' : 'How credits work'}
             </p>
+            <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-x-8 gap-y-3">
+              {(lang.startsWith('tr') ? [
+                'Yalnızca yeni açılan işletme kayıtları kredi kullanır.',
+                'Daha önce gördüğünüz sayfalar tekrar ücretlendirilmez.',
+                'Son sayfada yalnızca gelen kayıt adedince kredi düşer.',
+                'Sonuç yoksa hiç kredi kullanılmaz.',
+              ] : [
+                'Only newly revealed business records consume credits.',
+                'Pages you have already viewed are never charged again.',
+                'Partial last pages are charged only for records returned.',
+                'Zero results means zero credits used.',
+              ]).map((text, i) => (
+                <div key={i} className="flex items-start gap-2.5">
+                  <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0 mt-px" />
+                  <span className="text-xs text-muted-foreground leading-snug">{text}</span>
+                </div>
+              ))}
+            </div>
           </div>
-          <div className="grid sm:grid-cols-2 gap-x-10 gap-y-2.5 flex-1">
-            {(lang.startsWith('tr') ? [
-              'Yalnızca yeni açılan işletme kayıtları kredi kullanır.',
-              'Daha önce gördüğünüz sayfalar tekrar ücretlendirilmez.',
-              'Son sayfada yalnızca gelen kayıt adedince kredi düşer.',
-              'Sonuç yoksa hiç kredi kullanılmaz.',
-            ] : [
-              'Only newly revealed business records consume credits.',
-              'Pages you have already viewed are never charged again.',
-              'Partial last pages are charged only for records returned.',
-              'Zero results means zero credits used.',
-            ]).map((text, i) => (
-              <div key={i} className="flex items-start gap-2 text-xs text-muted-foreground">
-                <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0 mt-px" />
-                <span className="leading-snug">{text}</span>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
+        )}
+      </section>
 
       {/* ── Order history ────────────────────────────────────────────────── */}
       <section>
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center justify-between mb-5 pb-3 border-b">
           <h3 className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
             {t('billing.orderHistory')}
           </h3>
