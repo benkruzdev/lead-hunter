@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+﻿import { useEffect, useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import {
@@ -295,49 +295,45 @@ export default function BillingPage() {
 
 
   return (
-    <div className="space-y-10 animate-fade-in max-w-6xl">
+    <div className="w-full max-w-4xl mx-auto space-y-8 animate-fade-in">
 
-      {/* ── Hero ─────────────────────────────────────────────────────────── */}
-      <div className="flex items-start justify-between gap-8 pb-6 border-b">
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight">{t('billing.title')}</h2>
-          <p className="text-muted-foreground mt-2 text-sm max-w-2xl leading-relaxed">
-            {lang.startsWith('tr')
-              ? 'Tüm paketlerde aynı LeadHunter deneyimine erişirsiniz. Tek fark satın alınan kredi miktarıdır.'
-              : 'All packages include the same LeadHunter experience. The only difference is how many credits you purchase.'}
-          </p>
-          <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 mt-4">
-            {[
-              lang.startsWith('tr') ? 'Tüm paketlerde aynı erişim' : 'Same access in every package',
-              lang.startsWith('tr') ? 'Şeffaf ve adil ücretlendirme' : 'Transparent, fair billing',
-              lang.startsWith('tr') ? 'Gizli plan farkı yok' : 'No hidden plan differences',
-            ].map((label, i) => (
-              <span key={i} className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                {label}
-              </span>
-            ))}
+      {/* ── Hero ──────────────────────────────────────────────────────────────── */}
+      <div className="rounded-2xl border bg-card p-8">
+        <div className="flex items-start justify-between gap-6 mb-7">
+          <div className="min-w-0">
+            <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground mb-2.5">
+              {lang.startsWith('tr') ? 'Kredi Satın Al' : 'Purchase Credits'}
+            </p>
+            <h2 className="text-2xl font-bold tracking-tight">{t('billing.title')}</h2>
+            <p className="text-muted-foreground mt-2 text-sm leading-relaxed max-w-sm">
+              {lang.startsWith('tr')
+                ? 'Tüm paketlerde aynı LeadHunter deneyimine erişirsiniz. Tek fark satın alınan kredi miktarıdır.'
+                : 'All packages include the same LeadHunter experience. The only difference is how many credits you purchase.'}
+            </p>
+          </div>
+          <div className="shrink-0 flex items-center gap-1.5 text-xs text-muted-foreground bg-muted/50 border rounded-full px-3 py-1.5">
+            {region.isTurkeyContext
+              ? <><span>🇹🇷</span><span className="font-medium">TRY · Türkiye</span></>
+              : <><Globe className="w-3 h-3" /><span className="font-medium">USD · International</span></>
+            }
           </div>
         </div>
-        <div className="shrink-0 flex items-center gap-1.5 text-xs text-muted-foreground bg-muted/50 border rounded-full px-3 py-1.5 mt-1">
-          {region.isTurkeyContext
-            ? <><span>🇹🇷</span><span className="font-medium">TRY · Türkiye</span></>
-            : <><Globe className="w-3 h-3" /><span className="font-medium">USD · International</span></>
-          }
+        <div className="grid grid-cols-3 gap-4 pt-5 border-t">
+          {[
+            lang.startsWith('tr') ? 'Tüm paketlerde aynı erişim' : 'Same access in every package',
+            lang.startsWith('tr') ? 'Şeffaf ve adil ücretlendirme' : 'Transparent, fair billing',
+            lang.startsWith('tr') ? 'Gizli plan farkı yok' : 'No hidden plan differences',
+          ].map((label, i) => (
+            <div key={i} className="flex items-center gap-2 text-xs text-muted-foreground">
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+              <span>{label}</span>
+            </div>
+          ))}
         </div>
       </div>
 
-      {/* ── Packages ─────────────────────────────────────────────────────── */}
+      {/* ── Packages ──────────────────────────────────────────────────────────── */}
       <section>
-        <div className="flex items-center justify-between mb-6">
-          <h3 className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
-            {t('billing.packages')}
-          </h3>
-          <span className="text-xs text-muted-foreground">
-            {lang.startsWith('tr') ? 'Kredi satın al · tek seferlik' : 'Top up credits · one-time'}
-          </span>
-        </div>
-
         {isLoading && (
           <div className="flex items-center justify-center py-16 gap-2 text-muted-foreground">
             <Loader2 className="w-5 h-5 animate-spin" />
@@ -360,88 +356,84 @@ export default function BillingPage() {
         )}
 
         {!isLoading && !packagesError && packages.length > 0 && (
-          <div className={`grid gap-6 ${
-            packages.length === 1 ? 'grid-cols-1 max-w-sm'
-            : packages.length === 2 ? 'sm:grid-cols-2'
-            : 'sm:grid-cols-3'
-          }`}>
-            {packages.map(pkg => (
-              <div
-                key={pkg.id}
-                className={`relative flex flex-col rounded-2xl border transition-shadow ${
-                  pkg.isFeatured
-                    ? 'border-primary/50 ring-2 ring-primary/10 shadow-xl bg-card'
-                    : 'bg-card border-border hover:border-border/80 hover:shadow-md'
-                }`}
-              >
-                <div className="flex flex-col flex-1 p-7">
-                  {/* Featured badge */}
-                  {pkg.isFeatured && (
-                    <div className="flex justify-center mb-5">
-                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/10 text-primary text-[11px] font-semibold tracking-wide border border-primary/20">
-                        <Zap className="w-3 h-3" />
-                        {t('billing.popular')}
+          <>
+            <div className={`grid gap-5 ${
+              packages.length === 1 ? 'grid-cols-1 max-w-xs mx-auto'
+              : packages.length === 2 ? 'grid-cols-2'
+              : 'grid-cols-3'
+            }`}>
+              {packages.map(pkg => (
+                <div
+                  key={pkg.id}
+                  className={`relative flex flex-col rounded-2xl border transition-shadow ${
+                    pkg.isFeatured
+                      ? 'border-primary/50 ring-2 ring-primary/10 shadow-xl bg-card'
+                      : 'bg-card border-border hover:border-border/80 hover:shadow-md'
+                  }`}
+                >
+                  <div className="flex flex-col flex-1 p-7">
+                    {/* Featured badge */}
+                    {pkg.isFeatured && (
+                      <div className="flex justify-center mb-5">
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/10 text-primary text-[11px] font-semibold tracking-wide border border-primary/20">
+                          <Zap className="w-3 h-3" />
+                          {t('billing.popular')}
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Package name */}
+                    <p className={`text-[11px] font-bold uppercase tracking-widest mb-4 ${
+                      pkg.isFeatured ? 'text-primary' : 'text-muted-foreground'
+                    }`}>
+                      {pkg.displayName}
+                    </p>
+
+                    {/* Price */}
+                    <div className="mb-3">
+                      <span className="text-[2.75rem] font-extrabold tracking-tight leading-none">
+                        {currencySymbol}{fmtPrice(getDisplayPrice(pkg))}
                       </span>
                     </div>
-                  )}
 
-                  {/* Package name */}
-                  <p className={`text-[11px] font-bold uppercase tracking-widest ${
-                    pkg.isFeatured ? 'text-primary mb-3' : 'text-muted-foreground mb-3'
-                  }`}>
-                    {pkg.displayName}
-                  </p>
+                    {/* Credits */}
+                    <p className="text-sm">
+                      <span className="font-bold">{pkg.credits.toLocaleString()}</span>
+                      <span className="text-muted-foreground ml-1">{t('billing.credits')}</span>
+                    </p>
 
-                  {/* Price */}
-                  <div className="flex items-baseline gap-0.5 mb-0.5">
-                    <span className="text-[2.5rem] font-extrabold tracking-tight leading-none">
-                      {currencySymbol}{fmtPrice(getDisplayPrice(pkg))}
-                    </span>
-                  </div>
+                    {/* Admin-managed description — only when set */}
+                    {pkg.description && (
+                      <>
+                        <div className="my-4 border-t" />
+                        <p className="text-xs text-muted-foreground leading-relaxed flex-1">
+                          {pkg.description}
+                        </p>
+                      </>
+                    )}
 
-                  {/* Credits */}
-                  <p className="mt-2.5">
-                    <span className="text-sm font-bold">{pkg.credits.toLocaleString()}</span>
-                    <span className="text-sm text-muted-foreground ml-1">{t('billing.credits')}</span>
-                  </p>
+                    {!pkg.description && <div className="flex-1 min-h-4" />}
 
-                  {/* Admin-managed description — only when set */}
-                  {pkg.description && (
-                    <>
-                      <div className="my-4 border-t" />
-                      <p className="text-xs text-muted-foreground leading-relaxed flex-1">
-                        {pkg.description}
-                      </p>
-                    </>
-                  )}
-
-                  {/* Spacer when no description */}
-                  {!pkg.description && <div className="flex-1" />}
-
-                  {/* CTA */}
-                  <div className="mt-6">
-                    <Button
-                      className="w-full gap-2"
-                      size={pkg.isFeatured ? 'default' : 'sm'}
-                      variant={pkg.isFeatured ? 'default' : 'outline'}
-                      onClick={() => handleBuyClick(pkg)}
-                      disabled={!region.canUseCard && !region.bankTransferEnabled}
-                    >
-                      <ShoppingCart className="w-3.5 h-3.5" />
-                      {t('billing.buyNow')}
-                    </Button>
+                    {/* CTA */}
+                    <div className="mt-6">
+                      <Button
+                        className="w-full gap-2"
+                        size={pkg.isFeatured ? 'default' : 'sm'}
+                        variant={pkg.isFeatured ? 'default' : 'outline'}
+                        onClick={() => handleBuyClick(pkg)}
+                        disabled={!region.canUseCard && !region.bankTransferEnabled}
+                      >
+                        <ShoppingCart className="w-3.5 h-3.5" />
+                        {t('billing.buyNow')}
+                      </Button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
-        )}
-        {!isLoading && !packagesError && packages.length > 0 && (
-          <div className="mt-8 pt-6 border-t">
-            <p className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground mb-4">
-              {lang.startsWith('tr') ? 'Krediler nasıl çalışır?' : 'How credits work'}
-            </p>
-            <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-x-8 gap-y-3">
+              ))}
+            </div>
+
+            {/* How credits work — trust footer, part of the purchase surface */}
+            <div className="mt-8 pt-6 border-t grid grid-cols-2 gap-x-10 gap-y-3">
               {(lang.startsWith('tr') ? [
                 'Yalnızca yeni açılan işletme kayıtları kredi kullanır.',
                 'Daha önce gördüğünüz sayfalar tekrar ücretlendirilmez.',
@@ -459,11 +451,11 @@ export default function BillingPage() {
                 </div>
               ))}
             </div>
-          </div>
+          </>
         )}
       </section>
 
-      {/* ── Order history ────────────────────────────────────────────────── */}
+      {/* ── Order history ─────────────────────────────────────────────────────── */}
       <section>
         <div className="flex items-center justify-between mb-5 pb-3 border-b">
           <h3 className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
@@ -528,7 +520,7 @@ export default function BillingPage() {
         )}
       </section>
 
-      {/* ── Payment method dialog ─────────────────────────────────────────── */}
+      {/* ── Payment method dialog ─────────────────────────────────────────────── */}
       <Dialog open={showPaymentDialog} onOpenChange={setShowPaymentDialog}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
@@ -549,7 +541,6 @@ export default function BillingPage() {
             onValueChange={v => setPaymentMethod(v as PaymentMethodUI)}
             className="space-y-2"
           >
-            {/* Card — only when a card provider is available for this region */}
             {region.canUseCard && (
               <label
                 htmlFor="pay-card"
@@ -571,7 +562,6 @@ export default function BillingPage() {
               </label>
             )}
 
-            {/* Bank transfer — Turkey-only, shown only when enabled */}
             {region.bankTransferEnabled && (
               <label
                 htmlFor="pay-bank"
@@ -611,7 +601,7 @@ export default function BillingPage() {
         </DialogContent>
       </Dialog>
 
-      {/* ── Bank transfer result dialog ───────────────────────────────────── */}
+      {/* ── Bank transfer result dialog ───────────────────────────────────────── */}
       <Dialog open={showBankTransferInfo} onOpenChange={closeBankTransferInfo}>
         <DialogContent className="max-w-md">
           <DialogHeader>
