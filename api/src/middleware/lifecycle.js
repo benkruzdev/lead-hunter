@@ -13,6 +13,9 @@ export async function requireActiveLifecycle(req, res, next) {
 
         const userId = req.user.id;
 
+        // TEMPORARY PRODUCTION DIAGNOSTICS: remove after /api/account investigation is complete.
+        console.log('[LIFECYCLE DEBUG] before profile query', { userId });
+
         // Fetch canonical lifecycle state (plus legacy fallbacks for safety)
         const { data: profile, error } = await supabaseAdmin
             .from('profiles')
@@ -20,7 +23,22 @@ export async function requireActiveLifecycle(req, res, next) {
             .eq('id', userId)
             .single();
 
+        // TEMPORARY PRODUCTION DIAGNOSTICS: remove after /api/account investigation is complete.
+        console.log('[LIFECYCLE DEBUG] profile query result', {
+            profile,
+            errorCode: error?.code || null,
+            errorMessage: error?.message || null,
+            errorDetails: error?.details || null,
+            errorHint: error?.hint || null
+        });
+
         if (error || !profile) {
+            // TEMPORARY PRODUCTION DIAGNOSTICS: remove after /api/account investigation is complete.
+            console.log('[LIFECYCLE DEBUG] rejecting request', {
+                reason: error ? 'error' : '!profile',
+                hasError: Boolean(error),
+                hasProfile: Boolean(profile)
+            });
             return res.status(404).json({ error: 'Not Found', message: 'User profile not found' });
         }
 

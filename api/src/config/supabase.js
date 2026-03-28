@@ -7,6 +7,20 @@ if (!supabaseUrl || !supabaseServiceRoleKey) {
     throw new Error('Missing Supabase environment variables. Check SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.');
 }
 
+const supabaseHost = (() => {
+    try {
+        return new URL(supabaseUrl).hostname;
+    } catch {
+        return 'invalid_supabase_url';
+    }
+})();
+
+// TEMPORARY PRODUCTION DIAGNOSTICS: remove after /api/account investigation is complete.
+console.log('[SUPABASE DEBUG] active backend target', {
+    host: supabaseHost,
+    projectRef: supabaseHost.split('.')[0] || null
+});
+
 // Admin client with service role key - bypasses RLS
 export const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey, {
     auth: {
