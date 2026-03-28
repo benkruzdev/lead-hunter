@@ -1,406 +1,260 @@
-import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "@/contexts/AuthContext";
 import { COUNTRY_BY_CODE } from "@/config/countries";
-import {
-  getSearchSessions,
-  getLeadLists,
-  getExports,
-  getCredits,
-  type SearchSession,
-  type LeadList,
-} from "@/lib/api";
+import { getSearchSessions, getLeadLists, getExports, getCredits } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { MetricCard } from "@/components/shared/MetricCard";
 import { PageContainer } from "@/components/shared/PageContainer";
 import {
-  Search,
-  List,
-  FileDown,
-  CreditCard,
-  Clock,
-  ArrowRight,
-  Zap,
-  ChevronRight,
+    Search, List, FileDown, CreditCard, Clock, ArrowRight, Zap, ChevronRight, Activity
 } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { QUERY_KEYS } from "@/lib/queryKeys";
 
-type ExportItem = {
-  id: string;
-  listName: string;
-  format: string;
-  fileName: string;
-  leadCount: number;
-  createdAt: string;
-};
-
-/**
- * Returns a flag emoji + space prefix for non-TR sessions.
- * TR sessions (and legacy sessions without country_code) return empty string
- * so existing Turkish users see no visual change.
- */
 function getCountryPrefix(countryCode?: string | null): string {
-  const code = countryCode ?? 'TR';
-  if (code === 'TR') return '';
-  const entry = COUNTRY_BY_CODE.get(code);
-  return entry ? `${entry.flag} ` : '';
-}
-
-function sevenDaysAgo(): Date {
-  const d = new Date();
-  d.setDate(d.getDate() - 7);
-  return d;
+    const code = countryCode ?? 'TR';
+    if (code === 'TR') return '';
+    const entry = COUNTRY_BY_CODE.get(code);
+    return entry ? `${entry.flag} ` : '';
 }
 
 export default function DashboardPage() {
-  const { t } = useTranslation();
-  const navigate = useNavigate();
-  const { profile: authProfile, credits: contextCredits } = useAuth();
+    const { t } = useTranslation();
+    const navigate = useNavigate();
+    const { profile: authProfile, credits: contextCredits } = useAuth();
 
-  const [loading, setLoading] = useState(true);
-  const [credits, setCreditsState] = useState<number>(contextCredits ?? 0);
-  const [sessions, setSessions] = useState<SearchSession[]>([]);
-  const [lists, setLists] = useState<LeadList[]>([]);
-  const [exports, setExports] = useState<ExportItem[]>([]);
+    const firstName =
+        authProfile?.full_name?.split(" ")[0] ||
+        authProfile?.email?.split("@")[0] ||
+        "";
 
-  const firstName =
-    authProfile?.full_name?.split(" ")[0] ||
-    authProfile?.email?.split("@")[0] ||
-    "";
+    // Data fetching using TanStack Query
+    const { data: creditsData } = useQuery({
+        queryKey: QUERY_KEYS.credits,
+        queryFn: getCredits,
+        enabled: contextCredits === null,
+    });
+    const credits = contextCredits ?? creditsData?.credits ?? 0;
 
-  useEffect(() => {
-    if (contextCredits !== null && contextCredits !== undefined) {
-      setCreditsState(contextCredits);
-    }
-  }, [contextCredits]);
-
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-
-    Promise.all([
-      getSearchSessions().catch(() => ({ sessions: [] as SearchSession[] })),
-      getLeadLists().catch(() => ({ lists: [] as LeadList[] })),
-      getExports().catch(() => ({ exports: [] as ExportItem[] })),
-      contextCredits == null
-        ? getCredits().catch(() => ({ credits: 0 }))
-        : Promise.resolve(null),
-    ]).then(([sessionsRes, listsRes, exportsRes, creditsRes]) => {
-      if (cancelled) return;
-      setSessions(sessionsRes.sessions);
-      setLists(listsRes.lists);
-      setExports(
-        (exportsRes.exports ?? []).map((e) => ({
-          id: String(e.id ?? ""),
-          listName: e.listName ?? "",
-          format: e.format ?? "",
-          fileName: e.fileName ?? "",
-          leadCount: Number(e.leadCount ?? 0),
-          createdAt: e.createdAt ?? "",
-        }))
-      );
-      if (creditsRes !== null) setCreditsState(creditsRes.credits);
-      setLoading(false);
+    const { data: sessions = [], isLoading: loadingSessions } = useQuery({
+        queryKey: ['searchSessions'],
+        queryFn: async () => {
+            const res = await getSearchSessions();
+            return res.sessions;
+        }
     });
 
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+    const { data: lists = [], isLoading: loadingLists } = useQuery({
+        queryKey: ['leadLists'],
+        queryFn: async () => {
+            const res = await getLeadLists();
+            return res.lists;
+        }
+    });
 
-  const sortedSessions = [...sessions].sort(
-    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-  );
-  const sortedExports = [...exports].sort(
-    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-  );
+    const { data: exports = [], isLoading: loadingExports } = useQuery({
+        queryKey: ['exports'],
+        queryFn: async () => {
+            const res = await getExports();
+            return res.exports;
+        }
+    });
 
-  const cutoff = sevenDaysAgo();
-  const searches7d = sessions.filter(
-    (s) => new Date(s.created_at) >= cutoff
-  ).length;
-  const exports7d = exports.filter(
-    (e) => new Date(e.createdAt) >= cutoff
-  ).length;
+    const isLoading = loadingSessions || loadingLists || loadingExports;
 
-  const recentSessions = sortedSessions.slice(0, 3);
-  const recentLists = [...lists]
-    .sort(
-      (a, b) =>
-        new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
-    )
-    .slice(0, 3);
-  const recentExports = sortedExports.slice(0, 3);
-  const lastSession = sortedSessions[0] ?? null;
-
-  const stats: Array<{
-    label: string;
-    value: string | number;
-    icon: React.ElementType;
-    colorScheme: import("@/components/shared/MetricCard").MetricColorScheme;
-  }> = [
-    {
-      label: t("dashboard.creditsRemaining"),
-      value: credits.toLocaleString(),
-      icon: Zap,
-      colorScheme: "warning",
-    },
-    {
-      label: t("dashboard.totalSearches"),
-      value: sessions.length,
-      icon: Search,
-      colorScheme: "info",
-    },
-    {
-      label: t("dashboard.totalLists"),
-      value: lists.length,
-      icon: List,
-      colorScheme: "success",
-    },
-    {
-      label: t("dashboard.totalExports"),
-      value: exports.length,
-      icon: FileDown,
-      colorScheme: "accent",
-    },
-    {
-      label: t("dashboard.searches7d"),
-      value: searches7d,
-      icon: Clock,
-      colorScheme: "info",
-    },
-    {
-      label: t("dashboard.exports7d"),
-      value: exports7d,
-      icon: FileDown,
-      colorScheme: "accent",
-    },
-  ];
-
-  const quickActions = [
-    { label: t("dashboard.newSearch"), icon: Search, path: "/app/search" },
-    { label: t("layout.searchHistory"), icon: Clock, path: "/app/history" },
-    { label: t("layout.leadLists"), icon: List, path: "/app/lists" },
-    { label: t("layout.exports"), icon: FileDown, path: "/app/exports" },
-    { label: t("layout.buyCredits"), icon: CreditCard, path: "/app/billing" },
-  ];
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-      </div>
+    // Derived states
+    const sortedSessions = [...sessions].sort(
+        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
     );
-  }
+    const lastSession = sortedSessions[0] ?? null;
 
-  return (
-    <PageContainer maxWidth="xl">
-      {/* Hero */}
-      <PageHeader
-        title={
-          firstName ? `${t("dashboard.welcome")}, ${firstName}` : t("dashboard.welcome")
-        }
-        description={t("dashboard.welcomeDesc")}
-        actions={
-          <Button onClick={() => navigate("/app/search")} className="shrink-0">
-            <Search className="w-4 h-4 mr-2" />
-            {t("dashboard.newSearch")}
-          </Button>
-        }
-      />
+    // Unified timeline items
+    const timeline = [
+        ...sessions.map(s => ({
+            id: `s-${s.id}`,
+            type: 'search' as const,
+            title: `${getCountryPrefix(s.country_code)}${s.province}${s.district ? ` / ${s.district}` : ""}`,
+            subtitle: `${s.category} · ${s.total_results} ${t("dashboard.results", "Sonuç")}`,
+            date: new Date(s.created_at),
+            icon: Search,
+            onClick: () => navigate(`/app/search?sessionId=${s.id}`)
+        })),
+        ...lists.map(l => ({
+            id: `l-${l.id}`,
+            type: 'list' as const,
+            title: l.name,
+            subtitle: `${l.lead_count} ${t("dashboard.leads", "Lead")}`,
+            date: new Date(l.updated_at),
+            icon: List,
+            onClick: () => navigate(`/app/lists/${l.id}`)
+        })),
+        ...exports.map(e => ({
+            id: `e-${e.id}`,
+            type: 'export' as const,
+            title: e.listName,
+            subtitle: `${e.format.toUpperCase()} · ${e.leadCount} ${t("dashboard.leads", "Lead")}`,
+            date: new Date(e.createdAt),
+            icon: FileDown,
+            onClick: () => navigate(`/app/exports`)
+        }))
+    ].sort((a, b) => b.date.getTime() - a.date.getTime()).slice(0, 5);
 
-      {/* Stats grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-        {stats.map((stat) => (
-          <MetricCard
-            key={stat.label}
-            label={stat.label}
-            value={stat.value}
-            icon={stat.icon}
-            colorScheme={stat.colorScheme}
-          />
-        ))}
-      </div>
+    const stats = [
+        {
+            label: t("dashboard.creditsRemaining"),
+            value: credits.toLocaleString(),
+            icon: Zap,
+            colorScheme: "warning" as const,
+        },
+        {
+            label: t("dashboard.totalSearches"),
+            value: sessions.length,
+            icon: Search,
+            colorScheme: "info" as const,
+        },
+        {
+            label: t("dashboard.totalLists"),
+            value: lists.length,
+            icon: List,
+            colorScheme: "success" as const,
+        },
+        {
+            label: t("dashboard.totalExports"),
+            value: exports.length,
+            icon: FileDown,
+            colorScheme: "accent" as const,
+        },
+    ];
 
-      {/* Quick actions */}
-      <div>
-        <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">
-          {t("dashboard.quickActions")}
-        </h2>
-        <div className="flex flex-wrap gap-2">
-          {quickActions.map((action) => (
-            <Button
-              key={action.path}
-              variant="outline"
-              size="sm"
-              onClick={() => navigate(action.path)}
-            >
-              <action.icon className="w-3.5 h-3.5 mr-1.5" />
-              {action.label}
-            </Button>
-          ))}
-        </div>
-      </div>
+    const quickActions = [
+        { label: t("layout.searchHistory"), icon: Clock, path: "/app/history" },
+        { label: t("layout.leadLists"), icon: List, path: "/app/lists" },
+        { label: t("layout.exports"), icon: FileDown, path: "/app/exports" },
+        { label: t("layout.buyCredits"), icon: CreditCard, path: "/app/billing" },
+    ];
 
-      {/* Continue last search */}
-      {lastSession && (
-        <div className="bg-card border rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div>
-            <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
-              {t("dashboard.lastSearch")}
-            </div>
-            <div className="font-semibold">
-              {getCountryPrefix(lastSession.country_code)}{lastSession.province}
-              {lastSession.district ? ` / ${lastSession.district}` : ""} —{" "}
-              {lastSession.category}
-            </div>
-            <div className="text-sm text-muted-foreground">
-              {lastSession.total_results} {t("dashboard.results")}
-            </div>
-          </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() =>
-              navigate(`/app/search?sessionId=${lastSession.id}`)
-            }
-          >
-            {t("dashboard.continueSearch")}
-            <ArrowRight className="w-3.5 h-3.5 ml-1.5" />
-          </Button>
-        </div>
-      )}
+    return (
+        <PageContainer maxWidth="xl">
+            {/* Hero */}
+            <PageHeader
+                title={firstName ? `${t("dashboard.welcome")}, ${firstName}` : t("dashboard.welcome")}
+                description={t("dashboard.welcomeDesc")}
+                actions={
+                    <Button onClick={() => navigate("/app/search")} className="shrink-0" size="lg">
+                        <Search className="w-4 h-4 mr-2" />
+                        {t("dashboard.newSearch", "Yeni Arama")}
+                    </Button>
+                }
+            />
 
-      {/* Recent activity */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {/* Recent searches */}
-        <div className="bg-card border rounded-xl p-4">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-sm font-semibold">
-              {t("dashboard.recentSearches")}
-            </h2>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 text-xs"
-              onClick={() => navigate("/app/history")}
-            >
-              {t("dashboard.viewAll")}
-              <ChevronRight className="w-3 h-3 ml-0.5" />
-            </Button>
-          </div>
-          {recentSessions.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-2">
-              {t("dashboard.noSearches")}
-            </p>
-          ) : (
-            <ul className="space-y-1">
-              {recentSessions.map((s) => (
-                <li
-                  key={s.id}
-                  className="flex items-start gap-2 p-2 rounded-lg hover:bg-muted cursor-pointer transition-colors"
-                  onClick={() =>
-                    navigate(`/app/search?sessionId=${s.id}`)
-                  }
+            {/* Resume Last Search (Prominent) */}
+            {lastSession && (
+                <div 
+                    className="group bg-card hover:bg-muted/50 border rounded-xl p-5 sm:p-6 mb-6 cursor-pointer transition-colors shadow-sm"
+                    onClick={() => navigate(`/app/search?sessionId=${lastSession.id}`)}
                 >
-                  <Search className="w-3.5 h-3.5 mt-0.5 text-muted-foreground flex-shrink-0" />
-                  <div className="min-w-0">
-                    <div className="text-xs font-medium truncate">
-                      {getCountryPrefix(s.country_code)}{s.province}
-                      {s.district ? ` / ${s.district}` : ""}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <div>
+                            <div className="flex items-center gap-2 mb-2">
+                                <Activity className="w-4 h-4 text-primary" />
+                                <span className="text-xs font-semibold text-primary uppercase tracking-wider">
+                                    {t("dashboard.lastSearch", "Kaldığınız Yerden Devam Edin")}
+                                </span>
+                            </div>
+                            <h3 className="text-lg font-semibold text-foreground">
+                                {getCountryPrefix(lastSession.country_code)}{lastSession.province}
+                                {lastSession.district ? ` / ${lastSession.district}` : ""} — {lastSession.category}
+                            </h3>
+                            <p className="text-sm text-muted-foreground mt-1">
+                                {lastSession.total_results} {t("dashboard.results", "sonuç")} bulundu. Sonuçları incelemeye devam edin.
+                            </p>
+                        </div>
+                        <Button variant="default" className="shrink-0 shadow-sm sm:w-auto w-full group-hover:bg-primary/90">
+                            {t("dashboard.continueSearch", "Aramayı Gör")}
+                            <ArrowRight className="w-4 h-4 ml-2" />
+                        </Button>
                     </div>
-                    <div className="text-xs text-muted-foreground truncate">
-                      {s.category} · {s.total_results}{" "}
-                      {t("dashboard.results")}
-                    </div>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
+                </div>
+            )}
 
-        {/* Recent lists */}
-        <div className="bg-card border rounded-xl p-4">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-sm font-semibold">
-              {t("dashboard.recentLists")}
-            </h2>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 text-xs"
-              onClick={() => navigate("/app/lists")}
-            >
-              {t("dashboard.viewAll")}
-              <ChevronRight className="w-3 h-3 ml-0.5" />
-            </Button>
-          </div>
-          {recentLists.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-2">
-              {t("dashboard.noLists")}
-            </p>
-          ) : (
-            <ul className="space-y-1">
-              {recentLists.map((l) => (
-                <li
-                  key={l.id}
-                  className="flex items-start gap-2 p-2 rounded-lg hover:bg-muted cursor-pointer transition-colors"
-                  onClick={() => navigate(`/app/lists/${l.id}`)}
-                >
-                  <List className="w-3.5 h-3.5 mt-0.5 text-muted-foreground flex-shrink-0" />
-                  <div className="min-w-0">
-                    <div className="text-xs font-medium truncate">{l.name}</div>
-                    <div className="text-xs text-muted-foreground">
-                      {l.lead_count} {t("dashboard.leads")}
-                    </div>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
+            {/* Stats grid */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                {stats.map((stat) => (
+                    <MetricCard
+                        key={stat.label}
+                        label={stat.label}
+                        value={stat.value}
+                        icon={stat.icon}
+                        colorScheme={stat.colorScheme}
+                    />
+                ))}
+            </div>
 
-        {/* Recent exports */}
-        <div className="bg-card border rounded-xl p-4">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-sm font-semibold">
-              {t("dashboard.recentExports")}
-            </h2>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 text-xs"
-              onClick={() => navigate("/app/exports")}
-            >
-              {t("dashboard.viewAll")}
-              <ChevronRight className="w-3 h-3 ml-0.5" />
-            </Button>
-          </div>
-          {recentExports.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-2">
-              {t("dashboard.noExports")}
-            </p>
-          ) : (
-            <ul className="space-y-1">
-              {recentExports.map((e) => (
-                <li key={e.id} className="flex items-start gap-2 p-2 rounded-lg">
-                  <FileDown className="w-3.5 h-3.5 mt-0.5 text-muted-foreground flex-shrink-0" />
-                  <div className="min-w-0">
-                    <div className="text-xs font-medium truncate">
-                      {e.listName}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* Unified Recent Activity */}
+                <div className="lg:col-span-2 space-y-4">
+                    <div className="flex items-center justify-between">
+                        <h2 className="text-sm font-semibold text-foreground">
+                            {t("dashboard.recentActivity", "Son Hareketler")}
+                        </h2>
                     </div>
-                    <div className="text-xs text-muted-foreground uppercase">
-                      {e.format} · {e.leadCount} {t("dashboard.leads")}
+                    {isLoading ? (
+                        <div className="flex items-center justify-center p-8 bg-card border rounded-xl text-muted-foreground">
+                            <span className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin mr-2" />
+                            Yükleniyor...
+                        </div>
+                    ) : timeline.length === 0 ? (
+                        <div className="bg-card border rounded-xl p-8 text-center text-muted-foreground">
+                            <Clock className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                            <p className="text-sm">Henüz bir hareket bulunmuyor.</p>
+                        </div>
+                    ) : (
+                        <div className="bg-card border rounded-xl divide-y">
+                            {timeline.map((item) => (
+                                <div
+                                    key={item.id}
+                                    className="flex items-start gap-3 p-4 hover:bg-muted/50 cursor-pointer transition-colors"
+                                    onClick={item.onClick}
+                                >
+                                    <div className="p-2 bg-muted rounded-lg shrink-0 mt-0.5">
+                                        <item.icon className="w-4 h-4 text-foreground" />
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                        <div className="font-medium text-sm truncate">{item.title}</div>
+                                        <div className="text-xs text-muted-foreground mt-0.5">{item.subtitle}</div>
+                                    </div>
+                                    <div className="text-xs text-muted-foreground whitespace-nowrap shrink-0">
+                                        {item.date.toLocaleDateString("tr-TR")}
+                                    </div>
+                                    <ChevronRight className="w-4 h-4 text-muted-foreground/50 shrink-0 mt-2" />
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+
+                {/* Quick Actions (De-emphasized) */}
+                <div className="space-y-4">
+                    <h2 className="text-sm font-semibold text-foreground">
+                        {t("dashboard.quickActions")}
+                    </h2>
+                    <div className="bg-card border rounded-xl p-2 flex flex-col gap-1">
+                        {quickActions.map((action) => (
+                            <Button
+                                key={action.path}
+                                variant="ghost"
+                                className="w-full justify-start font-normal text-muted-foreground hover:text-foreground"
+                                onClick={() => navigate(action.path)}
+                            >
+                                <action.icon className="w-4 h-4 mr-3 opacity-70" />
+                                {action.label}
+                            </Button>
+                        ))}
                     </div>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      </div>
-    </PageContainer>
-  );
+                </div>
+            </div>
+        </PageContainer>
+    );
 }
