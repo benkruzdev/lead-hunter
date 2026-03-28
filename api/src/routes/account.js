@@ -19,6 +19,12 @@ const router = express.Router();
  */
 router.get('/', requireAuth, requireActiveLifecycle, async (req, res) => {
     try {
+        // TEMPORARY PRODUCTION DIAGNOSTICS: remove after /api/account investigation is complete.
+        console.log('[ACCOUNT ROUTE DEBUG] entered', {
+            userId: req.user?.id || null,
+            email: req.user?.email || null
+        });
+
         const userId = req.user.id;
 
         // Fetch core profile
@@ -27,6 +33,12 @@ router.get('/', requireAuth, requireActiveLifecycle, async (req, res) => {
             .select('*')
             .eq('id', userId)
             .single();
+
+        // TEMPORARY PRODUCTION DIAGNOSTICS: remove after /api/account investigation is complete.
+        console.log('[ACCOUNT ROUTE DEBUG] profile query result', {
+            profile,
+            profileErr
+        });
 
         if (profileErr || !profile) {
             return res.status(404).json({ error: 'Profile not found' });
