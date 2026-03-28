@@ -26,6 +26,13 @@ export async function requireAuth(req, res, next) {
         }
         // Attach user to request object
         req.user = user;
+
+        // [TEMPORARY PRODUCTION DIAGNOSTIC] Remove after /api/account investigation
+        console.log('[AUTH DEBUG] token verification succeeded');
+        console.log('[AUTH DEBUG] req.user.id:', req.user?.id);
+        console.log('[AUTH DEBUG] req.user.email:', req.user?.email);
+        console.log('[AUTH DEBUG] req.user.aud:', req.user?.aud || 'N/A');
+        
         next();
     } catch (err) {
         console.error('Auth middleware error:', err);

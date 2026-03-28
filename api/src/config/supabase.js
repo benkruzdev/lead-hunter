@@ -15,6 +15,14 @@ export const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey, {
     }
 });
 
+// [TEMPORARY PRODUCTION DIAGNOSTIC] Remove after /api/account investigation
+try {
+    const url = new URL(supabaseUrl);
+    console.log('[SUPABASE DEBUG] Target hostname:', url.hostname);
+} catch (e) {
+    console.log('[SUPABASE DEBUG] Invalid SUPABASE_URL format:', supabaseUrl?.substring(0, 10) + '...');
+}
+
 // Helper to verify user JWT token
 export async function verifyUserToken(token) {
     if (!token) {

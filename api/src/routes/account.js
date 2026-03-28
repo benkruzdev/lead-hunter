@@ -21,12 +21,23 @@ router.get('/', requireAuth, requireActiveLifecycle, async (req, res) => {
     try {
         const userId = req.user.id;
 
+        // [TEMPORARY PRODUCTION DIAGNOSTIC] Remove after /api/account investigation
+        console.log('[ACCOUNT ROUTE DEBUG] entered');
+        console.log('[ACCOUNT ROUTE DEBUG] req.user.id:', req.user?.id);
+        console.log('[ACCOUNT ROUTE DEBUG] req.user.email:', req.user?.email);
+
         // Fetch core profile
         const { data: profile, error: profileErr } = await supabaseAdmin
             .from('profiles')
             .select('*')
             .eq('id', userId)
+            .eq('id', userId)
             .single();
+
+        // [TEMPORARY PRODUCTION DIAGNOSTIC] Remove after /api/account investigation
+        console.log('[ACCOUNT ROUTE DEBUG] Canonical handler profile query completed');
+        console.log('[ACCOUNT ROUTE DEBUG] profile:', profile);
+        console.log('[ACCOUNT ROUTE DEBUG] profileErr:', profileErr);
 
         if (profileErr || !profile) {
             return res.status(404).json({ error: 'Profile not found' });
