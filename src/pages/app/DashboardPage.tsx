@@ -8,10 +8,12 @@ import { PageHeader } from "@/components/shared/PageHeader";
 import { MetricCard } from "@/components/shared/MetricCard";
 import { PageContainer } from "@/components/shared/PageContainer";
 import {
-    Search, List, FileDown, CreditCard, Clock, ArrowRight, Zap, ChevronRight, Activity
+    Search, List, FileDown, CreditCard, Clock, ArrowRight, Zap, ChevronRight, Activity, MapPin, Briefcase
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { QUERY_KEYS } from "@/lib/queryKeys";
+import { formatDistanceToNow } from "date-fns";
+import { tr, enUS } from "date-fns/locale";
 
 function getCountryPrefix(countryCode?: string | null): string {
     const code = countryCode ?? 'TR';
@@ -21,9 +23,12 @@ function getCountryPrefix(countryCode?: string | null): string {
 }
 
 export default function DashboardPage() {
-    const { t } = useTranslation();
+    const { t, i18n } = useTranslation();
     const navigate = useNavigate();
     const { profile: authProfile, credits: contextCredits } = useAuth();
+    
+    // Select locale for relative dates
+    const dateLocale = i18n.language?.startsWith('en') ? enUS : tr;
 
     const firstName =
         authProfile?.full_name?.split(" ")[0] ||
@@ -79,6 +84,7 @@ export default function DashboardPage() {
             subtitle: `${s.category} · ${s.total_results} ${t("dashboard.results", "Sonuç")}`,
             date: new Date(s.created_at),
             icon: Search,
+            iconClass: "bg-blue-500/10 text-blue-500",
             onClick: () => navigate(`/app/search?sessionId=${s.id}`)
         })),
         ...lists.map(l => ({
@@ -88,6 +94,7 @@ export default function DashboardPage() {
             subtitle: `${l.lead_count} ${t("dashboard.leads", "Lead")}`,
             date: new Date(l.updated_at),
             icon: List,
+            iconClass: "bg-emerald-500/10 text-emerald-500",
             onClick: () => navigate(`/app/lists/${l.id}`)
         })),
         ...exports.map(e => ({
@@ -97,9 +104,10 @@ export default function DashboardPage() {
             subtitle: `${e.format.toUpperCase()} · ${e.leadCount} ${t("dashboard.leads", "Lead")}`,
             date: new Date(e.createdAt),
             icon: FileDown,
+            iconClass: "bg-purple-500/10 text-purple-500",
             onClick: () => navigate(`/app/exports`)
         }))
-    ].sort((a, b) => b.date.getTime() - a.date.getTime()).slice(0, 5);
+    ].sort((a, b) => b.date.getTime() - a.date.getTime()).slice(0, 6);
 
     const stats = [
         {
@@ -129,10 +137,9 @@ export default function DashboardPage() {
     ];
 
     const quickActions = [
-        { label: t("layout.searchHistory"), icon: Clock, path: "/app/history" },
-        { label: t("layout.leadLists"), icon: List, path: "/app/lists" },
-        { label: t("layout.exports"), icon: FileDown, path: "/app/exports" },
-        { label: t("layout.buyCredits"), icon: CreditCard, path: "/app/billing" },
+        { label: t("layout.searchHistory", "Arama Geçmişi"), desc: "Önceki çalışmalarınız", icon: Clock, path: "/app/history" },
+        { label: t("layout.leadLists", "Lead Listeleri"), desc: "Kaydedilmiş sonuçlar", icon: List, path: "/app/lists" },
+        { label: t("layout.exports", "Dışa Aktarımlar"), desc: "Excel ve CSV dosyaları", icon: FileDown, path: "/app/exports" },
     ];
 
     return (
@@ -140,38 +147,52 @@ export default function DashboardPage() {
             {/* Hero */}
             <PageHeader
                 title={firstName ? `${t("dashboard.welcome")}, ${firstName}` : t("dashboard.welcome")}
-                description={t("dashboard.welcomeDesc")}
+                description={t("dashboard.welcomeDesc", "LeadHunter kontrol panelinize hoş geldiniz.")}
                 actions={
-                    <Button onClick={() => navigate("/app/search")} className="shrink-0" size="lg">
+                    <Button onClick={() => navigate("/app/search")} className="shrink-0 shadow-sm" size="lg">
                         <Search className="w-4 h-4 mr-2" />
                         {t("dashboard.newSearch", "Yeni Arama")}
                     </Button>
                 }
             />
 
-            {/* Resume Last Search (Prominent) */}
+            {/* Resume Last Search (Premium Focus) */}
             {lastSession && (
                 <div 
-                    className="group bg-card hover:bg-muted/50 border rounded-xl p-5 sm:p-6 mb-6 cursor-pointer transition-colors shadow-sm"
+                    className="group relative overflow-hidden bg-card hover:bg-muted/30 border border-primary/20 hover:border-primary/40 rounded-2xl p-6 sm:p-8 mb-8 cursor-pointer shadow-sm transition-all duration-300"
                     onClick={() => navigate(`/app/search?sessionId=${lastSession.id}`)}
                 >
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                        <div>
-                            <div className="flex items-center gap-2 mb-2">
+                    <div className="absolute top-0 left-0 w-1.5 h-full bg-primary/80" />
+                    <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3 pointer-events-none" />
+                    
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 relative z-10">
+                        <div className="space-y-3">
+                            <div className="flex items-center gap-2">
                                 <Activity className="w-4 h-4 text-primary" />
-                                <span className="text-xs font-semibold text-primary uppercase tracking-wider">
+                                <span className="text-xs font-bold text-primary uppercase tracking-wide">
                                     {t("dashboard.lastSearch", "Kaldığınız Yerden Devam Edin")}
                                 </span>
                             </div>
-                            <h3 className="text-lg font-semibold text-foreground">
-                                {getCountryPrefix(lastSession.country_code)}{lastSession.province}
-                                {lastSession.district ? ` / ${lastSession.district}` : ""} — {lastSession.category}
-                            </h3>
-                            <p className="text-sm text-muted-foreground mt-1">
-                                {lastSession.total_results} {t("dashboard.results", "sonuç")} bulundu. Sonuçları incelemeye devam edin.
+                            
+                            <div className="flex flex-col sm:flex-row sm:items-center gap-y-2 gap-x-6">
+                                <div className="flex items-center gap-2 text-foreground font-medium">
+                                    <MapPin className="w-4 h-4 text-muted-foreground" />
+                                    <span>
+                                        {getCountryPrefix(lastSession.country_code)}
+                                        {lastSession.province}{lastSession.district ? ` / ${lastSession.district}` : ""}
+                                    </span>
+                                </div>
+                                <div className="flex items-center gap-2 text-foreground font-medium">
+                                    <Briefcase className="w-4 h-4 text-muted-foreground" />
+                                    <span>{lastSession.category}</span>
+                                </div>
+                            </div>
+                            
+                            <p className="text-sm text-muted-foreground">
+                                {lastSession.total_results} {t("dashboard.results", "potansiyel müşteri bulundu")}. Listelemeye devam etmek için tıklayın.
                             </p>
                         </div>
-                        <Button variant="default" className="shrink-0 shadow-sm sm:w-auto w-full group-hover:bg-primary/90">
+                        <Button variant="default" className="shrink-0 shadow-sm sm:w-auto w-full group-hover:bg-primary/95 transition-colors">
                             {t("dashboard.continueSearch", "Aramayı Gör")}
                             <ArrowRight className="w-4 h-4 ml-2" />
                         </Button>
@@ -192,66 +213,107 @@ export default function DashboardPage() {
                 ))}
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Unified Recent Activity */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                {/* Unified Recent Activity (Polished) */}
                 <div className="lg:col-span-2 space-y-4">
                     <div className="flex items-center justify-between">
-                        <h2 className="text-sm font-semibold text-foreground">
+                        <h2 className="text-sm font-semibold text-foreground uppercase tracking-wide">
                             {t("dashboard.recentActivity", "Son Hareketler")}
                         </h2>
                     </div>
                     {isLoading ? (
-                        <div className="flex items-center justify-center p-8 bg-card border rounded-xl text-muted-foreground">
-                            <span className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin mr-2" />
+                        <div className="flex items-center justify-center p-12 bg-card border rounded-2xl text-muted-foreground opacity-60">
+                            <span className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin mr-3" />
                             Yükleniyor...
                         </div>
                     ) : timeline.length === 0 ? (
-                        <div className="bg-card border rounded-xl p-8 text-center text-muted-foreground">
-                            <Clock className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                            <p className="text-sm">Henüz bir hareket bulunmuyor.</p>
+                        <div className="bg-card border rounded-2xl p-12 text-center text-muted-foreground">
+                            <Clock className="w-10 h-10 mx-auto mb-3 opacity-30" />
+                            <p className="text-sm font-medium">Henüz bir hareket bulunmuyor.</p>
+                            <p className="text-xs opacity-70 mt-1">Yaptığınız arama ve listelemeler burada görünür.</p>
                         </div>
                     ) : (
-                        <div className="bg-card border rounded-xl divide-y">
-                            {timeline.map((item) => (
-                                <div
-                                    key={item.id}
-                                    className="flex items-start gap-3 p-4 hover:bg-muted/50 cursor-pointer transition-colors"
-                                    onClick={item.onClick}
-                                >
-                                    <div className="p-2 bg-muted rounded-lg shrink-0 mt-0.5">
-                                        <item.icon className="w-4 h-4 text-foreground" />
+                        <div className="bg-card border rounded-2xl overflow-hidden shadow-sm">
+                            <div className="divide-y divide-border/50">
+                                {timeline.map((item) => (
+                                    <div
+                                        key={item.id}
+                                        className="flex items-start gap-4 p-4 hover:bg-muted/40 cursor-pointer transition-all duration-200"
+                                        onClick={item.onClick}
+                                    >
+                                        <div className={`p-2.5 rounded-xl shrink-0 mt-0.5 ${item.iconClass}`}>
+                                            <item.icon className="w-4 h-4" />
+                                        </div>
+                                        <div className="min-w-0 flex-1 py-0.5">
+                                            <div className="font-semibold text-sm text-foreground truncate">{item.title}</div>
+                                            <div className="text-xs text-muted-foreground mt-1 flex items-center gap-1.5">
+                                                <span>{item.subtitle}</span>
+                                                <span className="w-1 h-1 rounded-full bg-border" />
+                                                <span>
+                                                    {formatDistanceToNow(item.date, { addSuffix: true, locale: dateLocale })}
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <div className="py-2">
+                                            <ChevronRight className="w-4 h-4 text-muted-foreground/40 shrink-0 group-hover:text-muted-foreground/80 transition-colors" />
+                                        </div>
                                     </div>
-                                    <div className="min-w-0 flex-1">
-                                        <div className="font-medium text-sm truncate">{item.title}</div>
-                                        <div className="text-xs text-muted-foreground mt-0.5">{item.subtitle}</div>
-                                    </div>
-                                    <div className="text-xs text-muted-foreground whitespace-nowrap shrink-0">
-                                        {item.date.toLocaleDateString("tr-TR")}
-                                    </div>
-                                    <ChevronRight className="w-4 h-4 text-muted-foreground/50 shrink-0 mt-2" />
-                                </div>
-                            ))}
+                                ))}
+                            </div>
                         </div>
                     )}
                 </div>
 
-                {/* Quick Actions (De-emphasized) */}
-                <div className="space-y-4">
-                    <h2 className="text-sm font-semibold text-foreground">
-                        {t("dashboard.quickActions")}
-                    </h2>
-                    <div className="bg-card border rounded-xl p-2 flex flex-col gap-1">
-                        {quickActions.map((action) => (
-                            <Button
-                                key={action.path}
-                                variant="ghost"
-                                className="w-full justify-start font-normal text-muted-foreground hover:text-foreground"
-                                onClick={() => navigate(action.path)}
+                {/* Secondary Panel / Workspace Shortcuts */}
+                <div className="space-y-6">
+                    {/* Quick Actions (Polished Block) */}
+                    <div className="space-y-4">
+                        <h2 className="text-sm font-semibold text-foreground uppercase tracking-wide">
+                            {t("dashboard.quickActions", "Çalışma Alanı")}
+                        </h2>
+                        <div className="bg-card border rounded-2xl p-3 flex flex-col gap-1 shadow-sm">
+                            {quickActions.map((action) => (
+                                <button
+                                    key={action.path}
+                                    className="flex items-center gap-3 w-full text-left p-3 rounded-xl hover:bg-muted/50 transition-colors group"
+                                    onClick={() => navigate(action.path)}
+                                >
+                                    <div className="p-2 bg-muted rounded-lg shrink-0 text-muted-foreground group-hover:text-foreground group-hover:bg-background transition-colors">
+                                        <action.icon className="w-4 h-4" />
+                                    </div>
+                                    <div>
+                                        <div className="text-sm font-medium text-foreground group-hover:text-primary transition-colors">
+                                            {action.label}
+                                        </div>
+                                        <div className="text-xs text-muted-foreground mt-0.5">
+                                            {action.desc}
+                                        </div>
+                                    </div>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Billing Context */}
+                    <div className="bg-card border border-primary/10 rounded-2xl p-5 shadow-sm relative overflow-hidden">
+                        <div className="absolute -right-6 -top-6 w-24 h-24 bg-primary/10 rounded-full blur-2xl pointer-events-none" />
+                        <div className="relative z-10 flex flex-col gap-3">
+                            <div className="flex items-center gap-2 text-primary font-medium">
+                                <CreditCard className="w-4 h-4" />
+                                <span className="text-sm">{t("layout.billing", "Faturalandırma")}</span>
+                            </div>
+                            <p className="text-xs text-muted-foreground leading-relaxed">
+                                {credits.toLocaleString()} krediniz kaldı. Büyük bir liste öncesinde kredilerinizi yönetin veya yeni bakiye yükleyin.
+                            </p>
+                            <Button 
+                                variant="outline" 
+                                size="sm" 
+                                className="w-full mt-2 border-primary/20 hover:bg-primary/5 hover:text-primary transition-colors"
+                                onClick={() => navigate("/app/billing")}
                             >
-                                <action.icon className="w-4 h-4 mr-3 opacity-70" />
-                                {action.label}
+                                {t("layout.buyCredits", "Kredi Satın Al")}
                             </Button>
-                        ))}
+                        </div>
                     </div>
                 </div>
             </div>
