@@ -5,18 +5,16 @@ import {
   FileDown,
   CreditCard,
   Settings,
-  LogOut,
   Menu,
   X,
-  ChevronDown,
   ChevronLeft,
   ChevronRight,
-  User,
-  Globe,
   Shield,
   Clock,
   LayoutDashboard
 } from "lucide-react";
+
+import { TopbarProfileMenu } from "@/components/shared/TopbarProfileMenu";
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -46,7 +44,6 @@ const sidebarItems = [
 
 export default function AppLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
     try { return localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "true"; } catch { return false; }
   });
@@ -100,10 +97,6 @@ export default function AppLayout() {
     }
   }, [creditsData?.credits]);
 
-  // Close user dropdown on route change
-  useEffect(() => {
-    setUserMenuOpen(false);
-  }, [location.pathname]);
 
 
   // Get display name (full_name or email)
@@ -244,57 +237,12 @@ export default function AppLayout() {
               </SelectContent>
             </Select>
 
-            {/* User menu */}
-            <div className="relative">
-              <button
-                onClick={() => setUserMenuOpen(!userMenuOpen)}
-                className="flex items-center gap-2 p-2 rounded-lg hover:bg-muted transition-colors"
-              >
-                <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-sm font-semibold">
-                  {initials}
-                </div>
-                <span className="hidden sm:block text-sm font-medium">{displayName}</span>
-                <ChevronDown className="w-4 h-4 text-muted-foreground" />
-              </button>
-
-              {userMenuOpen && (
-                <>
-                  <div
-                    className="fixed inset-0 z-40"
-                    onClick={() => setUserMenuOpen(false)}
-                  />
-                  <div className="absolute right-0 top-full mt-2 w-48 bg-card rounded-lg shadow-card border p-2 z-50 animate-fade-in">
-                    <NavLink
-                      to="/app/settings"
-                      onClick={() => setUserMenuOpen(false)}
-                      className="flex items-center gap-2 px-3 py-2 text-sm rounded-md hover:bg-muted"
-                    >
-                      <User className="w-4 h-4" />
-                      {t("layout.profile")}
-                    </NavLink>
-                    <NavLink
-                      to="/app/settings"
-                      onClick={() => setUserMenuOpen(false)}
-                      className="flex items-center gap-2 px-3 py-2 text-sm rounded-md hover:bg-muted"
-                    >
-                      <Settings className="w-4 h-4" />
-                      {t("layout.settings")}
-                    </NavLink>
-                    <hr className="my-2" />
-                    <button
-                      onClick={async () => {
-                        setUserMenuOpen(false);
-                        await handleLogout();
-                      }}
-                      className="flex items-center gap-2 px-3 py-2 text-sm rounded-md hover:bg-muted w-full text-left text-destructive"
-                    >
-                      <LogOut className="w-4 h-4" />
-                      {t("auth.logout")}
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
+            {/* User menu — extracted to TopbarProfileMenu */}
+            <TopbarProfileMenu
+              displayName={displayName}
+              initials={initials}
+              onLogout={handleLogout}
+            />
           </div>
         </header>
 

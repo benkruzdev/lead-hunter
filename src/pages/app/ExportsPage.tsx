@@ -3,8 +3,12 @@ import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import { getExports, downloadExport } from "@/lib/api";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { PageHeader } from "@/components/shared/PageHeader";
+import { MetricCard } from "@/components/shared/MetricCard";
+import { StatusBadge } from "@/components/shared/StatusBadge";
+import { DataTable, type ColumnDef } from "@/components/shared/DataTable";
+import { PageContainer } from "@/components/shared/PageContainer";
 import {
   Select,
   SelectContent,
@@ -151,64 +155,137 @@ export default function ExportsPage() {
   const hasActiveFilter =
     searchQuery.length > 0 || filterFormat !== "all" || filterScope !== "all";
 
-  // ── Helpers ──────────────────────────────────────────────
+  // ── Page-local badge helpers (format/scope are domain-specific, not StatusBadge territory)
   function FormatBadge({ format }: { format: string }) {
     const f = format.toLowerCase();
     if (f === "xlsx") {
       return (
-        <Badge className="text-xs bg-green-100 text-green-700 border-green-200 hover:bg-green-100">
-          XLSX
-        </Badge>
+        <StatusBadge variant="success">{"XLSX"}</StatusBadge>
       );
     }
     return (
-      <Badge className="text-xs bg-blue-100 text-blue-700 border-blue-200 hover:bg-blue-100">
-        CSV
-      </Badge>
+      <StatusBadge variant="info">{"CSV"}</StatusBadge>
     );
   }
 
   function ScopeBadge({ scope }: { scope?: string }) {
     if (scope === "full") {
       return (
-        <Badge className="text-xs bg-violet-100 text-violet-700 border-violet-200 hover:bg-violet-100">
-          {t("exports.scopeFull")}
-        </Badge>
+        <StatusBadge variant="info">{t("exports.scopeFull")}</StatusBadge>
       );
     }
     if (scope === "compact") {
       return (
-        <Badge className="text-xs bg-amber-100 text-amber-700 border-amber-200 hover:bg-amber-100">
-          {t("exports.scopeCompact")}
-        </Badge>
+        <StatusBadge variant="warning">{t("exports.scopeCompact")}</StatusBadge>
       );
     }
     return <span className="text-muted-foreground text-xs">—</span>;
   }
 
-  return (
-    <div className="space-y-6 animate-fade-in">
-      {/* Header */}
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-bold">{t("exports.title")}</h2>
-          <p className="text-muted-foreground mt-1">{t("exports.emptyDescription")}</p>
+  // ── Column definitions for DataTable ────────────────────────
+  const columns: ColumnDef<Export>[] = [
+    {
+      key: "fileName",
+      header: t("exports.fileName"),
+      headerClassName: "w-[180px]",
+      className: "font-medium max-w-[180px] truncate",
+      render: (exp) => exp.fileName,
+    },
+    {
+      key: "listName",
+      header: t("exports.listName"),
+      className: "text-muted-foreground max-w-[140px] truncate",
+      render: (exp) => exp.listName,
+    },
+    {
+      key: "scope",
+      header: t("exports.scope"),
+      render: (exp) => <ScopeBadge scope={exp.scope} />,
+    },
+    {
+      key: "format",
+      header: t("exports.format"),
+      render: (exp) => <FormatBadge format={exp.format} />,
+    },
+    {
+      key: "leadCount",
+      header: t("exports.leadCount"),
+      className: "tabular-nums",
+      render: (exp) => exp.leadCount,
+    },
+    {
+      key: "createdAt",
+      header: t("exports.createdAt"),
+      className: "text-muted-foreground whitespace-nowrap",
+      render: (exp) =>
+        formatDistanceToNow(new Date(exp.createdAt), { addSuffix: true, locale }),
+    },
+    {
+      key: "note",
+      header: t("exports.note"),
+      className: "text-muted-foreground max-w-[140px]",
+      render: (exp) =>
+        exp.note ? (
+          <span className="truncate block">{exp.note}</span>
+        ) : (
+          <span>—</span>
+        ),
+    },
+    {
+      key: "actions",
+      header: t("exports.actions"),
+      render: (exp) => (
+        <div className="flex items-center gap-1">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => handleDownload(exp.id)}
+            disabled={downloadingId === exp.id}
+          >
+            {downloadingId === exp.id ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            ) : (
+              <FileDown className="w-3.5 h-3.5" />
+            )}
+            <span className="ml-1.5">
+              {downloadingId === exp.id
+                ? t("exports.downloading")
+                : t("exports.download")}
+            </span>
+          </Button>
+          <Button variant="ghost" size="sm" disabled title={t("exports.regenerate")}>
+            <RefreshCw className="w-3.5 h-3.5" />
+          </Button>
+          <Button variant="ghost" size="sm" disabled title={t("exports.deleteExport")}>
+            <Trash2 className="w-3.5 h-3.5" />
+          </Button>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={loadExports}
-          disabled={isLoading}
-          className="shrink-0 mt-1"
-        >
-          {isLoading ? (
-            <Loader2 className="w-4 h-4 animate-spin" />
-          ) : (
-            <RefreshCw className="w-4 h-4" />
-          )}
-          <span className="ml-1.5">{t("exports.refresh")}</span>
-        </Button>
-      </div>
+      ),
+    },
+  ];
+
+  return (
+    <PageContainer>
+      {/* Header */}
+      <PageHeader
+        title={t("exports.title")}
+        description={t("exports.emptyDescription")}
+        actions={
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={loadExports}
+            disabled={isLoading}
+          >
+            {isLoading ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <RefreshCw className="w-4 h-4" />
+            )}
+            <span className="ml-1.5">{t("exports.refresh")}</span>
+          </Button>
+        }
+      />
 
       {/* Loading */}
       {isLoading ? (
@@ -224,20 +301,10 @@ export default function ExportsPage() {
         <>
           {/* Summary bar */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {[
-              { label: t("exports.totalExports"), value: summary.total },
-              { label: t("exports.last7Days"), value: summary.last7 },
-              { label: t("exports.mostUsedFormat"), value: summary.mostUsed },
-              { label: t("exports.lastExport"), value: summary.lastTime },
-            ].map(({ label, value }) => (
-              <div
-                key={label}
-                className="bg-card rounded-xl border p-4 flex flex-col gap-0.5"
-              >
-                <span className="text-xs text-muted-foreground">{label}</span>
-                <span className="text-lg font-semibold truncate">{value}</span>
-              </div>
-            ))}
+            <MetricCard label={t("exports.totalExports")} value={summary.total} colorScheme="accent" />
+            <MetricCard label={t("exports.last7Days")} value={summary.last7} colorScheme="info" />
+            <MetricCard label={t("exports.mostUsedFormat")} value={summary.mostUsed} colorScheme="success" />
+            <MetricCard label={t("exports.lastExport")} value={summary.lastTime} />
           </div>
 
           {/* Control bar */}
@@ -319,86 +386,14 @@ export default function ExportsPage() {
             </div>
           ) : (
             /* Table */
-            <div className="bg-card rounded-xl border overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-muted/50 border-b">
-                    <tr>
-                      <th className="p-3 text-left text-xs font-medium text-muted-foreground">{t("exports.fileName")}</th>
-                      <th className="p-3 text-left text-xs font-medium text-muted-foreground">{t("exports.listName")}</th>
-                      <th className="p-3 text-left text-xs font-medium text-muted-foreground">{t("exports.scope")}</th>
-                      <th className="p-3 text-left text-xs font-medium text-muted-foreground">{t("exports.format")}</th>
-                      <th className="p-3 text-left text-xs font-medium text-muted-foreground">{t("exports.leadCount")}</th>
-                      <th className="p-3 text-left text-xs font-medium text-muted-foreground">{t("exports.createdAt")}</th>
-                      <th className="p-3 text-left text-xs font-medium text-muted-foreground">{t("exports.note")}</th>
-                      <th className="p-3 text-left text-xs font-medium text-muted-foreground">{t("exports.actions")}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {visible.map((exp) => (
-                      <tr key={exp.id} className="border-b last:border-0 hover:bg-muted/30 transition-colors">
-                        <td className="p-3 text-sm font-medium max-w-[180px] truncate">
-                          {exp.fileName}
-                        </td>
-                        <td className="p-3 text-sm text-muted-foreground max-w-[140px] truncate">
-                          {exp.listName}
-                        </td>
-                        <td className="p-3">
-                          <ScopeBadge scope={exp.scope} />
-                        </td>
-                        <td className="p-3">
-                          <FormatBadge format={exp.format} />
-                        </td>
-                        <td className="p-3 text-sm tabular-nums">{exp.leadCount}</td>
-                        <td className="p-3 text-sm text-muted-foreground whitespace-nowrap">
-                          {formatDistanceToNow(new Date(exp.createdAt), {
-                            addSuffix: true,
-                            locale,
-                          })}
-                        </td>
-                        <td className="p-3 text-sm text-muted-foreground max-w-[140px]">
-                          {exp.note ? (
-                            <span className="truncate block">{exp.note}</span>
-                          ) : (
-                            <span>—</span>
-                          )}
-                        </td>
-                        <td className="p-3">
-                          <div className="flex items-center gap-1">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleDownload(exp.id)}
-                              disabled={downloadingId === exp.id}
-                            >
-                              {downloadingId === exp.id ? (
-                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                              ) : (
-                                <FileDown className="w-3.5 h-3.5" />
-                              )}
-                              <span className="ml-1.5">
-                                {downloadingId === exp.id
-                                  ? t("exports.downloading")
-                                  : t("exports.download")}
-                              </span>
-                            </Button>
-                            <Button variant="ghost" size="sm" disabled title={t("exports.regenerate")}>
-                              <RefreshCw className="w-3.5 h-3.5" />
-                            </Button>
-                            <Button variant="ghost" size="sm" disabled title={t("exports.deleteExport")}>
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </Button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+            <DataTable<Export>
+              columns={columns}
+              data={visible}
+              getRowKey={(exp) => exp.id}
+            />
           )}
         </>
       )}
-    </div>
+    </PageContainer>
   );
 }

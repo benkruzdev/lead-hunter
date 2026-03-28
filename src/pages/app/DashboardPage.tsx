@@ -12,6 +12,9 @@ import {
   type LeadList,
 } from "@/lib/api";
 import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/shared/PageHeader";
+import { MetricCard } from "@/components/shared/MetricCard";
+import { PageContainer } from "@/components/shared/PageContainer";
 import {
   Search,
   List,
@@ -131,48 +134,47 @@ export default function DashboardPage() {
   const recentExports = sortedExports.slice(0, 3);
   const lastSession = sortedSessions[0] ?? null;
 
-  const stats = [
+  const stats: Array<{
+    label: string;
+    value: string | number;
+    icon: React.ElementType;
+    colorScheme: import("@/components/shared/MetricCard").MetricColorScheme;
+  }> = [
     {
       label: t("dashboard.creditsRemaining"),
       value: credits.toLocaleString(),
       icon: Zap,
-      color: "text-amber-500",
-      bg: "bg-amber-50 dark:bg-amber-950/20",
+      colorScheme: "warning",
     },
     {
       label: t("dashboard.totalSearches"),
       value: sessions.length,
       icon: Search,
-      color: "text-blue-500",
-      bg: "bg-blue-50 dark:bg-blue-950/20",
+      colorScheme: "info",
     },
     {
       label: t("dashboard.totalLists"),
       value: lists.length,
       icon: List,
-      color: "text-emerald-500",
-      bg: "bg-emerald-50 dark:bg-emerald-950/20",
+      colorScheme: "success",
     },
     {
       label: t("dashboard.totalExports"),
       value: exports.length,
       icon: FileDown,
-      color: "text-purple-500",
-      bg: "bg-purple-50 dark:bg-purple-950/20",
+      colorScheme: "accent",
     },
     {
       label: t("dashboard.searches7d"),
       value: searches7d,
       icon: Clock,
-      color: "text-sky-500",
-      bg: "bg-sky-50 dark:bg-sky-950/20",
+      colorScheme: "info",
     },
     {
       label: t("dashboard.exports7d"),
       value: exports7d,
       icon: FileDown,
-      color: "text-indigo-500",
-      bg: "bg-indigo-50 dark:bg-indigo-950/20",
+      colorScheme: "accent",
     },
   ];
 
@@ -193,42 +195,31 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="space-y-6 max-w-5xl mx-auto">
+    <PageContainer maxWidth="xl">
       {/* Hero */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold">
-            {firstName
-              ? `${t("dashboard.welcome")}, ${firstName}`
-              : t("dashboard.welcome")}
-          </h1>
-          <p className="text-muted-foreground mt-1 text-sm">
-            {t("dashboard.welcomeDesc")}
-          </p>
-        </div>
-        <Button onClick={() => navigate("/app/search")} className="shrink-0">
-          <Search className="w-4 h-4 mr-2" />
-          {t("dashboard.newSearch")}
-        </Button>
-      </div>
+      <PageHeader
+        title={
+          firstName ? `${t("dashboard.welcome")}, ${firstName}` : t("dashboard.welcome")
+        }
+        description={t("dashboard.welcomeDesc")}
+        actions={
+          <Button onClick={() => navigate("/app/search")} className="shrink-0">
+            <Search className="w-4 h-4 mr-2" />
+            {t("dashboard.newSearch")}
+          </Button>
+        }
+      />
 
       {/* Stats grid */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         {stats.map((stat) => (
-          <div
+          <MetricCard
             key={stat.label}
-            className="bg-card border rounded-xl p-4 flex flex-col gap-2"
-          >
-            <div
-              className={`w-8 h-8 rounded-lg flex items-center justify-center ${stat.bg}`}
-            >
-              <stat.icon className={`w-4 h-4 ${stat.color}`} />
-            </div>
-            <div className="text-2xl font-bold">{stat.value}</div>
-            <div className="text-xs text-muted-foreground leading-tight">
-              {stat.label}
-            </div>
-          </div>
+            label={stat.label}
+            value={stat.value}
+            icon={stat.icon}
+            colorScheme={stat.colorScheme}
+          />
         ))}
       </div>
 
@@ -410,6 +401,6 @@ export default function DashboardPage() {
           )}
         </div>
       </div>
-    </div>
+    </PageContainer>
   );
 }

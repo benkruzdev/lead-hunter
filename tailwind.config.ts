@@ -77,6 +77,36 @@ export default {
           warm: "hsl(var(--lead-warm))",
           cold: "hsl(var(--lead-cold))",
         },
+        // ── Semantic surface tokens ──────────────────────────────────────
+        surface: {
+          DEFAULT: "hsl(var(--surface))",
+          muted: "hsl(var(--surface-muted))",
+          elevated: "hsl(var(--surface-elevated))",
+        },
+        // ── Semantic border tokens ───────────────────────────────────────
+        "border-default": "hsl(var(--border-default))",
+        "border-strong": "hsl(var(--border-strong))",
+        // ── Status semantic tokens ───────────────────────────────────────
+        status: {
+          success: "hsl(var(--status-success))",
+          "success-subtle": "hsl(var(--status-success-subtle))",
+          "success-fg": "hsl(var(--status-success-fg))",
+          warning: "hsl(var(--status-warning))",
+          "warning-subtle": "hsl(var(--status-warning-subtle))",
+          "warning-fg": "hsl(var(--status-warning-fg))",
+          danger: "hsl(var(--status-danger))",
+          "danger-subtle": "hsl(var(--status-danger-subtle))",
+          "danger-fg": "hsl(var(--status-danger-fg))",
+          info: "hsl(var(--status-info))",
+          "info-subtle": "hsl(var(--status-info-subtle))",
+          "info-fg": "hsl(var(--status-info-fg))",
+          neutral: "hsl(var(--status-neutral))",
+          "neutral-subtle": "hsl(var(--status-neutral-subtle))",
+          "neutral-fg": "hsl(var(--status-neutral-fg))",
+          accent: "hsl(var(--status-accent))",
+          "accent-subtle": "hsl(var(--status-accent-subtle))",
+          "accent-fg": "hsl(var(--status-accent-fg))",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",

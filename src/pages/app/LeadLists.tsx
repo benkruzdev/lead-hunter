@@ -24,6 +24,9 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { PageHeader } from "@/components/shared/PageHeader";
+import { MetricCard } from "@/components/shared/MetricCard";
+import { PageContainer } from "@/components/shared/PageContainer";
 import {
   Plus,
   List,
@@ -231,23 +234,21 @@ export default function LeadLists() {
 
   return (
     <TooltipProvider delayDuration={300}>
-      <div className="space-y-6 animate-fade-in">
+      <PageContainer>
 
         {/* ── Header ───────────────────────────── */}
         <div className="space-y-4">
           {/* Row 1: title + CTA */}
-          <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
-            <div>
-              <h2 className="text-xl font-bold tracking-tight">{t("leadListsPage.title")}</h2>
-              <p className="text-sm text-muted-foreground mt-0.5">
-                {t("leadListsPage.description")}
-              </p>
-            </div>
-            <Button onClick={() => setShowCreateDialog(true)} className="shrink-0">
-              <Plus className="w-4 h-4" />
-              {t("leadListsPage.createButton")}
-            </Button>
-          </div>
+          <PageHeader
+            title={t("leadListsPage.title")}
+            description={t("leadListsPage.description")}
+            actions={
+              <Button onClick={() => setShowCreateDialog(true)} className="shrink-0">
+                <Plus className="w-4 h-4" />
+                {t("leadListsPage.createButton")}
+              </Button>
+            }
+          />
 
           {/* Row 2: search + sort (only shown when not loading) */}
           {!isLoading && lists.length > 0 && (
@@ -298,62 +299,40 @@ export default function LeadLists() {
             {/* ── Summary bar (only when lists exist) ── */}
             {lists.length > 0 && (
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                {/* Total Lists */}
-                <div className="bg-card border rounded-lg p-4 flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                    <LayoutList className="w-4 h-4 text-primary" />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-xs text-muted-foreground truncate">{t("leadListsPage.statTotalLists")}</p>
-                    <p className="text-lg font-bold leading-tight">{summary.total}</p>
-                  </div>
-                </div>
-
-                {/* Total Leads */}
-                <div className="bg-card border rounded-lg p-4 flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-lg bg-emerald-500/10 flex items-center justify-center shrink-0">
-                    <Users className="w-4 h-4 text-emerald-600" />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-xs text-muted-foreground truncate">{t("leadListsPage.statTotalLeads")}</p>
-                    <p className="text-lg font-bold leading-tight">{summary.totalLeads.toLocaleString(lang)}</p>
-                  </div>
-                </div>
-
-                {/* Average leads per list */}
+                <MetricCard
+                  label={t("leadListsPage.statTotalLists")}
+                  value={summary.total}
+                  icon={LayoutList}
+                  colorScheme="accent"
+                />
+                <MetricCard
+                  label={t("leadListsPage.statTotalLeads")}
+                  value={summary.totalLeads.toLocaleString(lang)}
+                  icon={Users}
+                  colorScheme="success"
+                />
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <div className="bg-card border rounded-lg p-4 flex items-center gap-3 cursor-default">
-                      <div className="w-9 h-9 rounded-lg bg-blue-500/10 flex items-center justify-center shrink-0">
-                        <BarChart2 className="w-4 h-4 text-blue-600" />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-xs text-muted-foreground truncate">{t("leadListsPage.statAvgSize")}</p>
-                        <p className="text-lg font-bold leading-tight">{summary.avgLeads.toLocaleString(lang)}</p>
-                      </div>
+                    <div>
+                      <MetricCard
+                        label={t("leadListsPage.statAvgSize")}
+                        value={summary.avgLeads.toLocaleString(lang)}
+                        icon={BarChart2}
+                        colorScheme="info"
+                        className="cursor-default"
+                      />
                     </div>
                   </TooltipTrigger>
                   <TooltipContent side="bottom">
                     <p className="text-xs max-w-[200px]">{t("leadListsPage.statAvgSizeTooltip")}</p>
                   </TooltipContent>
                 </Tooltip>
-
-                {/* Largest list */}
-                <div className="bg-card border rounded-lg p-4 flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-lg bg-amber-500/10 flex items-center justify-center shrink-0">
-                    <Trophy className="w-4 h-4 text-amber-600" />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-xs text-muted-foreground truncate">{t("leadListsPage.statLargest")}</p>
-                    {summary.largest ? (
-                      <p className="text-sm font-semibold leading-tight truncate" title={summary.largest.name}>
-                        {summary.largest.name}
-                      </p>
-                    ) : (
-                      <p className="text-sm text-muted-foreground">—</p>
-                    )}
-                  </div>
-                </div>
+                <MetricCard
+                  label={t("leadListsPage.statLargest")}
+                  value={summary.largest ? summary.largest.name : "—"}
+                  icon={Trophy}
+                  colorScheme="warning"
+                />
               </div>
             )}
 
@@ -688,7 +667,7 @@ export default function LeadLists() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
-      </div>
+      </PageContainer>
     </TooltipProvider>
   );
 }

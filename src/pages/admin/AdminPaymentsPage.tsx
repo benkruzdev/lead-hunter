@@ -1,4 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
+import { PageHeader } from "@/components/shared/PageHeader";
+import { StatusBadge as SharedStatusBadge } from "@/components/shared/StatusBadge";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -69,12 +71,18 @@ function shortId(id: string) {
     return "#" + id.replace(/-/g, "").slice(0, 8);
 }
 
-function StatusBadge({ status }: { status: string }) {
-    const s = STATUS_MAP[status] ?? { label: status, cls: "bg-muted text-muted-foreground" };
+function PaymentStatusBadge({ status }: { status: string }) {
+    const s = STATUS_MAP[status] ?? { label: status, cls: "" };
+    const variant =
+        status === "completed" ? "success" as const :
+        status === "pending"   ? "warning" as const :
+        status === "failed"    ? "danger"  as const :
+        status === "cancelled" ? "neutral" as const :
+                                 "neutral" as const;
     return (
-        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${s.cls}`}>
+        <SharedStatusBadge variant={variant}>
             {s.label}
-        </span>
+        </SharedStatusBadge>
     );
 }
 
@@ -264,7 +272,7 @@ function OrderDetailModal({
                         <span className="font-mono text-sm text-muted-foreground">
                             {shortId(order.id)}
                         </span>
-                        <StatusBadge status={order.status} />
+                        <PaymentStatusBadge status={order.status} />
                     </DialogTitle>
                     {isFailed && order.failure_reason && (
                         <DialogDescription className="text-red-500 text-xs font-medium">
@@ -512,10 +520,10 @@ export default function AdminPaymentsPage() {
 
     return (
         <div className="space-y-6">
-            <div>
-                <h1 className="text-3xl font-bold">Ödemeler</h1>
-                <p className="text-muted-foreground">Sipariş listesi ve havale onay yönetimi</p>
-            </div>
+            <PageHeader
+                title="Ödemeler"
+                description="Sipariş listesi ve havale onay yönetimi"
+            />
 
             <Card>
                 <CardHeader className="flex flex-row items-start justify-between gap-4">
@@ -621,7 +629,7 @@ export default function AdminPaymentsPage() {
                                                     <MethodBadge method={order.payment_method} />
                                                 </td>
                                                 <td className="py-2.5 pr-3">
-                                                    <StatusBadge status={order.status} />
+                                                    <PaymentStatusBadge status={order.status} />
                                                     {order.failure_reason && (
                                                         <div
                                                             className="text-xs text-red-500 mt-0.5 truncate max-w-[160px]"

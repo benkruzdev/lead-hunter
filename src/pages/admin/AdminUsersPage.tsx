@@ -12,11 +12,14 @@ import {
     Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
-    Loader2, Search, Users, ExternalLink, ChevronLeft, ChevronRight, AlertCircle,
+    Loader2, Search, ExternalLink, ChevronLeft, ChevronRight, AlertCircle,
 } from "lucide-react";
 import { getAdminUsers, updateAdminUser } from "@/lib/api";
 import { useTranslation } from "react-i18next";
 import { useToast } from "@/hooks/use-toast";
+import { PageHeader } from "@/components/shared/PageHeader";
+import { StatusBadge } from "@/components/shared/StatusBadge";
+import { DataTable, type ColumnDef } from "@/components/shared/DataTable";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -45,31 +48,25 @@ function fmtDate(dt: string | null) {
     return d.toLocaleDateString("tr-TR") + " " + d.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" });
 }
 
+// RoleBadge: uses shared StatusBadge with semantic variants
 function RoleBadge({ role }: { role: string }) {
-    const isAdmin = role === "admin";
     return (
-        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${
-            isAdmin
-                ? "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400"
-                : "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400"
-        }`}>
-            {isAdmin ? "Admin" : "Kullanıcı"}
-        </span>
+        <StatusBadge variant={role === "admin" ? "info" : "neutral"}>
+            {role === "admin" ? "Admin" : "Kullanıcı"}
+        </StatusBadge>
     );
 }
 
-function StatusBadge({ status }: { status: boolean }) {
+// UserStatusBadge: uses shared StatusBadge
+function UserStatusBadge({ status }: { status: boolean }) {
     return (
-        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${
-            status
-                ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
-                : "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400"
-        }`}>
+        <StatusBadge variant={status ? "success" : "danger"}>
             {status ? "Aktif" : "Pasif"}
-        </span>
+        </StatusBadge>
     );
 }
 
+// PlanBadge: domain-specific, kept page-local
 function PlanBadge({ plan }: { plan: string }) {
     return (
         <Badge variant="outline" className="text-xs">
@@ -98,7 +95,7 @@ function EditUserDialog({
     });
 
     const mutation = useMutation({
-        mutationFn: (data: any) => updateAdminUser(user.id, data),
+        mutationFn: (data: Record<string, unknown>) => updateAdminUser(user.id, data),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["adminUsers"] });
             toast({ title: "Kullanıcı güncellendi" });
@@ -206,29 +203,59 @@ export default function AdminUsersPage() {
         setActiveQuery(searchInput);
     };
 
+    const userColumns: ColumnDef<AdminUser>[] = [
+        {
+            key: "user",
+            header: "Kullanici",
+            render: (user) => (
+                <Link to={`/app/admin/users/${user.id}`} className="hover:underline">
+                    <div className="font-medium leading-tight truncate max-w-[160px]">{user.full_name || "—"}</div>
+                    <div className="text-xs text-muted-foreground truncate max-w-[160px]">{user.email || "—"}</div>
+                </Link>
+            ),
+        },
+        { key: "phone", header: "Telefon", className: "text-xs text-muted-foreground whitespace-nowrap", render: (user) => user.phone || "—" },
+        { key: "role", header: "Rol", render: (user) => <RoleBadge role={user.role} /> },
+        { key: "plan", header: "Plan", render: (user) => <PlanBadge plan={user.plan} /> },
+        { key: "credits", header: "Kredi", className: "font-medium tabular-nums", render: (user) => user.credits.toLocaleString() },
+        { key: "status", header: "Durum", render: (user) => <UserStatusBadge status={user.status} /> },
+        { key: "last_sign_in_at", header: "Son Giris", className: "text-xs text-muted-foreground whitespace-nowrap", render: (user) => fmtDate(user.last_sign_in_at) },
+        { key: "last_login_ip", header: "IP", className: "text-xs font-mono text-muted-foreground whitespace-nowrap", render: (user) => user.last_login_ip || "—" },
+        { key: "created_at", header: "Kayit", className: "text-xs text-muted-foreground whitespace-nowrap", render: (user) => new Date(user.created_at).toLocaleDateString("tr-TR") },
+        {
+            key: "actions",
+            header: "",
+            render: (user) => (
+                <div className="flex items-center gap-1">
+                    <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => setEditUser(user as AdminUser)}>Duzenle</Button>
+                    <Link to={`/app/admin/users/${user.id}`}>
+                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0"><ExternalLink className="w-3 h-3" /></Button>
+                    </Link>
+                </div>
+            ),
+        },
+    ];
+
     return (
         <div className="space-y-6">
-            <div>
-                <h1 className="text-3xl font-bold flex items-center gap-2">
-                    <Users className="w-7 h-7" />
-                    {t("admin.users.title")}
-                </h1>
-                <p className="text-muted-foreground">{t("admin.users.description")}</p>
-            </div>
-
-            {/* Search */}
-            <form onSubmit={handleSearch} className="flex gap-2 max-w-sm">
-                <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                    <Input
-                        placeholder="E-posta, ad, telefon…"
-                        value={searchInput}
-                        onChange={e => { setSearchInput(e.target.value); }}
-                        className="pl-9"
-                    />
-                </div>
-                <Button type="submit" variant="outline">Ara</Button>
-            </form>
+            <PageHeader
+                title={t("admin.users.title")}
+                description={t("admin.users.description")}
+                actions={
+                    <form onSubmit={handleSearch} className="flex gap-2">
+                        <div className="relative">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                            <Input
+                                placeholder="E-posta, ad, telefon…"
+                                value={searchInput}
+                                onChange={e => { setSearchInput(e.target.value); }}
+                                className="pl-9 w-60"
+                            />
+                        </div>
+                        <Button type="submit" variant="outline">Ara</Button>
+                    </form>
+                }
+            />
 
             {/* Table */}
             {isLoading ? (
@@ -252,91 +279,11 @@ export default function AdminUsersPage() {
                     <div className="text-xs text-muted-foreground">
                         Toplam {total.toLocaleString()} kullanıcı
                     </div>
-                    <div className="rounded-xl border bg-card overflow-x-auto">
-                        <table className="w-full text-sm">
-                            <thead className="bg-muted/50 border-b">
-                                <tr>
-                                    <th className="p-3 text-left font-medium">Kullanıcı</th>
-                                    <th className="p-3 text-left font-medium">Telefon</th>
-                                    <th className="p-3 text-left font-medium">Rol</th>
-                                    <th className="p-3 text-left font-medium">Plan</th>
-                                    <th className="p-3 text-left font-medium">Kredi</th>
-                                    <th className="p-3 text-left font-medium">Durum</th>
-                                    <th className="p-3 text-left font-medium">Son Giriş</th>
-                                    <th className="p-3 text-left font-medium">IP</th>
-                                    <th className="p-3 text-left font-medium">Kayıt</th>
-                                    <th className="p-3 text-left font-medium"></th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y">
-                                {users.map(user => (
-                                    <tr key={user.id} className="hover:bg-muted/30 transition-colors">
-                                        {/* Kullanıcı */}
-                                        <td className="p-3">
-                                            <Link to={`/app/admin/users/${user.id}`} className="hover:underline">
-                                                <div className="font-medium leading-tight truncate max-w-[160px]">
-                                                    {user.full_name || "—"}
-                                                </div>
-                                                <div className="text-xs text-muted-foreground truncate max-w-[160px]">
-                                                    {user.email || "—"}
-                                                </div>
-                                            </Link>
-                                        </td>
-                                        {/* Telefon */}
-                                        <td className="p-3 text-xs text-muted-foreground whitespace-nowrap">
-                                            {user.phone || "—"}
-                                        </td>
-                                        {/* Rol */}
-                                        <td className="p-3">
-                                            <RoleBadge role={user.role} />
-                                        </td>
-                                        {/* Plan */}
-                                        <td className="p-3">
-                                            <PlanBadge plan={user.plan} />
-                                        </td>
-                                        {/* Kredi */}
-                                        <td className="p-3 font-medium tabular-nums">
-                                            {user.credits.toLocaleString()}
-                                        </td>
-                                        {/* Durum */}
-                                        <td className="p-3">
-                                            <StatusBadge status={user.status} />
-                                        </td>
-                                        {/* Son Giriş */}
-                                        <td className="p-3 text-xs text-muted-foreground whitespace-nowrap">
-                                            {fmtDate(user.last_sign_in_at)}
-                                        </td>
-                                        {/* IP */}
-                                        <td className="p-3 text-xs font-mono text-muted-foreground whitespace-nowrap">
-                                            {user.last_login_ip || "—"}
-                                        </td>
-                                        {/* Kayıt */}
-                                        <td className="p-3 text-xs text-muted-foreground whitespace-nowrap">
-                                            {new Date(user.created_at).toLocaleDateString("tr-TR")}
-                                        </td>
-                                        {/* Aksiyonlar */}
-                                        <td className="p-3">
-                                            <div className="flex items-center gap-1">
-                                                <Button
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    className="h-7 px-2 text-xs"
-                                                    onClick={() => setEditUser(user as AdminUser)}
-                                                >
-                                                    Düzenle
-                                                </Button>
-                                                <Link to={`/app/admin/users/${user.id}`}>
-                                                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
-                                                        <ExternalLink className="w-3 h-3" />
-                                                    </Button>
-                                                </Link>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
+                    <DataTable<AdminUser>
+                        columns={userColumns}
+                        data={users}
+                        getRowKey={(u) => u.id}
+                    />
 
                     {/* Pagination */}
                     {totalPages > 1 && (

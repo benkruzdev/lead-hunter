@@ -1,8 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getAdminDashboard } from "@/lib/api";
 import { Loader2, Users, Search, Coins, FileDown } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { PageHeader } from "@/components/shared/PageHeader";
+import { MetricCard } from "@/components/shared/MetricCard";
+import type { MetricColorScheme } from "@/components/shared/MetricCard";
 
 export default function AdminDashboardPage() {
     const { t } = useTranslation();
@@ -35,52 +37,60 @@ export default function AdminDashboardPage() {
         );
     }
 
-    const stats = [
+    const stats: Array<{
+        title: string;
+        value: number;
+        icon: React.ElementType;
+        description: string;
+        colorScheme: MetricColorScheme;
+    }> = [
         {
             title: t('admin.dashboard.totalUsers'),
             value: data?.total_users || 0,
             icon: Users,
             description: t('admin.dashboard.totalUsersDesc'),
+            colorScheme: "accent",
         },
         {
             title: t('admin.dashboard.dailySearches'),
             value: data?.daily_search_count || 0,
             icon: Search,
             description: t('admin.dashboard.dailySearchesDesc'),
+            colorScheme: "info",
         },
         {
             title: t('admin.dashboard.dailyCredits'),
             value: data?.daily_credits_spent || 0,
             icon: Coins,
             description: t('admin.dashboard.dailyCreditsDesc'),
+            colorScheme: "warning",
         },
         {
             title: t('admin.dashboard.dailyExports'),
             value: data?.daily_exports_count || 0,
             icon: FileDown,
             description: t('admin.dashboard.dailyExportsDesc'),
+            colorScheme: "success",
         },
     ];
 
     return (
         <div className="space-y-6">
-            <div>
-                <h1 className="text-3xl font-bold">{t('admin.dashboard.title')}</h1>
-                <p className="text-muted-foreground">{t('admin.dashboard.description')}</p>
-            </div>
+            <PageHeader
+                title={t('admin.dashboard.title')}
+                description={t('admin.dashboard.description')}
+            />
 
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                 {stats.map((stat) => (
-                    <Card key={stat.title}>
-                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                            <CardTitle className="text-sm font-medium">{stat.title}</CardTitle>
-                            <stat.icon className="h-4 w-4 text-muted-foreground" />
-                        </CardHeader>
-                        <CardContent>
-                            <div className="text-2xl font-bold">{stat.value.toLocaleString()}</div>
-                            <p className="text-xs text-muted-foreground mt-1">{stat.description}</p>
-                        </CardContent>
-                    </Card>
+                    <MetricCard
+                        key={stat.title}
+                        label={stat.title}
+                        value={stat.value.toLocaleString()}
+                        icon={stat.icon}
+                        colorScheme={stat.colorScheme}
+                        description={stat.description}
+                    />
                 ))}
             </div>
         </div>
