@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback } from "react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Search, Loader2, AlertCircle, RefreshCw, ChevronLeft, ChevronRight } from "lucide-react";
 import { getAdminSearchLogs } from "@/lib/api";
 import { useTranslation } from "react-i18next";
+import { PageHeader } from "@/components/shared/PageHeader";
+import { DataTable, type ColumnDef } from "@/components/shared/DataTable";
 
 const PAGE_SIZE = 50;
 
@@ -59,26 +60,86 @@ export default function AdminSearchLogsPage() {
 
     const totalPages = Math.ceil(total / PAGE_SIZE);
 
-    const displayLabel = (log: SearchLog) =>
-        log.user_name || log.user_email || log.user_id.slice(0, 8) + "…";
+    const columns: ColumnDef<SearchLog>[] = [
+        {
+            key: "user",
+            header: "Kullanıcı",
+            render: (log) => (
+                <div>
+                    <div className="font-medium text-sm">{log.user_name || "—"}</div>
+                    <div className="text-xs text-muted-foreground">
+                        {log.user_email || log.user_id.slice(0, 8) + "…"}
+                    </div>
+                </div>
+            ),
+        },
+        {
+            key: "location",
+            header: "İl / İlçe",
+            render: (log) => (
+                <span>
+                    {log.province || "—"}
+                    {log.district && <span className="text-muted-foreground"> / {log.district}</span>}
+                </span>
+            ),
+        },
+        {
+            key: "category",
+            header: "Kategori",
+            className: "max-w-[140px] truncate",
+            render: (log) => log.category || "—",
+        },
+        {
+            key: "keyword",
+            header: "Anahtar Sözcük",
+            className: "max-w-[120px] truncate text-muted-foreground",
+            render: (log) => log.keyword || "—",
+        },
+        {
+            key: "total_results",
+            header: "Sonuç",
+            className: "text-center font-medium tabular-nums",
+            render: (log) => log.total_results,
+        },
+        {
+            key: "pages_viewed",
+            header: "Sayfa",
+            className: "text-center text-muted-foreground tabular-nums",
+            render: (log) => log.pages_viewed,
+        },
+        {
+            key: "created_at",
+            header: "Tarih",
+            className: "text-xs text-muted-foreground whitespace-nowrap",
+            render: (log) => new Date(log.created_at).toLocaleString("tr-TR"),
+        },
+    ];
+
+    const paginationFooter = totalPages > 1 ? (
+        <div className="flex items-center justify-between px-1 py-2">
+            <p className="text-xs text-muted-foreground">
+                Sayfa {page + 1} / {totalPages}
+            </p>
+            <div className="flex gap-2">
+                <Button variant="outline" size="sm" disabled={page === 0}
+                    onClick={() => setPage(p => p - 1)}>
+                    <ChevronLeft className="w-4 h-4" />
+                </Button>
+                <Button variant="outline" size="sm" disabled={page >= totalPages - 1}
+                    onClick={() => setPage(p => p + 1)}>
+                    <ChevronRight className="w-4 h-4" />
+                </Button>
+            </div>
+        </div>
+    ) : undefined;
 
     return (
         <div className="space-y-6">
-            <div>
-                <h1 className="text-3xl font-bold">{t('admin.searchLogs.title')}</h1>
-                <p className="text-muted-foreground">{t('admin.searchLogs.description')}</p>
-            </div>
-
-            <Card>
-                <CardHeader className="flex flex-row items-start justify-between gap-4">
-                    <div>
-                        <CardTitle className="flex items-center gap-2">
-                            <Search className="w-5 h-5" />
-                            {t('admin.searchLogs.title')}
-                        </CardTitle>
-                        <CardDescription>Toplam {total.toLocaleString()} arama oturumu</CardDescription>
-                    </div>
-                    <div className="flex items-center gap-2 flex-shrink-0">
+            <PageHeader
+                title={t("admin.searchLogs.title")}
+                description={t("admin.searchLogs.description")}
+                actions={
+                    <div className="flex items-center gap-2 flex-wrap">
                         <form onSubmit={handleSearch} className="flex gap-2">
                             <Input
                                 placeholder="Kullanıcı, il, kategori…"
@@ -92,96 +153,31 @@ export default function AdminSearchLogsPage() {
                             <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
                         </Button>
                     </div>
-                </CardHeader>
-                <CardContent>
-                    {loading && (
-                        <div className="flex justify-center py-12">
-                            <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
-                        </div>
-                    )}
-                    {error && (
-                        <div className="flex flex-col items-center py-10 gap-2 text-destructive">
-                            <AlertCircle className="w-8 h-8" />
-                            <p className="text-sm">{error}</p>
-                        </div>
-                    )}
-                    {!loading && !error && (
-                        <>
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-sm">
-                                    <thead>
-                                        <tr className="border-b text-left text-muted-foreground">
-                                            <th className="pb-2 pr-4 font-medium">Kullanıcı</th>
-                                            <th className="pb-2 pr-4 font-medium">İl / İlçe</th>
-                                            <th className="pb-2 pr-4 font-medium">Kategori</th>
-                                            <th className="pb-2 pr-4 font-medium">Anahtar Sözcük</th>
-                                            <th className="pb-2 pr-4 font-medium">Sonuç</th>
-                                            <th className="pb-2 pr-4 font-medium">Sayfa</th>
-                                            <th className="pb-2 font-medium">Tarih</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y">
-                                        {logs.length === 0 && (
-                                            <tr>
-                                                <td colSpan={7} className="py-10 text-center text-muted-foreground">
-                                                    Kayıt bulunamadı
-                                                </td>
-                                            </tr>
-                                        )}
-                                        {logs.map(log => (
-                                            <tr key={log.id} className="hover:bg-muted/40">
-                                                <td className="py-2 pr-4">
-                                                    <div className="font-medium text-sm">{log.user_name || "—"}</div>
-                                                    <div className="text-xs text-muted-foreground">
-                                                        {log.user_email || log.user_id.slice(0, 8) + "…"}
-                                                    </div>
-                                                </td>
-                                                <td className="py-2 pr-4">
-                                                    <span>{log.province || "—"}</span>
-                                                    {log.district && <span className="text-muted-foreground"> / {log.district}</span>}
-                                                </td>
-                                                <td className="py-2 pr-4 max-w-[140px] truncate">
-                                                    {log.category || "—"}
-                                                </td>
-                                                <td className="py-2 pr-4 max-w-[120px] truncate text-muted-foreground">
-                                                    {log.keyword || "—"}
-                                                </td>
-                                                <td className="py-2 pr-4 text-center font-medium">
-                                                    {log.total_results}
-                                                </td>
-                                                <td className="py-2 pr-4 text-center text-muted-foreground">
-                                                    {log.pages_viewed}
-                                                </td>
-                                                <td className="py-2 text-xs text-muted-foreground whitespace-nowrap">
-                                                    {new Date(log.created_at).toLocaleString("tr-TR")}
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
+                }
+            />
 
-                            {totalPages > 1 && (
-                                <div className="flex items-center justify-between mt-4 pt-4 border-t">
-                                    <p className="text-xs text-muted-foreground">
-                                        Sayfa {page + 1} / {totalPages}
-                                    </p>
-                                    <div className="flex gap-2">
-                                        <Button variant="outline" size="sm" disabled={page === 0}
-                                            onClick={() => setPage(p => p - 1)}>
-                                            <ChevronLeft className="w-4 h-4" />
-                                        </Button>
-                                        <Button variant="outline" size="sm" disabled={page >= totalPages - 1}
-                                            onClick={() => setPage(p => p + 1)}>
-                                            <ChevronRight className="w-4 h-4" />
-                                        </Button>
-                                    </div>
-                                </div>
-                            )}
-                        </>
-                    )}
-                </CardContent>
-            </Card>
+            {error && (
+                <div className="flex flex-col items-center py-10 gap-2 text-destructive">
+                    <AlertCircle className="w-8 h-8" />
+                    <p className="text-sm">{error}</p>
+                </div>
+            )}
+
+            {!error && (
+                <DataTable<SearchLog>
+                    columns={columns}
+                    data={logs}
+                    getRowKey={(log) => log.id}
+                    isLoading={loading}
+                    emptyState={
+                        <div className="flex flex-col items-center py-10 gap-2 text-muted-foreground">
+                            <Search className="w-8 h-8 opacity-40" />
+                            <p className="text-sm">Kayıt bulunamadı</p>
+                        </div>
+                    }
+                    footer={paginationFooter}
+                />
+            )}
         </div>
     );
 }

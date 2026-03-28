@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { PageHeader } from "@/components/shared/PageHeader";
 import { useNavigate } from "react-router-dom";
 import { getSearchSessions, SearchSession } from "@/lib/api";
 import { COUNTRY_BY_CODE } from "@/config/countries";
@@ -224,34 +225,31 @@ export default function SearchHistoryPage() {
     return (
         <div className="space-y-5">
             {/* ── Header + sort control ── */}
-            <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
-                <div>
-                    <h1 className="text-2xl font-bold">{t("searchHistory.title")}</h1>
-                    <p className="text-sm text-muted-foreground mt-0.5">
-                        {t("searchHistory.description")}
-                    </p>
-                </div>
-
-                <div className="flex items-center gap-2 shrink-0">
-                    <ArrowUpDown className="w-4 h-4 text-muted-foreground" />
-                    <Select
-                        value={sortKey}
-                        onValueChange={(v) => setSortKey(v as SortKey)}
-                    >
-                        <SelectTrigger className="h-8 w-[160px] text-sm">
-                            <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="newest">
-                                {t("searchHistory.sortNewest")}
-                            </SelectItem>
-                            <SelectItem value="mostExplored">
-                                {t("searchHistory.sortMostExplored")}
-                            </SelectItem>
-                        </SelectContent>
-                    </Select>
-                </div>
-            </div>
+            <PageHeader
+                title={t("searchHistory.title")}
+                description={t("searchHistory.description")}
+                actions={
+                    <div className="flex items-center gap-2 shrink-0">
+                        <ArrowUpDown className="w-4 h-4 text-muted-foreground" />
+                        <Select
+                            value={sortKey}
+                            onValueChange={(v) => setSortKey(v as SortKey)}
+                        >
+                            <SelectTrigger className="h-8 w-[160px] text-sm">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="newest">
+                                    {t("searchHistory.sortNewest")}
+                                </SelectItem>
+                                <SelectItem value="mostExplored">
+                                    {t("searchHistory.sortMostExplored")}
+                                </SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                }
+            />
 
             {/* ── Card list ── */}
             <div className="grid gap-3">
