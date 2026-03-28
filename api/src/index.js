@@ -23,6 +23,7 @@ import listsRoutes from './routes/lists.js';
 import exportsRoutes from './routes/exports.js';
 import billingRoutes from './routes/billing.js';
 import profileRoutes from './routes/profile.js';
+import accountRoutes from './routes/account.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -68,6 +69,7 @@ app.use('/api/lists', listsRoutes);
 app.use('/api/exports', exportsRoutes);
 app.use('/api/billing', billingRoutes);
 app.use('/api/profile', profileRoutes);
+app.use('/api/account', accountRoutes);
 
 
 // Root endpoint
@@ -139,6 +141,10 @@ Available endpoints:
   - GET  /api/health/ready
   - GET  /api/auth/profile
   - PATCH /api/auth/profile
+  - GET  /api/account
+  - PATCH /api/account/profile
+  - GET  /api/account/preferences
+  - PATCH /api/account/preferences
   - POST /api/auth/verify
   - GET  /api/credits/balance
   - GET  /api/credits/history

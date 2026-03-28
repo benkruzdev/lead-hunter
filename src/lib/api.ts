@@ -233,9 +233,111 @@ export async function downloadExport(exportId: string): Promise<{
 
 
 
+// ============================================================================
+// CANONICAL ACCOUNT & PREFERENCES CONTRACT (Phase 4)
+// ============================================================================
+// This is the new, unified source of truth for the entire frontend application.
+
+export type CanonicalAccount = {
+    id: string;
+    email: string | null;
+    full_name: string | null;
+    phone: string | null;
+    role: string;
+    plan: string;
+    credits: number;
+    lifecycle: {
+        status: string;
+        is_active: boolean;
+        is_deleted: boolean;
+    };
+    preferences: {
+        language: string;
+        locale: string;
+        timezone: string;
+        default_search_country: string;
+        default_export_format: string;
+        default_export_scope: string;
+        low_credit_warning_enabled: boolean;
+        low_credit_warning_threshold: number;
+        product_updates_email_enabled: boolean;
+        notifications_email_enabled: boolean;
+    };
+    created_at: string;
+};
+
 /**
- * Get current user's profile
- * GET /api/auth/profile
+ * Get unified canonical account payload
+ * GET /api/account
+ */
+export async function getCanonicalAccount() {
+    return apiRequest<{ account: CanonicalAccount }>('/api/account');
+}
+
+/**
+ * Update core canonical identity
+ * PATCH /api/account/profile
+ */
+export async function updateAccountProfile(data: { full_name?: string; phone?: string; }) {
+    return apiRequest<{ success: boolean; profile: any }>('/api/account/profile', {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+    });
+}
+
+/**
+ * Update canonical preferences 
+ * PATCH /api/account/preferences
+ */
+export async function updateAccountPreferences(data: Partial<CanonicalAccount['preferences']>) {
+    return apiRequest<{ success: boolean; preferences: any }>('/api/account/preferences', {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+    });
+}
+
+/**
+ * Safely soft-delete account via canonical API
+ * POST /api/account/lifecycle/soft-delete
+ */
+export async function requestAccountSoftDelete(): Promise<{ success: boolean; message?: string }> {
+    return apiRequest('/api/account/lifecycle/soft-delete', { method: 'POST' });
+}
+
+/**
+ * Temporarily pause account
+ * POST /api/account/lifecycle/deactivate
+ */
+export async function requestAccountDeactivate(): Promise<{ success: boolean; message?: string }> {
+    return apiRequest('/api/account/lifecycle/deactivate', { method: 'POST' });
+}
+
+/**
+ * Remove account from pause queue
+ * POST /api/account/lifecycle/reactivate
+ */
+export async function requestAccountReactivate(): Promise<{ success: boolean; message?: string }> {
+    return apiRequest('/api/account/lifecycle/reactivate', { method: 'POST' });
+}
+
+/**
+ * Safely rotate security vault password via canonical API
+ * POST /api/account/security/password
+ */
+export async function changeUserPassword(currentPassword: string, newPassword: string): Promise<{ success: boolean }> {
+    return apiRequest('/api/account/security/password', {
+        method: 'POST',
+        body: JSON.stringify({ currentPassword, newPassword }),
+    });
+}
+
+// ============================================================================
+// [DEPRECATED] LEGACY PROFILE CONTRACT
+// ============================================================================
+// Do not use for new features. Rely on getCanonicalAccount instead.
+
+/**
+ * @deprecated Use getCanonicalAccount() instead
  */
 export async function getProfile() {
     return apiRequest<{
@@ -256,18 +358,10 @@ export async function getProfile() {
 }
 
 /**
- * Update user's profile
- * PATCH /api/auth/profile
+ * @deprecated Use updateAccountProfile() instead
  */
-export async function updateProfile(data: {
-    full_name?: string;
-    phone?: string;
-    onboarding_completed?: boolean;
-}) {
-    return apiRequest<{
-        success: boolean;
-        profile: any;
-    }>('/api/auth/profile', {
+export async function updateProfile(data: { full_name?: string; phone?: string; onboarding_completed?: boolean; }) {
+    return apiRequest<{ success: boolean; profile: any }>('/api/auth/profile', {
         method: 'PATCH',
         body: JSON.stringify(data),
     });
@@ -1273,9 +1367,13 @@ export async function createOrder(
 }
 
 // ============================================================================
-// Settings / Profile
+// LEGACY / DEPRECATED PROFILE ROUTES
 // ============================================================================
 
+/**
+ * @deprecated Use `updateProfile` (PATCH /api/auth/profile) via snake_case payload instead.
+ * This legacy route uses PUT /api/profile with strict phone/soft-delete validation.
+ */
 export async function updateUserProfile(fullName: string, phone: string): Promise<{ success: boolean; profile: any }> {
     return apiRequest('/api/profile', {
         method: 'PUT',
@@ -1283,17 +1381,11 @@ export async function updateUserProfile(fullName: string, phone: string): Promis
     });
 }
 
-export async function changeUserPassword(currentPassword: string, newPassword: string): Promise<{ success: boolean }> {
-    return apiRequest('/api/auth/change-password', {
-        method: 'POST',
-        body: JSON.stringify({ currentPassword, newPassword }),
-    });
-}
-
+/**
+ * @deprecated Ambiguous lifecycle naming. Use `requestAccountSoftDelete()` instead.
+ */
 export async function deleteUserAccount(): Promise<{ success: boolean }> {
-    return apiRequest('/api/profile/delete', {
-        method: 'POST',
-    });
+    return requestAccountSoftDelete();
 }
 
 // ============================================================================

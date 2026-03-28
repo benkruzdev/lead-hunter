@@ -1,10 +1,12 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { supabase, type Profile } from '@/lib/supabaseClient';
+import { supabase } from '@/lib/supabaseClient';
 import type { User, Session } from '@supabase/supabase-js';
+import { getCanonicalAccount, type CanonicalAccount } from '@/lib/api';
 
 type AuthContextType = {
     user: User | null;
-    profile: Profile | null;
+    account: CanonicalAccount | null;
+    profile: any | null; // Legacy alias, deprecated
     session: Session | null;
     loading: boolean;
     credits: number | null;
@@ -31,30 +33,20 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const [user, setUser] = useState<User | null>(null);
-    const [profile, setProfile] = useState<Profile | null>(null);
+    const [account, setAccount] = useState<CanonicalAccount | null>(null);
     const [session, setSession] = useState<Session | null>(null);
     const [loading, setLoading] = useState(true);
     const [credits, setCreditsState] = useState<number | null>(null);
 
-    // Load profile from database
+    // Load canonical account from backend API instead of client-side table read
     const loadProfile = async (userId: string) => {
         try {
-            const { data, error } = await supabase
-                .from('profiles')
-                .select('*')
-                .eq('id', userId)
-                .single();
-
-            if (error) {
-                console.error('Profile load error:', error);
-                throw error;
-            }
-
-            setProfile(data);
-            setCreditsState(data.credits ?? 0);
+            const { account: canonicalAccount } = await getCanonicalAccount();
+            setAccount(canonicalAccount);
+            setCreditsState(canonicalAccount.credits ?? 0);
         } catch (error) {
-            console.error('Failed to load profile:', error);
-            setProfile(null);
+            console.error('Failed to load canonical account:', error);
+            setAccount(null);
         }
     };
 
@@ -94,7 +86,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 if (session?.user) {
                     await loadProfile(session.user.id);
                 } else {
-                    setProfile(null);
+                    setAccount(null);
                 }
             } finally {
                 setLoading(false);
@@ -214,7 +206,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     const value: AuthContextType = {
         user,
-        profile,
+        account,
+        profile: account, // Expose for backwards compatibility
         session,
         loading,
         credits,

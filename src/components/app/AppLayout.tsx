@@ -25,8 +25,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useAuth } from "@/contexts/AuthContext";
-import { useQuery } from "@tanstack/react-query";
-import { getProfile, getCredits } from "@/lib/api";
+import { updateAccountPreferences } from "@/lib/api";
 import { QUERY_KEYS } from "@/lib/queryKeys";
 import { useTranslation } from "react-i18next";
 
@@ -48,8 +47,7 @@ export default function AppLayout() {
     try { return localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "true"; } catch { return false; }
   });
   const navigate = useNavigate();
-  const location = useLocation();
-  const { user, signOut, profile: authProfile, refreshProfile, credits: contextCredits, setCredits } = useAuth();
+  const { user, signOut, account, credits: contextCredits, setCredits, refreshProfile } = useAuth();
   const { t, i18n } = useTranslation();
 
   const toggleCollapsed = () => {
@@ -60,47 +58,29 @@ export default function AppLayout() {
     });
   };
 
-  // Fetch profile and credits from backend
-  const { data: profileData } = useQuery({
-    queryKey: ["profile"],
-    queryFn: getProfile,
-    enabled: !!user,
-    // Disable automatic focus/reconnect refetch: these background queries
-    // fire concurrent getSession() calls that race with load-more and other
-    // user-triggered requests, stalling the auth pipeline. Explicit
-    // invalidation (refreshProfile, queryClient.invalidateQueries) still works.
-    refetchOnWindowFocus: false,
-    refetchOnReconnect: false,
-  });
-
-  const { data: creditsData } = useQuery({
-    queryKey: QUERY_KEYS.credits,
-    queryFn: getCredits,
-    enabled: !!user,
-    // refetchInterval removed: the 30s timer was firing getSession() concurrently
-    // with load-more and other user-triggered requests, stalling the auth pipeline.
-    // Credits stay accurate via explicit queryClient.invalidateQueries(QUERY_KEYS.credits)
-    // after every action that changes the balance (search, load-more, enrich, purchase).
-    refetchOnWindowFocus: false,
-    refetchOnReconnect: false,
-  });
-
-  const profile = profileData?.profile;
-  const credits = contextCredits ?? creditsData?.credits ?? 0;
-
-  // Sync credits from backend to context ONLY on initial load (contextCredits === null).
-  // After that, contextCredits is the single source of truth — refreshProfile() updates it
-  // directly. Never overwrite a fresh value with a stale React Query cache result.
+  // Sync preferred language continuously if defined in the canonical backend preference
   useEffect(() => {
-    if (creditsData?.credits !== undefined && contextCredits === null) {
-      setCredits(creditsData.credits);
+    if (account?.preferences?.language && account.preferences.language !== i18n.language) {
+        i18n.changeLanguage(account.preferences.language);
     }
-  }, [creditsData?.credits]);
+  }, [account?.preferences?.language, i18n]);
 
+  const toggleLanguage = async (newLang: string) => {
+    // 1. Optimistic local update
+    i18n.changeLanguage(newLang);
+    
+    // 2. Persist safely to canonical user_preferences 
+    if (account) {
+        try {
+            await updateAccountPreferences({ language: newLang });
+            await refreshProfile(); // Refresh canonical tree
+        } catch (err) {
+            console.error('Failed pushing language preference', err);
+        }
+    }
+  };
 
-
-  // Get display name (full_name or email)
-  const displayName = profile?.full_name || profile?.email || "User";
+  const displayName = account?.full_name || account?.email || "User";
   const initials = displayName
     .split(" ")
     .map((n) => n[0])
@@ -116,10 +96,7 @@ export default function AppLayout() {
     navigate("/login");
   };
 
-  const toggleLanguage = () => {
-    const newLang = i18n.language === "tr" ? "en" : "tr";
-    i18n.changeLanguage(newLang);
-  };
+
 
   return (
     <div className="h-screen overflow-hidden bg-muted/30 flex">
@@ -158,7 +135,7 @@ export default function AppLayout() {
             })}
 
             {/* Admin Panel (conditional) */}
-            {authProfile?.role === 'admin' && (
+            {account?.role === 'admin' && (
               <NavLink
                 to="/app/admin"
                 onClick={() => setSidebarOpen(false)}
@@ -216,7 +193,7 @@ export default function AppLayout() {
             {/* Credit display */}
             <div className="flex items-center gap-2 px-3 py-1.5 bg-muted rounded-lg">
               <span className="text-sm font-medium">{t("common.creditsRemaining")}:</span>
-              <span className="text-sm font-bold text-primary">{credits.toLocaleString()}</span>
+              <span className="text-sm font-bold text-primary">{(contextCredits ?? account?.credits ?? 0).toLocaleString()}</span>
               <Button
                 size="sm"
                 variant="outline"
@@ -227,7 +204,7 @@ export default function AppLayout() {
               </Button>
             </div>
             {/* Language selector */}
-            <Select value={i18n.language} onValueChange={(value) => i18n.changeLanguage(value)}>
+            <Select value={i18n.language} onValueChange={toggleLanguage}>
               <SelectTrigger className="w-20 h-9 bg-muted">
                 <SelectValue />
               </SelectTrigger>

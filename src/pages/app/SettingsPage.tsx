@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import {
   Select,
   SelectContent,
@@ -19,8 +20,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { User, Mail, Phone, Lock, Globe, Trash2, Save, AlertTriangle, Shield, CreditCard, ArrowRight, Zap, CheckCircle2 } from 'lucide-react';
-import { updateUserProfile, changeUserPassword, deleteUserAccount } from '@/lib/api';
+import { User, Mail, Phone, Lock, Globe, Trash2, Save, AlertTriangle, Shield, CreditCard, ArrowRight, Zap, CheckCircle2, FileDown, Bell, PauseCircle } from 'lucide-react';
+import { updateAccountProfile, changeUserPassword, requestAccountSoftDelete, requestAccountDeactivate, updateAccountPreferences } from '@/lib/api';
+import { ACTIVE_COUNTRIES } from '@/config/countries';
 import { useAuth } from '@/contexts/AuthContext';
 import { PageContainer } from '@/components/shared/PageContainer';
 import { PageHeader } from '@/components/shared/PageHeader';
@@ -28,8 +30,8 @@ import { PageHeader } from '@/components/shared/PageHeader';
 export default function SettingsPage() {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
-  // Safe frontend data-flow cleanup: rely solely on context profile, avoiding isolated page state
-  const { profile, credits, refreshProfile, signOut, loading: authLoading } = useAuth();
+  // Safe frontend data-flow cleanup: rely solely on canonical account, avoiding isolated page state
+  const { account, credits, refreshProfile, signOut, loading: authLoading } = useAuth();
 
   // Profile Form State
   const [fullName, setFullName] = useState('');
@@ -38,13 +40,13 @@ export default function SettingsPage() {
   const [profileError, setProfileError] = useState<string | null>(null);
   const [profileSuccess, setProfileSuccess] = useState(false);
 
-  // Sync internal form when context profile loads or changes
+  // Sync internal form when context account loads or changes
   useEffect(() => {
-    if (profile) {
-      setFullName(profile.full_name || '');
-      setPhone(profile.phone || '');
+    if (account) {
+      setFullName(account.full_name || '');
+      setPhone(account.phone || '');
     }
-  }, [profile]);
+  }, [account]);
 
   // Password Form State
   const [currentPassword, setCurrentPassword] = useState('');
@@ -57,6 +59,29 @@ export default function SettingsPage() {
   // Delete Account State
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // Deactivate Account State
+  const [showDeactivateDialog, setShowDeactivateDialog] = useState(false);
+  const [isDeactivating, setIsDeactivating] = useState(false);
+
+  const handlePreferenceToggle = async (key: string, value: boolean) => {
+    try {
+      await updateAccountPreferences({ [key]: value });
+      await refreshProfile();
+    } catch (err) {
+      console.error(`[Settings] Failed toggling ${key}:`, err);
+    }
+  };
+
+  const handlePreferenceSelect = async (key: string, value: string) => {
+    try {
+      if (key === 'language') i18n.changeLanguage(value);
+      await updateAccountPreferences({ [key]: value });
+      await refreshProfile();
+    } catch (err) {
+      console.error(`[Settings] Failed updating ${key}:`, err);
+    }
+  };
 
   const handleSaveProfile = async () => {
     try {
@@ -74,7 +99,7 @@ export default function SettingsPage() {
         return;
       }
 
-      await updateUserProfile(fullName, phone);
+      await updateAccountProfile({ full_name: fullName, phone });
       
       // Keep app-wide auth state perfectly synchronized immediately after DB update
       await refreshProfile();
@@ -128,7 +153,7 @@ export default function SettingsPage() {
   const handleDeleteAccount = async () => {
     try {
       setIsDeleting(true);
-      await deleteUserAccount();
+      await requestAccountSoftDelete();
       await signOut();
       navigate('/login');
     } catch (error: any) {
@@ -140,9 +165,19 @@ export default function SettingsPage() {
     }
   };
 
-  const handleLanguageChange = (lang: string) => {
-    i18n.changeLanguage(lang);
-    localStorage.setItem('language', lang);
+  const handleDeactivateAccount = async () => {
+    try {
+      setIsDeactivating(true);
+      await requestAccountDeactivate();
+      await signOut();
+      navigate('/login');
+    } catch (error: any) {
+      console.error('[Settings] Account deactivation failed:', error);
+      alert(error.message || 'Failed to pause account');
+    } finally {
+      setIsDeactivating(false);
+      setShowDeactivateDialog(false);
+    }
   };
 
   const formatPhoneForDisplay = (phoneDigits: string) => {
@@ -154,7 +189,7 @@ export default function SettingsPage() {
     return phoneDigits;
   };
 
-  if (authLoading && !profile) {
+  if (authLoading && !account) {
     return (
       <div className="flex items-center justify-center py-24">
         <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
@@ -162,10 +197,10 @@ export default function SettingsPage() {
     );
   }
 
-  const initial = profile?.full_name?.charAt(0).toUpperCase() || profile?.email?.charAt(0).toUpperCase() || 'U';
+  const initial = account?.full_name?.charAt(0).toUpperCase() || account?.email?.charAt(0).toUpperCase() || 'U';
 
   return (
-    <PageContainer maxWidth="4xl">
+    <PageContainer maxWidth="2xl">
       <PageHeader 
         title={t('settings.title', 'Hesap Merkezi')} 
         description={t('settings.description', 'Kişisel profilinizi, güvenlik ayarlarınızı ve uygulama tercihlerinizi buradan yönetebilirsiniz.')} 
@@ -178,10 +213,10 @@ export default function SettingsPage() {
             <span className="text-2xl font-semibold text-primary">{initial}</span>
           </div>
           <div className="min-w-0">
-            <h2 className="text-xl font-bold text-foreground truncate">{profile?.full_name || t('settings.anonymous', 'İsimsiz Kullanıcı')}</h2>
+            <h2 className="text-xl font-bold text-foreground truncate">{account?.full_name || t('settings.anonymous', 'İsimsiz Kullanıcı')}</h2>
             <div className="text-sm text-muted-foreground flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4 mt-1">
-              <div className="flex items-center gap-1.5 shrink-0"><Mail className="w-3.5 h-3.5"/> <span className="truncate">{profile?.email || '—'}</span></div>
-              <div className="flex items-center gap-1.5 shrink-0"><Phone className="w-3.5 h-3.5"/> <span>{formatPhoneForDisplay(profile?.phone || '') || '—'}</span></div>
+              <div className="flex items-center gap-1.5 shrink-0"><Mail className="w-3.5 h-3.5"/> <span className="truncate">{account?.email || '—'}</span></div>
+              <div className="flex items-center gap-1.5 shrink-0"><Phone className="w-3.5 h-3.5"/> <span>{formatPhoneForDisplay(account?.phone || '') || '—'}</span></div>
             </div>
           </div>
         </div>
@@ -234,7 +269,7 @@ export default function SettingsPage() {
                   <Input
                     id="email"
                     type="email"
-                    value={profile?.email || ''}
+                    value={account?.email || ''}
                     disabled
                     className="pl-10 cursor-not-allowed bg-muted"
                   />
@@ -363,92 +398,238 @@ export default function SettingsPage() {
               {t('settings.preferences', 'Uygulama Tercihleri')}
             </h3>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              Kullanıcı arayüzü dilini ve bölgesel formatları belirleyin. Bu ayar tarayıcınızda hatırlanır.
+              Global platform davranışınızı ve varsayılan bölgesel ayarlarınızı buradan yapılandırabilirsiniz.
             </p>
           </div>
           <div className="md:col-span-2">
-            <div className="bg-card border rounded-2xl p-6 sm:p-8 shadow-sm">
-              <div className="max-w-xs space-y-2">
-                <Label className="text-xs font-bold uppercase tracking-wide text-muted-foreground">{t('settings.language', 'Arayüz Dili')}</Label>
-                <Select value={i18n.language} onValueChange={handleLanguageChange}>
-                  <SelectTrigger className="bg-background h-10">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="tr">Türkçe (TR)</SelectItem>
-                    <SelectItem value="en">English (US)</SelectItem>
-                  </SelectContent>
-                </Select>
+            <div className="bg-card border rounded-2xl p-6 sm:p-8 shadow-sm space-y-8">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <Label className="text-xs font-bold uppercase tracking-wide text-muted-foreground">{t('settings.language', 'Arayüz Dili')}</Label>
+                  <Select value={account?.preferences?.language || i18n.language} onValueChange={async (val) => await handlePreferenceSelect('language', val)}>
+                    <SelectTrigger className="bg-background h-10">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="tr">Türkçe (TR)</SelectItem>
+                      <SelectItem value="en">English (US)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label className="text-xs font-bold uppercase tracking-wide text-muted-foreground">{t('settings.defaultCountry', 'Varsayılan Hedef Ülke')}</Label>
+                  <Select value={account?.preferences?.default_search_country || 'TR'} onValueChange={async (val) => await handlePreferenceSelect('default_search_country', val)}>
+                    <SelectTrigger className="bg-background h-10">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {ACTIVE_COUNTRIES.map(c => (
+                        <SelectItem key={c.code} value={c.code}>
+                          {c.flag} {c.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="pt-2">
+                <h4 className="flex items-center gap-2 text-sm font-semibold mb-4 text-foreground">
+                  <FileDown className="w-4 h-4 text-primary" />
+                  Dışa Aktarım Varsayılanları
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <Label className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">Varsayılan Format</Label>
+                    <Select value={account?.preferences?.default_export_format || 'xlsx'} onValueChange={async (val) => await handlePreferenceSelect('default_export_format', val)}>
+                      <SelectTrigger className="bg-background h-10">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="xlsx">Excel (.xlsx)</SelectItem>
+                        <SelectItem value="csv">CSV (.csv)</SelectItem>
+                        <SelectItem value="gsheets">Google Sheets</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">Varsayılan Kapsam</Label>
+                    <Select value={account?.preferences?.default_export_scope || 'full'} onValueChange={async (val) => await handlePreferenceSelect('default_export_scope', val)}>
+                      <SelectTrigger className="bg-background h-10">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="full">Tam Karakteristik (Tüm Sütunlar)</SelectItem>
+                        <SelectItem value="compact">Kompakt (Sadece İletişim)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
         </section>
 
-        {/* 4. Danger Zone */}
-        <section className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-10 pt-4">
+        {/* 4. Notifications Section */}
+        <section className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-10 pb-10 border-b border-border/50">
           <div className="md:col-span-1 space-y-3">
-            <h3 className="text-lg font-semibold text-destructive flex items-center gap-2">
-              <AlertTriangle className="w-5 h-5" />
-              {t('settings.dangerZone', 'Tehlikeli Alan')}
+            <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
+              <Bell className="w-5 h-5 text-primary" />
+              {t('settings.notifications', 'Bildirim Sistemi')}
             </h3>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              Hesabınızı ve verilerinizi kalıcı sistemsel durumlarına çekebileceğiniz kurtarılamaz işlemler.
+              Sistem uyarılarını ve bülten haberlerini yapılandırın. Kritik güvenlik mailleri her zaman gönderilir.
             </p>
           </div>
           <div className="md:col-span-2">
-            <div className="bg-card border border-destructive/20 rounded-2xl p-6 sm:p-8 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-6">
-              <div className="space-y-1">
-                <p className="font-semibold text-foreground">{t('settings.deleteAccount', 'Hesabı Kapat')}</p>
-                <p className="text-sm text-muted-foreground max-w-sm">
-                  {t('settings.deleteWarning', 'Hesabınızı sildiğinizde geçerli tüm oturumlarınız kapatılır ve profil verileriniz izole edilir. Bu işlem geri döndürülemez.')}
-                </p>
+            <div className="bg-card border rounded-2xl p-6 sm:p-8 shadow-sm space-y-6">
+              
+              <div className="flex items-center justify-between border-b pb-4">
+                <div className="space-y-1">
+                  <Label className="text-sm font-medium">Bakiye Uyarı Sistemi</Label>
+                  <p className="text-xs text-muted-foreground">Krediniz belirlediğiniz eşiğin altına düşünce e-posta alırsınız.</p>
+                </div>
+                <Switch 
+                  checked={account?.preferences?.low_credit_warning_enabled ?? true} 
+                  onCheckedChange={(checked) => handlePreferenceToggle('low_credit_warning_enabled', checked)}
+                />
               </div>
-              <Button
-                variant="destructive"
-                className="shrink-0 w-full sm:w-auto"
-                onClick={() => setShowDeleteDialog(true)}
-              >
-                <Trash2 className="w-4 h-4 mr-2" />
-                {t('settings.deleteButton', 'Hesabı Kalıcı Olarak Sil')}
-              </Button>
+
+              {account?.preferences?.low_credit_warning_enabled && (
+                <div className="flex items-center gap-4 bg-muted/50 p-4 rounded-xl -mt-2">
+                  <Label className="text-sm font-medium w-32 shrink-0">Uyarı Eşiği</Label>
+                  <Input 
+                    type="number"
+                    min="0"
+                    step="100"
+                    className="w-32 bg-background"
+                    value={account?.preferences?.low_credit_warning_threshold ?? 100}
+                    onBlur={(e) => handlePreferenceSelect('low_credit_warning_threshold', e.target.value)}
+                    onChange={() => {}} // Controlled strictly via blur to avoid heavy un-debounced syncs
+                  />
+                  <span className="text-xs text-muted-foreground">Kredi</span>
+                </div>
+              )}
+
+              <div className="flex items-center justify-between border-b pb-4">
+                <div className="space-y-1">
+                  <Label className="text-sm font-medium">Sistem Bildirimleri</Label>
+                  <p className="text-xs text-muted-foreground">Dışa aktarım tamamlanmaları ve fatura özetleri.</p>
+                </div>
+                <Switch 
+                  checked={account?.preferences?.notifications_email_enabled ?? true} 
+                  onCheckedChange={(checked) => handlePreferenceToggle('notifications_email_enabled', checked)}
+                />
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div className="space-y-1">
+                  <Label className="text-sm font-medium">Platform Güncellemeleri</Label>
+                  <p className="text-xs text-muted-foreground">Yeni ülkeler, özellikler ve verimlilik bültenleri.</p>
+                </div>
+                <Switch 
+                  checked={account?.preferences?.product_updates_email_enabled ?? true} 
+                  onCheckedChange={(checked) => handlePreferenceToggle('product_updates_email_enabled', checked)}
+                />
+              </div>
+
+            </div>
+          </div>
+        </section>
+
+        {/* 5. Lifecycle / Danger Zone */}
+        <section className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-10 pt-4">
+          <div className="md:col-span-1 space-y-3">
+            <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-warning" />
+              Hesap Durumu
+            </h3>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              Hesabınızı geçici olarak askıya alabilir veya kalıcı olarak kapatma sürecini başlatabilirsiniz. Tüm aktif oturumlarınız sonlanır.
+            </p>
+          </div>
+          <div className="md:col-span-2">
+            <div className="bg-card border rounded-2xl p-6 shadow-sm flex flex-col gap-6">
+              
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b">
+                <div className="space-y-1 pr-4">
+                  <p className="font-semibold text-foreground flex items-center gap-2">
+                    <PauseCircle className="w-4 h-4 text-muted-foreground" />
+                    Hesabımı Dondur (Deaktif)
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    Görünürlüğünüz kilitlenir ancak verileriniz korunur. Tekrar giriş yaptığınızda hesabınız otomatik olarak aktifleşir.
+                  </p>
+                </div>
+                <Button variant="secondary" className="shrink-0" onClick={() => setShowDeactivateDialog(true)}>
+                  Hesabı Dondur
+                </Button>
+              </div>
+
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="space-y-1 pr-4">
+                  <p className="font-semibold text-destructive flex items-center gap-2">
+                    <Trash2 className="w-4 h-4" />
+                    Hesabı Kapat (Soft Delete)
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    Hesabınızın operasyonel erişimi sonlandırılır ve verileriniz gizlenir. Operasyon merkezinde tamamen askıya alınmış olarak görünürsünüz.
+                  </p>
+                </div>
+                <Button variant="destructive" className="shrink-0" onClick={() => setShowDeleteDialog(true)}>
+                  Hesabı Kapat
+                </Button>
+              </div>
+
             </div>
           </div>
         </section>
       </div>
 
-      {/* Delete Confirmation Dialog */}
+      {/* Deactivate Account Confirmation Dialog */}
+      <Dialog open={showDeactivateDialog} onOpenChange={setShowDeactivateDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <PauseCircle className="w-5 h-5" />
+              Hesabınız Dondurulacak
+            </DialogTitle>
+            <DialogDescription className="pt-2 leading-relaxed">
+              Hesabınızı geçici süreliğine deaktif etmek üzeresiniz. Oturumunuz tamamen sonlandırılacaktır. Tekrar kullanmak istediğinizde şifrenizle giriş yapmanız yeterlidir. Onaylıyor musunuz?
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 mt-4">
+            <Button variant="ghost" onClick={() => setShowDeactivateDialog(false)} disabled={isDeactivating} className="w-full sm:w-auto">
+              Vazgeç
+            </Button>
+            <Button variant="secondary" onClick={handleDeactivateAccount} disabled={isDeactivating} className="w-full sm:w-auto">
+              {isDeactivating ? <span className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin mr-2" /> : <PauseCircle className="w-4 h-4 mr-2" />}
+              Hesabımı Dondur
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Soft Delete Account Confirmation Dialog */}
       <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="text-destructive flex items-center gap-2">
-              <AlertTriangle className="w-5 h-5" />
-              {t('settings.deleteConfirmTitle', 'Emin misiniz?')}
+              <Trash2 className="w-5 h-5" />
+              Hesap Kapatma Sürecini Başlat
             </DialogTitle>
             <DialogDescription className="pt-2 leading-relaxed">
-              {t('settings.deleteConfirmDesc', 'Bu işlem hesabınızı kapatacak ve aktif oturumunuzu sonlandıracaktır. Devam etmek istediğinize emin misiniz?')}
+              Bu işlem hesabınızı kalıcı kapatma durumuna çeker ("Soft Delete"). Oturumunuz kapatılacaktır ve uygulamayı bir daha kullanamazsınız. Açık faturalarınız veya iade gerektiren durumlar varsa müşteri hizmetleri ile temasa geçebilirsiniz. Devam edilsin mi?
             </DialogDescription>
           </DialogHeader>
           <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 mt-4">
-            <Button
-              variant="outline"
-              onClick={() => setShowDeleteDialog(false)}
-              disabled={isDeleting}
-              className="w-full sm:w-auto"
-            >
-              {t('common.cancel', 'Vazgeç')}
+            <Button variant="outline" onClick={() => setShowDeleteDialog(false)} disabled={isDeleting} className="w-full sm:w-auto">
+              Vazgeç
             </Button>
-            <Button
-              variant="destructive"
-              onClick={handleDeleteAccount}
-              disabled={isDeleting}
-              className="w-full sm:w-auto"
-            >
-              {isDeleting ? (
-                <span className="w-4 h-4 border-2 border-destructive-foreground/30 border-t-transparent rounded-full animate-spin mr-2" />
-              ) : (
-                <Trash2 className="w-4 h-4 mr-2" />
-              )}
-              {t('settings.deleteButton', 'Evet, Hesabımı Sil')}
+            <Button variant="destructive" onClick={handleDeleteAccount} disabled={isDeleting} className="w-full sm:w-auto">
+              {isDeleting ? <span className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin mr-2" /> : <Trash2 className="w-4 h-4 mr-2" />}
+              Evet, Kapat
             </Button>
           </div>
         </DialogContent>
