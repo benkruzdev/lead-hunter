@@ -21,23 +21,12 @@ router.get('/', requireAuth, requireActiveLifecycle, async (req, res) => {
     try {
         const userId = req.user.id;
 
-        // [TEMPORARY PRODUCTION DIAGNOSTIC] Remove after /api/account investigation
-        console.log('[ACCOUNT ROUTE DEBUG] entered');
-        console.log('[ACCOUNT ROUTE DEBUG] req.user.id:', req.user?.id);
-        console.log('[ACCOUNT ROUTE DEBUG] req.user.email:', req.user?.email);
-
         // Fetch core profile
         const { data: profile, error: profileErr } = await supabaseAdmin
             .from('profiles')
             .select('*')
             .eq('id', userId)
-            .eq('id', userId)
             .single();
-
-        // [TEMPORARY PRODUCTION DIAGNOSTIC] Remove after /api/account investigation
-        console.log('[ACCOUNT ROUTE DEBUG] Canonical handler profile query completed');
-        console.log('[ACCOUNT ROUTE DEBUG] profile:', profile);
-        console.log('[ACCOUNT ROUTE DEBUG] profileErr:', profileErr);
 
         if (profileErr || !profile) {
             return res.status(404).json({ error: 'Profile not found' });
@@ -77,8 +66,7 @@ router.get('/', requireAuth, requireActiveLifecycle, async (req, res) => {
                 credits: profile.credits,
                 lifecycle: {
                     status: profile.account_status,
-                    is_active: profile.is_active, // Legacy bridge flag
-                    is_deleted: profile.is_deleted // Legacy bridge flag
+                    is_deleted: profile.is_deleted // Legacy bridge flag depending on exact migration timeline
                 },
                 preferences: prefs,
                 created_at: profile.created_at
@@ -240,7 +228,6 @@ router.post('/lifecycle/soft-delete', requireAuth, async (req, res) => {
                 account_status: 'soft_deleted',
                 is_deleted: true,          // Legacy compatibility
                 status: false,             // Legacy compatibility
-                is_active: false,          // Legacy compatibility
                 deactivated_at: deletionStamp,
                 lifecycle_reason: 'User explicitly triggered account retirement.',
                 lifecycle_changed_by: userId,
@@ -279,7 +266,6 @@ router.post('/lifecycle/deactivate', requireAuth, requireActiveLifecycle, async 
             .from('profiles')
             .update({
                 account_status: 'inactive',
-                is_active: false, // Legacy fallback sync
                 status: false,    // Legacy fallback sync
                 deactivated_at: stamp,
                 lifecycle_changed_by: userId,
@@ -329,7 +315,6 @@ router.post('/lifecycle/reactivate', requireAuth, async (req, res) => {
             .from('profiles')
             .update({
                 account_status: 'active',
-                is_active: true,
                 status: true,
                 reactivated_at: new Date().toISOString(),
                 lifecycle_changed_by: userId,

@@ -13,36 +13,23 @@ export async function requireActiveLifecycle(req, res, next) {
 
         const userId = req.user.id;
 
-        // [TEMPORARY PRODUCTION DIAGNOSTIC] Remove after /api/account investigation
-        console.log('[LIFECYCLE DEBUG] Querying user profile id:', userId);
-
         // Fetch canonical lifecycle state (plus legacy fallbacks for safety)
         const { data: profile, error } = await supabaseAdmin
             .from('profiles')
-            .select('account_status, is_active, is_deleted')
+            .select('account_status, is_deleted')
             .eq('id', userId)
             .single();
 
-        // [TEMPORARY PRODUCTION DIAGNOSTIC] Remove after /api/account investigation
-        console.log('[LIFECYCLE DEBUG] Query completed');
-        console.log('[LIFECYCLE DEBUG] profile result:', profile);
+        // Separate real systemic query failures from actual missing rows
         if (error) {
-            console.log('[LIFECYCLE DEBUG] error object:', {
-                code: error.code,
-                message: error.message,
-                details: error.details,
-                hint: error.hint
-            });
+            if (error.code === 'PGRST116') {
+                return res.status(404).json({ error: 'Not Found', message: 'User profile not found' });
+            }
+            console.error('[requireActiveLifecycle] Database querying error:', error);
+            return res.status(500).json({ error: 'Internal Server Error', message: 'Failed to access profile lifecycle table' });
         }
 
-        if (error || !profile) {
-            // [TEMPORARY PRODUCTION DIAGNOSTIC] Distinguish the exact reason
-            if (error) {
-                console.log('[LIFECYCLE DEBUG] Failed due to explicit error object');
-            } else if (!profile) {
-                console.log('[LIFECYCLE DEBUG] Failed because profile was null/undefined');
-            }
-
+        if (!profile) {
             return res.status(404).json({ error: 'Not Found', message: 'User profile not found' });
         }
 
@@ -55,7 +42,7 @@ export async function requireActiveLifecycle(req, res, next) {
             });
         }
 
-        if (profile.account_status === 'inactive' || profile.is_active === false) {
+        if (profile.account_status === 'inactive') {
             return res.status(403).json({ 
                 error: 'Forbidden', 
                 message: 'Account is currently inactive or suspended.',
