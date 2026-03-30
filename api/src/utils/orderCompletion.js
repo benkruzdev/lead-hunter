@@ -26,7 +26,7 @@ export async function completeOrder(supabase, orderId, actorLabel = 'payment-cal
     // completed this returns 0 rows and we bail without touching credits.
     const { data: flipped, error: flipErr } = await supabase
         .from('orders')
-        .update({ status: 'completed' })
+        .update({ status: 'completed', completed_at: new Date().toISOString() })
         .eq('id', orderId)
         .eq('status', 'pending')
         .select('id, user_id, credits, amount, currency, payment_method');
@@ -70,10 +70,13 @@ export async function completeOrder(supabase, orderId, actorLabel = 'payment-cal
     }
 
     // Step 4: Credit ledger entry (non-fatal).
+    // Records the credit addition with traceability back to the originating order.
     const { error: ledgerErr } = await supabase
         .from('credit_ledger')
         .insert({
             user_id: order.user_id,
+            order_id: orderId,      // FK added in migration 020 — links ledger to order for audit
+            source: 'billing',      // source column added in migration 020
             amount: order.credits,
             type: 'order_complete',
             description: `Ödeme tamamlandı (${order.payment_method}) — sipariş: ${orderId}`,

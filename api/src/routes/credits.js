@@ -5,8 +5,12 @@ import { requireAuth } from '../middleware/auth.js';
 const router = express.Router();
 
 /**
- * Get current user's credit balance
- * GET /api/credits/balance
+ * @deprecated GET /api/credits/balance
+ * Returns the isolated credit balance.
+ *
+ * CANONICAL RULE: The frontend should use `GET /api/account` for the
+ * comprehensive user profile, lifecycle state, and credit balance.
+ * This endpoint is kept for operational/script compatibility.
  */
 router.get('/balance', requireAuth, async (req, res) => {
     try {
@@ -36,8 +40,10 @@ router.get('/balance', requireAuth, async (req, res) => {
 });
 
 /**
- * Get credit transaction history
  * GET /api/credits/history?limit=50
+ *
+ * CANONICAL FLAG: This is the authoritative source for the user's
+ * credit consumption and purchase ledger.
  */
 router.get('/history', requireAuth, async (req, res) => {
     try {
@@ -70,8 +76,13 @@ router.get('/history', requireAuth, async (req, res) => {
 });
 
 /**
- * Deduct credits (internal use - called by other endpoints)
  * POST /api/credits/deduct
+ *
+ * INTERNAL USE ONLY: Operational path called directly by frontend
+ * (e.g. enrichment flows).
+ *
+ * Note: When resolving backend/DB billing operations, always prefer
+ * SQL RPCs directly where atomic safety is needed (e.g. search billing).
  * Body: { amount, type, description }
  */
 router.post('/deduct', requireAuth, async (req, res) => {

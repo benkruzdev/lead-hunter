@@ -64,8 +64,7 @@ export default function Pricing() {
               Basit ve Şeffaf Fiyatlandırma
             </h1>
             <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-              İhtiyacınıza uygun planı seçin. Tüm planlar kredi tabanlıdır, 
-              kullandığınız kadar ödeyin.
+              İhtiyacınıza uygun kredi paketini seçin. Abonelik, taahhüt veya gizli ücret yok, sadece ihtiyacınız kadar alın.
             </p>
           </div>
 
@@ -91,10 +90,9 @@ export default function Pricing() {
                 <div className="mb-6">
                   <div className="flex items-baseline gap-1">
                     <span className="text-4xl font-bold">₺{plan.price}</span>
-                    <span className="text-muted-foreground">/ ay</span>
                   </div>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    {plan.credits} kredi dahil
+                  <p className="text-sm text-foreground/80 mt-2 font-medium">
+                    {plan.credits} Kredi
                   </p>
                 </div>
 
@@ -122,8 +120,8 @@ export default function Pricing() {
             ))}
           </div>
 
-          <p className="text-center text-muted-foreground mt-12">
-            Tüm planlar 7 günlük ücretsiz deneme içerir. Kredi kartı gerekmez.
+          <p className="text-center text-sm text-muted-foreground mt-12 font-medium">
+            Kredi kartı kaydetmeden hemen ücretsiz hesap oluşturabilirsiniz.
           </p>
         </div>
       </section>

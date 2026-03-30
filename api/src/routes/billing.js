@@ -12,6 +12,20 @@ import { initStripe, verifyStripeWebhook } from '../services/stripeService.js';
 const router = express.Router();
 
 // ---------------------------------------------------------------------------
+// Billing contract source-of-truth map
+// ---------------------------------------------------------------------------
+// GET  /api/billing/packages              — PUBLIC.  Package catalog (no auth).
+// GET  /api/billing/orders                — AUTH.    Per-user order history.
+// POST /api/billing/orders                — AUTH.    Create order + initiate payment.
+// GET  /api/billing/payment-providers     — PUBLIC.  Enabled providers (secrets stripped).
+// POST /api/billing/orders/:id/complete   — ADMIN.   Manual order completion.
+// POST /api/billing/callback/{provider}  — PUBLIC.  Provider webhook/callback handlers.
+// POST /api/billing/webhook/stripe        — PUBLIC.  Stripe webhook (raw body required).
+//
+// Credit balance source of truth: GET /api/account (requireActiveLifecycle)
+// Credit ledger / history:        GET /api/credits/history
+// ---------------------------------------------------------------------------
+
 // Helpers
 // ---------------------------------------------------------------------------
 
@@ -99,6 +113,9 @@ router.get('/packages', async (req, res) => {
 
 // ---------------------------------------------------------------------------
 // GET /api/billing/orders
+// User-facing order history. Source-of-truth for previous orders display.
+// Note: `failure_code` and `last_payment_event_at` are intentionally omitted
+// here to keep raw provider diagnostics as admin-only fields.
 // ---------------------------------------------------------------------------
 router.get('/orders', requireAuth, async (req, res) => {
     try {
