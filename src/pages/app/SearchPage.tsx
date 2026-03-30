@@ -533,10 +533,8 @@ export default function SearchPage() {
       const alreadyViewed = Array.isArray(session.viewed_pages) ? session.viewed_pages : [1];
       setViewedPages(new Set(alreadyViewed));
       setNextPage(2);
-      // Backend hasMore flag is authoritative; result-count heuristic is only a fallback.
-      // Do NOT use totalResults here — it may be capped, stale, or unavailable.
-      const restoredHasMore = searchResponse.hasMore ?? (searchResponse.results.length >= resultsPerPage);
-      setHasMore(restoredHasMore);
+      // Backend hasMore flag is strictly authoritative.
+      setHasMore(searchResponse.hasMore);
     } catch (error: any) {
       if (seq !== reqSeq.current) return;
       console.error('[SearchPage] loadSession failed:', { sid, status: error?.status, message: error?.message });
@@ -576,10 +574,8 @@ export default function SearchPage() {
       setResults(response.results as any[]);
       setTotalResults(response.totalResults);
       setNextPage(2);
-      // Prefer the backend's authoritative hasMore flag when available.
-      // Fall back to heuristic: a full page implies more may exist.
-      const initialHasMore = response.hasMore ?? ((response.results as any[]).length >= resultsPerPage);
-      setHasMore(initialHasMore);
+      // The backend's authoritative hasMore is deterministic.
+      setHasMore(response.hasMore);
       setHasSearched(true);
       // Page 1 was just served — mark it viewed so the credit label shows correctly.
       setViewedPages(new Set([1]));
@@ -647,10 +643,8 @@ export default function SearchPage() {
       setNextPage(pageToFetch + 1);
       // Mark this page as viewed so the credit label updates correctly.
       setViewedPages(prev => new Set([...prev, pageToFetch]));
-      // Prefer backend hasMore flag; fall back to heuristic: a full page → assume more.
-      // A short page (< resultsPerPage) signals the end of results — stop showing the button.
-      const pageHasMore = response.hasMore ?? ((response.results as any[]).length >= resultsPerPage);
-      setHasMore(pageHasMore);
+      // Rely explicitly on backend hasMore flag.
+      setHasMore(response.hasMore);
       if (response.creditCost > 0) {
         refreshProfile();
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.credits });

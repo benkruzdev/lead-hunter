@@ -1017,24 +1017,45 @@ export interface SearchResponse {
     totalResults: number;
     currentPage: number;
     /**
-     * When the backend provides this flag, it is the authoritative signal for
-     * whether more pages exist. Falls back to result-count heuristics when absent.
+     * Authoritative signal for whether the total pool exceeds the fetched page.
      */
-    hasMore?: boolean;
+    hasMore: boolean;
+    /**
+     * Exact credit cost deducted for returning this set of business records.
+     */
+    creditCost: number;
+    /**
+     * True if the page was previously paid for in this session, reducing cost to 0.
+     */
+    alreadyViewed: boolean;
+    /**
+     * True if the result was served from the cache-first infrastructure.
+     */
+    fromCache?: boolean;
 }
 
 export interface SearchPageResponse {
     results: SearchResult[];
     currentPage: number;
     totalResults: number;
+    /**
+     * Exact credit cost deducted for returning this set of business records.
+     */
     creditCost: number;
+    /**
+     * True if the page was previously paid for in this session, reducing cost to 0.
+     */
     alreadyViewed: boolean;
     /**
      * Authoritative backend signal for whether more pages exist.
      * A short final page signals hasMore=false; its actual record count
      * determines the credit charge (not a fixed page rate).
      */
-    hasMore?: boolean;
+    hasMore: boolean;
+    /**
+     * True if the result was served from the cache-first infrastructure.
+     */
+    fromCache?: boolean;
 }
 
 /**

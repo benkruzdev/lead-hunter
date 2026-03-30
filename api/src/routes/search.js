@@ -450,6 +450,8 @@ router.post('/', requireAuth, async (req, res) => {
             }
 
             const qKey = existingSession.query_key;
+            const allIds = Array.isArray(existingSession.place_ids) ? existingSession.place_ids : [];
+            const hasMoreTrueTruth = allIds.length > PAGE_SIZE;
 
             // Try page 1 from query page cache (cache-first restore)
             if (qKey) {
@@ -475,8 +477,9 @@ router.post('/', requireAuth, async (req, res) => {
                         results: pageRow.results_json,
                         totalResults: existingSession.total_results,
                         currentPage: 1,
-                        // authoritative hasMore: pool has more candidates beyond page 1
-                        hasMore: (Array.isArray(pageRow.place_ids) ? pageRow.place_ids.length : (pageRow.results_json || []).length) >= PAGE_SIZE,
+                        hasMore: hasMoreTrueTruth,
+                        creditCost: 0,
+                        alreadyViewed: true,
                         fromCache: true,
                     });
                 }
@@ -484,7 +487,6 @@ router.post('/', requireAuth, async (req, res) => {
 
             // Fallback: use place_ids stored in session (old sessions without query_key)
             const apiKey = await getGoogleMapsApiKey();
-            const allIds = Array.isArray(existingSession.place_ids) ? existingSession.place_ids : [];
             const pageIds = allIds.slice(0, PAGE_SIZE);
 
             let results = [];
@@ -502,8 +504,10 @@ router.post('/', requireAuth, async (req, res) => {
                 results,
                 totalResults: existingSession.total_results,
                 currentPage: 1,
-                // hasMore: more candidates beyond page 1 means the pool is larger than one page
-                hasMore: allIds.length > PAGE_SIZE,
+                hasMore: hasMoreTrueTruth,
+                creditCost: 0,
+                alreadyViewed: true,
+                fromCache: true,
             });
         }
 
@@ -578,8 +582,9 @@ router.post('/', requireAuth, async (req, res) => {
                     results: page1Row.results_json,
                     totalResults,
                     currentPage: 1,
-                    // authoritative hasMore: pool has candidates beyond the first page
                     hasMore: allPlaceIds.length > PAGE_SIZE,
+                    creditCost: 0,
+                    alreadyViewed: true,
                     fromCache: true,
                 });
             }
