@@ -1016,25 +1016,25 @@ export default function ListDetail() {
                             aria-label={t("listDetail.selectAll")}
                           />
                         </th>
-                        <th className="p-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                        <th className="p-3 text-left text-xs font-semibold text-muted-foreground tracking-wide">
                           {t("listDetail.colBusiness")}
                         </th>
-                        <th className="p-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden md:table-cell">
+                        <th className="p-3 text-left text-xs font-semibold text-muted-foreground tracking-wide hidden md:table-cell">
                           {t("listDetail.colLocation")}
                         </th>
-                        <th className="p-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                        <th className="p-3 text-left text-xs font-semibold text-muted-foreground tracking-wide">
                           {t("listDetail.colPotential")}
                         </th>
-                        <th className="p-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                        <th className="p-3 text-left text-xs font-semibold text-muted-foreground tracking-wide">
                           {t("listDetail.colContact")}
                         </th>
-                        <th className="p-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden lg:table-cell">
+                        <th className="p-3 text-left text-xs font-semibold text-muted-foreground tracking-wide hidden lg:table-cell">
                           {t("listDetail.colExtra")}
                         </th>
-                        <th className="p-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                        <th className="p-3 text-left text-xs font-semibold text-muted-foreground tracking-wide">
                           {t("listDetail.colStatus")}
                         </th>
-                        <th className="p-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                        <th className="p-3 text-left text-xs font-semibold text-muted-foreground tracking-wide">
                           {t("listDetail.colActions")}
                         </th>
                       </tr>
@@ -1238,7 +1238,7 @@ export default function ListDetail() {
                 <div className="space-y-5 overflow-y-auto max-h-[60vh] pr-1">
                   {/* ── General ── */}
                   <section>
-                    <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                    <h4 className="text-xs font-semibold text-muted-foreground tracking-wide mb-2">
                       {t("listDetail.sectionGeneral")}
                     </h4>
                     <div className="space-y-2">
@@ -1288,7 +1288,7 @@ export default function ListDetail() {
 
                   {/* ── Contact ── */}
                   <section>
-                    <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                    <h4 className="text-xs font-semibold text-muted-foreground tracking-wide mb-2">
                       {t("listDetail.sectionContact")}
                     </h4>
                     <div className="space-y-2">
@@ -1330,7 +1330,7 @@ export default function ListDetail() {
                                 href={url}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="text-xs text-primary hover:underline capitalize"
+                                className="text-xs text-primary hover:underline"
                               >
                                 {platform}
                               </a>
@@ -1343,7 +1343,7 @@ export default function ListDetail() {
 
                   {/* ── Actions ── */}
                   <section>
-                    <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                    <h4 className="text-xs font-semibold text-muted-foreground tracking-wide mb-2">
                       {t("listDetail.sectionActions")}
                     </h4>
                     <div className="flex flex-wrap gap-2">

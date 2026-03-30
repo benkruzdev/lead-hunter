@@ -739,7 +739,7 @@ export default function SearchPage() {
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {/* Country — CountrySelect with comingSoon support */}
           <div className="space-y-1.5">
-            <Label className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-primary">
+            <Label className="flex items-center gap-1.5 text-xs font-semibold tracking-wide text-primary">
               <MapPin className="w-3.5 h-3.5" />
               {t("searchPage.country")}
             </Label>
@@ -757,7 +757,7 @@ export default function SearchPage() {
           <div className="space-y-1.5">
             <Label
               htmlFor="city-select"
-              className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-foreground"
+              className="flex items-center gap-1.5 text-xs font-semibold tracking-wide text-foreground"
             >
               <MapPin className="w-3.5 h-3.5 text-primary" />
               {t(countryEntry?.regionLabelKey ?? "searchPage.region")}
@@ -784,7 +784,7 @@ export default function SearchPage() {
           <div className="space-y-1.5">
             <Label
               htmlFor="district-select"
-              className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-foreground"
+              className="flex items-center gap-1.5 text-xs font-semibold tracking-wide text-foreground"
             >
               <MapPin className="w-3.5 h-3.5 text-primary" />
               {t(countryEntry?.subregionLabelKey ?? "searchPage.subregion")}
@@ -818,7 +818,7 @@ export default function SearchPage() {
           <div className="space-y-1.5">
             <Label
               htmlFor="category-input"
-              className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-foreground"
+              className="flex items-center gap-1.5 text-xs font-semibold tracking-wide text-foreground"
             >
               <Tag className="w-3.5 h-3.5 text-primary" />
               {t("searchPage.category")}
@@ -975,11 +975,11 @@ export default function SearchPage() {
                     />
                   </th>
                   <th className="text-left px-4 py-3 font-semibold text-foreground">{t("searchPage.colBusiness")}</th>
-                  <th className="text-left px-4 py-3 font-medium text-muted-foreground text-xs uppercase tracking-wide">{t("searchPage.colLocation")}</th>
-                  <th className="text-left px-4 py-3 font-medium text-muted-foreground text-xs uppercase tracking-wide">{t("searchPage.colCategory")}</th>
-                  <th className="text-left px-4 py-3 font-medium text-muted-foreground text-xs uppercase tracking-wide">{t("searchPage.colRating")}</th>
-                  <th className="text-left px-4 py-3 font-medium text-muted-foreground text-xs uppercase tracking-wide">{t("searchPage.colReviews")}</th>
-                  <th className="text-left px-4 py-3 font-medium text-muted-foreground text-xs uppercase tracking-wide">
+                  <th className="text-left px-4 py-3 font-medium text-muted-foreground text-xs tracking-wide">{t("searchPage.colLocation")}</th>
+                  <th className="text-left px-4 py-3 font-medium text-muted-foreground text-xs tracking-wide">{t("searchPage.colCategory")}</th>
+                  <th className="text-left px-4 py-3 font-medium text-muted-foreground text-xs tracking-wide">{t("searchPage.colRating")}</th>
+                  <th className="text-left px-4 py-3 font-medium text-muted-foreground text-xs tracking-wide">{t("searchPage.colReviews")}</th>
+                  <th className="text-left px-4 py-3 font-medium text-muted-foreground text-xs tracking-wide">
                     <span className="flex items-center gap-1">
                       {t("searchPage.colLeadScore")}
                       <Tooltip>
@@ -999,10 +999,10 @@ export default function SearchPage() {
                       </Tooltip>
                     </span>
                   </th>
-                  <th className="text-left px-4 py-3 font-medium text-muted-foreground text-xs uppercase tracking-wide">{t("searchPage.colContact")}</th>
-                  <th className="text-left px-4 py-3 font-medium text-muted-foreground text-xs uppercase tracking-wide">{t("searchPage.colExtraData")}</th>
-                  <th className="text-left px-4 py-3 font-medium text-muted-foreground text-xs uppercase tracking-wide">{t("searchPage.colWebsite")}</th>
-                  <th className="text-left px-4 py-3 font-medium text-muted-foreground text-xs uppercase tracking-wide w-24">{t("searchPage.colAction")}</th>
+                  <th className="text-left px-4 py-3 font-medium text-muted-foreground text-xs tracking-wide">{t("searchPage.colContact")}</th>
+                  <th className="text-left px-4 py-3 font-medium text-muted-foreground text-xs tracking-wide">{t("searchPage.colExtraData")}</th>
+                  <th className="text-left px-4 py-3 font-medium text-muted-foreground text-xs tracking-wide">{t("searchPage.colWebsite")}</th>
+                  <th className="text-left px-4 py-3 font-medium text-muted-foreground text-xs tracking-wide w-24">{t("searchPage.colAction")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -1228,7 +1228,7 @@ export default function SearchPage() {
 
               {/* A) General */}
               <section>
-                <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
+                <h4 className="text-xs font-semibold tracking-wider text-muted-foreground mb-3">
                   {t("searchPage.drawerGeneral")}
                 </h4>
                 <div className="space-y-3">
@@ -1259,7 +1259,7 @@ export default function SearchPage() {
 
               {/* B) Contact */}
               <section>
-                <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
+                <h4 className="text-xs font-semibold tracking-wider text-muted-foreground mb-3">
                   {t("searchPage.drawerContact")}
                 </h4>
                 <div className="space-y-3">
@@ -1315,7 +1315,7 @@ export default function SearchPage() {
 
               {/* C) Actions */}
               <section>
-                <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
+                <h4 className="text-xs font-semibold tracking-wider text-muted-foreground mb-3">
                   {t("searchPage.drawerActions")}
                 </h4>
                 <div className="space-y-2">

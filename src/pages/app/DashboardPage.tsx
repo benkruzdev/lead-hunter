@@ -169,7 +169,7 @@ export default function DashboardPage() {
                         <div className="space-y-3">
                             <div className="flex items-center gap-2">
                                 <Activity className="w-4 h-4 text-primary" />
-                                <span className="text-xs font-bold text-primary uppercase tracking-wide">
+                                <span className="text-xs font-bold text-primary tracking-wide">
                                     {t("dashboard.lastSearch", "Kaldığınız Yerden Devam Edin")}
                                 </span>
                             </div>
@@ -217,7 +217,7 @@ export default function DashboardPage() {
                 {/* Unified Recent Activity (Polished) */}
                 <div className="lg:col-span-2 space-y-4">
                     <div className="flex items-center justify-between">
-                        <h2 className="text-sm font-semibold text-foreground uppercase tracking-wide">
+                        <h2 className="text-sm font-semibold text-foreground tracking-wide">
                             {t("dashboard.recentActivity", "Son Hareketler")}
                         </h2>
                     </div>
@@ -268,7 +268,7 @@ export default function DashboardPage() {
                 <div className="space-y-6">
                     {/* Quick Actions (Polished Block) */}
                     <div className="space-y-4">
-                        <h2 className="text-sm font-semibold text-foreground uppercase tracking-wide">
+                        <h2 className="text-sm font-semibold text-foreground tracking-wide">
                             {t("dashboard.quickActions", "Çalışma Alanı")}
                         </h2>
                         <div className="bg-card border rounded-2xl p-3 flex flex-col gap-1 shadow-sm">

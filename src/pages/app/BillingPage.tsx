@@ -324,10 +324,10 @@ export default function BillingPage() {
            <AlertCircle className="w-5 h-5 mt-0.5 shrink-0" />}
           
           <div className="flex-1 text-sm font-medium pt-0.5">
-            {paymentStatus === 'success' && (lang.startsWith('tr') ? 'Ödemeniz alındı veya onay sürecindedir. Lütfen sipariş geçmişinizden güncel durumu kontrol edin.' : 'Payment received or is processing. Please review your order history below for the latest status.')}
-            {paymentStatus === 'cancelled' && (lang.startsWith('tr') ? 'Ödeme işlemi iptal edildi.' : 'Payment process was cancelled.')}
-            {paymentStatus === 'failed' && (lang.startsWith('tr') ? 'Ödeme reddedildi veya başarısız oldu. Lütfen tekrar deneyin.' : 'Payment failed or was declined. Please try again.')}
-            {paymentStatus === 'error' && (lang.startsWith('tr') ? 'Ödeme sırasında sistemsel bir sorun oluştu.' : 'A system error occurred during payment.')}
+            {paymentStatus === 'success' && t('billing.paymentSuccessMsg')}
+            {paymentStatus === 'cancelled' && t('billing.paymentCancelledMsg')}
+            {paymentStatus === 'failed' && t('billing.paymentFailedMsg')}
+            {paymentStatus === 'error' && t('billing.paymentErrorMsg')}
           </div>
           
           <button onClick={handleDismissBanner} className="text-current/60 hover:text-current transition-colors">
@@ -340,21 +340,19 @@ export default function BillingPage() {
       <div className="rounded-2xl border bg-card p-8">
         <div className="flex items-start justify-between gap-6 mb-7">
           <div className="min-w-0">
-            <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground mb-2.5">
-              {lang.startsWith('tr') ? 'Kredi Satın Al' : 'Purchase Credits'}
+            <p className="text-[10px] font-bold tracking-[0.15em] text-muted-foreground mb-2.5">
+              {t('billing.buyCredits')}
             </p>
             <h2 className="text-2xl font-bold tracking-tight">{t('billing.title')}</h2>
             <p className="text-muted-foreground mt-2 text-sm leading-relaxed max-w-sm">
-              {lang.startsWith('tr')
-                ? 'Tüm paketlerde aynı LeadHunter deneyimine erişirsiniz. Tek fark satın alınan kredi miktarıdır.'
-                : 'All packages include the same LeadHunter experience. The only difference is how many credits you purchase.'}
+              {t('billing.pageDescription')}
             </p>
           </div>
           <div className="shrink-0 flex flex-col items-end gap-2 text-xs">
             <div className="flex items-center gap-1.5 text-muted-foreground bg-muted/50 border rounded-full px-3 py-1.5">
               {region.isTurkeyContext
-                ? <><span>🇹🇷</span><span className="font-medium">TRY · Türkiye</span></>
-                : <><Globe className="w-3 h-3" /><span className="font-medium">USD · International</span></>
+                ? <><span>🇹🇷</span><span className="font-medium">{t('billing.storefrontTr')}</span></>
+                : <><Globe className="w-3 h-3" /><span className="font-medium">{t('billing.storefrontGlobal')}</span></>
               }
             </div>
             {currentCredits !== null && currentCredits !== undefined && (
@@ -362,8 +360,8 @@ export default function BillingPage() {
                  <Zap className="w-4 h-4" />
                  <div className="flex flex-col text-right">
                    <span className="font-bold text-sm leading-none">{currentCredits.toLocaleString()} {t('billing.credits', 'cr')}</span>
-                   <span className="text-[10px] font-medium opacity-80 mt-0.5 uppercase tracking-wide">
-                     {lang.startsWith('tr') ? 'Mevcut Bakiye' : 'Current Balance'}
+                   <span className="text-[10px] font-medium opacity-80 mt-0.5 tracking-wide">
+                     {t('billing.currentBalance')}
                    </span>
                  </div>
               </div>
@@ -372,9 +370,9 @@ export default function BillingPage() {
         </div>
         <div className="grid grid-cols-3 gap-4 pt-5 border-t">
           {[
-            lang.startsWith('tr') ? 'Tüm paketlerde aynı erişim' : 'Same access in every package',
-            lang.startsWith('tr') ? 'Şeffaf ve adil ücretlendirme' : 'Transparent, fair billing',
-            lang.startsWith('tr') ? 'Gizli plan farkı yok' : 'No hidden plan differences',
+            t('billing.featureSameAccess'),
+            t('billing.featureFairBilling'),
+            t('billing.featureNoHiddenPlan'),
           ].map((label, i) => (
             <div key={i} className="flex items-center gap-2 text-xs text-muted-foreground">
               <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
@@ -495,17 +493,12 @@ export default function BillingPage() {
 
             {/* How credits work — trust footer, part of the purchase surface */}
             <div className="mt-8 pt-6 border-t grid grid-cols-2 gap-x-10 gap-y-3">
-              {(lang.startsWith('tr') ? [
-                'Yalnızca yeni açılan işletme kayıtları kredi kullanır.',
-                'Daha önce gördüğünüz sayfalar tekrar ücretlendirilmez.',
-                'Son sayfada yalnızca gelen kayıt adedince kredi düşer.',
-                'Sonuç yoksa hiç kredi kullanılmaz.',
-              ] : [
-                'Only newly revealed business records consume credits.',
-                'Pages you have already viewed are never charged again.',
-                'Partial last pages are charged only for records returned.',
-                'Zero results means zero credits used.',
-              ]).map((text, i) => (
+              {[
+                t('billing.trust1'),
+                t('billing.trust2'),
+                t('billing.trust3'),
+                t('billing.trust4'),
+              ].map((text, i) => (
                 <div key={i} className="flex items-start gap-2.5">
                   <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0 mt-px" />
                   <span className="text-xs text-muted-foreground leading-snug">{text}</span>
@@ -519,7 +512,7 @@ export default function BillingPage() {
       {/* ── Order history ─────────────────────────────────────────────────────── */}
       <section>
         <div className="flex items-center justify-between mb-5 pb-3 border-b">
-          <h3 className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
+          <h3 className="text-[11px] font-bold tracking-widest text-muted-foreground">
             {t('billing.orderHistory')}
           </h3>
         </div>
@@ -551,11 +544,11 @@ export default function BillingPage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-muted/40 border-b">
-                    <th className="text-left px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-muted-foreground/80 whitespace-nowrap">{t('billing.packageName')}</th>
-                    <th className="text-left px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-muted-foreground/80 whitespace-nowrap">{t('billing.amount')}</th>
-                    <th className="text-right px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-muted-foreground/80 whitespace-nowrap">{t('billing.credits')}</th>
-                    <th className="text-left px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-muted-foreground/80 whitespace-nowrap">{t('billing.status')}</th>
-                    <th className="text-left px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-muted-foreground/80 whitespace-nowrap">{t('billing.orderDate')}</th>
+                    <th className="text-left px-6 py-4 text-[10px] font-bold tracking-widest text-muted-foreground/80 whitespace-nowrap">{t('billing.packageName')}</th>
+                    <th className="text-left px-6 py-4 text-[10px] font-bold tracking-widest text-muted-foreground/80 whitespace-nowrap">{t('billing.amount')}</th>
+                    <th className="text-right px-6 py-4 text-[10px] font-bold tracking-widest text-muted-foreground/80 whitespace-nowrap">{t('billing.credits')}</th>
+                    <th className="text-left px-6 py-4 text-[10px] font-bold tracking-widest text-muted-foreground/80 whitespace-nowrap">{t('billing.status')}</th>
+                    <th className="text-left px-6 py-4 text-[10px] font-bold tracking-widest text-muted-foreground/80 whitespace-nowrap">{t('billing.orderDate')}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/60">

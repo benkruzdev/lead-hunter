@@ -69,6 +69,34 @@ const resources = {
                 invalidEmail: 'Geçerli bir e-posta adresi giriniz.',
                 invalidPhone: 'Geçerli bir telefon numarası giriniz (05XX XXX XX XX).',
                 passwordMismatch: 'Şifreler eşleşmiyor.',
+
+                errors: {
+                    invalidResetLink: 'Geçersiz sıfırlama bağlantısı',
+                    requestNewLink: 'Lütfen yeni bir şifre sıfırlama bağlantısı isteyin',
+                    passwordsDoNotMatch: 'Şifreler eşleşmiyor',
+                    passwordMinLength: 'Şifre en az 6 karakter olmalıdır',
+                    passwordUpdateFailed: 'Şifre güncellenemedi',
+                    tryAgain: 'Lütfen tekrar deneyin',
+                    recaptchaNotConfigured: 'reCAPTCHA yapılandırılmadı',
+                    contactAdmin: 'Lütfen yönetici ile iletişime geçin (Admin Panel)',
+                    nameRequired: 'Ad Soyad zorunludur',
+                    phoneFormat: 'Telefon 05XX XXX XX XX formatında olmalıdır',
+                    confirmEmailRequired: 'Hesabınızı doğrulamak için e-postanızı kontrol edin.',
+                    registrationFailed: 'Kayıt başarısız',
+                    oauthNotConfigured: 'Google OAuth yapılandırılmadı',
+                    googleLoginFailed: 'Google ile giriş başarısız',
+                    registrationDisabled: 'Kayıt geçici olarak devre dışı.',
+                    loginFailed: 'Giriş başarısız',
+                    resetFailed: 'Şifre sıfırlama başarısız'
+                },
+                messages: {
+                    passwordResetSuccess: 'Şifreniz güncellendi',
+                    welcomeMessage: 'LeadHunter\'a hoş geldiniz!',
+                    welcomeBack: 'Tekrar Hoş Geldiniz!',
+                    checkEmail: 'Lütfen e-postanızı kontrol edin',
+                    emailSent: 'E-posta Gönderildi',
+                    resetEmailDescription: 'Şifre sıfırlama bağlantısı e-posta adresinize gönderildi. Spam klasörünü kontrol etmeyi unutmayın.'
+                }
             },
 
             // Layout
@@ -257,6 +285,22 @@ const resources = {
             // Billing
             billing: {
                 title: 'Kredi Satın Al',
+                storefrontTr: 'TRY · Türkiye',
+                storefrontGlobal: 'USD · Uluslararası',
+                buyCredits: 'Kredi Satın Al',
+                currentBalance: 'Mevcut Bakiye',
+                pageDescription: 'Tüm paketlerde aynı LeadHunter deneyimine erişirsiniz. Tek fark satın alınan kredi miktarıdır.',
+                featureSameAccess: 'Tüm paketlerde aynı erişim',
+                featureFairBilling: 'Şeffaf ve adil ücretlendirme',
+                featureNoHiddenPlan: 'Gizli plan farkı yok',
+                trust1: 'Yalnızca yeni açılan işletme kayıtları kredi kullanır.',
+                trust2: 'Daha önce gördüğünüz sayfalar tekrar ücretlendirilmez.',
+                trust3: 'Son sayfada yalnızca gelen kayıt adedince kredi düşer.',
+                trust4: 'Sonuç yoksa hiç kredi kullanılmaz.',
+                paymentSuccessMsg: 'Ödemeniz alındı veya onay sürecindedir. Lütfen sipariş geçmişinizden güncel durumu kontrol edin.',
+                paymentCancelledMsg: 'Ödeme işlemi iptal edildi.',
+                paymentFailedMsg: 'Ödeme reddedildi veya başarısız oldu. Lütfen tekrar deneyin.',
+                paymentErrorMsg: 'Ödeme sırasında sistemsel bir sorun oluştu.',
                 packages: 'Paketler',
                 orderHistory: 'Sipariş Geçmişi',
                 selectPackage: 'Paket Seç',
@@ -291,7 +335,6 @@ const resources = {
                 packageName: 'Paket',
                 loadPackagesFailed: 'Paketler yüklenemedi',
                 loadOrdersFailed: 'Siparişler yüklenemedi',
-                pageDescription: 'Lead araştırma kapasitesini artırmak için kredi paketi seçin.',
                 paymentDialogTitle: 'Ödeme Yöntemi Seç',
                 paymentCard: 'Kredi / Banka Kartı',
                 paymentCardDesc: 'Güvenli ödeme sağlayıcısı üzerinden anında işlenir.',
@@ -637,6 +680,7 @@ const resources = {
             },
 
             searchPage: {
+                initialSearchFree: 'İlk arama sonuçları tamamen ücretsizdir.',
                 city: 'Şehir',
                 selectCity: 'Şehir seçin',
                 district: 'İlçe',
@@ -706,10 +750,10 @@ const resources = {
                 detailPhone: 'Telefon',
                 detailWebsite: 'Website',
                 detailHours: 'Çalışma Saatleri',
-                pageChangeTitle: 'Daha Fazla YüKle',
+                pageChangeTitle: 'Daha Fazla Yükle',
                 pageChangeDesc: 'En fazla {{cost}} kredi kullanılacak — yalnızca dönen işletmeler ücretlendirilir.',
                 pageChangeCreditInfo: 'Kalan krediniz: {{credits}}',
-                confirmPageBtn: 'YüKle (en fazla {{cost}} kredi)',
+                confirmPageBtn: 'Yükle (en fazla {{cost}} kredi)',
                 sessionLoadFailed: 'Arama oturumu yüklenemedi.',
                 searchFailed: 'Arama başarısız oldu. Lütfen tekrar deneyin.',
                 pageLoadFailed: 'Sayfa yüklenemedi. Lütfen tekrar deneyin.',
@@ -1015,6 +1059,34 @@ const resources = {
                 invalidEmail: 'Please enter a valid email address.',
                 invalidPhone: 'Please enter a valid phone number (05XX XXX XX XX).',
                 passwordMismatch: 'Passwords do not match.',
+
+                errors: {
+                    invalidResetLink: 'Invalid reset link',
+                    requestNewLink: 'Please request a new password reset link',
+                    passwordsDoNotMatch: 'Passwords do not match',
+                    passwordMinLength: 'Password must be at least 6 characters',
+                    passwordUpdateFailed: 'Password update failed',
+                    tryAgain: 'Please try again',
+                    recaptchaNotConfigured: 'reCAPTCHA not configured',
+                    contactAdmin: 'Please contact administrator to configure this integration',
+                    nameRequired: 'Full name is required',
+                    phoneFormat: 'Phone must be in format: 05XX XXX XX XX',
+                    confirmEmailRequired: 'Please check your email to verify your account.',
+                    registrationFailed: 'Registration failed',
+                    oauthNotConfigured: 'Google OAuth not configured',
+                    googleLoginFailed: 'Google login failed',
+                    registrationDisabled: 'Registration is temporarily disabled.',
+                    loginFailed: 'Login failed',
+                    resetFailed: 'Password reset failed'
+                },
+                messages: {
+                    passwordResetSuccess: 'Your password has been updated',
+                    welcomeMessage: 'Welcome to LeadHunter!',
+                    welcomeBack: 'Welcome back!',
+                    checkEmail: 'Please check your email',
+                    emailSent: 'Email Sent',
+                    resetEmailDescription: 'Password reset link has been sent to your email. Do not forget to check the spam folder.'
+                }
             },
 
             // Common
@@ -1225,6 +1297,22 @@ const resources = {
             // Billing
             billing: {
                 title: 'Buy Credits',
+                storefrontTr: 'TRY · Turkey',
+                storefrontGlobal: 'USD · International',
+                buyCredits: 'Purchase Credits',
+                currentBalance: 'Current Balance',
+                pageDescription: 'All packages include the same LeadHunter experience. The only difference is how many credits you purchase.',
+                featureSameAccess: 'Same access in every package',
+                featureFairBilling: 'Transparent, fair billing',
+                featureNoHiddenPlan: 'No hidden plan differences',
+                trust1: 'Only newly revealed business records consume credits.',
+                trust2: 'Pages you have already viewed are never charged again.',
+                trust3: 'Partial last pages are charged only for records returned.',
+                trust4: 'Zero results means zero credits used.',
+                paymentSuccessMsg: 'Payment received or is processing. Please review your order history below for the latest status.',
+                paymentCancelledMsg: 'Payment process was cancelled.',
+                paymentFailedMsg: 'Payment failed or was declined. Please try again.',
+                paymentErrorMsg: 'A system error occurred during payment.',
                 packages: 'Packages',
                 orderHistory: 'Order History',
                 selectPackage: 'Select Package',
@@ -1259,7 +1347,6 @@ const resources = {
                 packageName: 'Package',
                 loadPackagesFailed: 'Failed to load packages',
                 loadOrdersFailed: 'Failed to load orders',
-                pageDescription: 'Choose a credit package to expand your lead research capacity.',
                 paymentDialogTitle: 'Select Payment Method',
                 paymentCard: 'Credit / Debit Card',
                 paymentCardDesc: 'Processed instantly via secure payment provider.',
@@ -1552,8 +1639,8 @@ const resources = {
                     description: 'Only publicly available business information is provided. User privacy and data security are our priorities. We operate with a privacy-first and compliance-focused approach.',
                 },
                 disclaimer: {
-                    title: 'Yasal Uyarı',
-                    description: 'Bu sayfa yalnızca bilgilendirme amaçlıdır ve yasal garanti veya tavsiye teşkil etmez. Platform yaklaşımımızı açıklamak için hazırlanmıştır.',
+                    title: 'Legal Disclaimer',
+                    description: 'This page is for informational purposes only and does not constitute a legal guarantee or advice. It is prepared to explain our platform approach.',
                 },
             },
 
@@ -1605,6 +1692,7 @@ const resources = {
             },
 
             searchPage: {
+                initialSearchFree: 'Initial page fetch is completely free.',
                 city: 'City',
                 selectCity: 'Select city',
                 district: 'District',

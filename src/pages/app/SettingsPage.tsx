@@ -223,7 +223,7 @@ export default function SettingsPage() {
         
         {/* Billing/Credits Shortcut */}
         <div className="flex flex-col items-center sm:items-end gap-1.5 bg-background sm:bg-transparent w-full sm:w-auto p-4 sm:p-0 rounded-xl sm:rounded-none border sm:border-none">
-          <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{t('dashboard.creditsRemaining', 'Kalan Krediniz')}</div>
+          <div className="text-xs font-semibold text-muted-foreground tracking-wider">{t('dashboard.creditsRemaining', 'Kalan Krediniz')}</div>
           <div className="flex items-center gap-2">
             <Zap className="w-5 h-5 text-warning shrink-0" />
             <span className="text-2xl font-bold tabular-nums text-foreground">{credits?.toLocaleString() ?? 0}</span>
@@ -249,7 +249,7 @@ export default function SettingsPage() {
           <div className="md:col-span-2">
             <div className="bg-card border rounded-2xl p-6 sm:p-8 shadow-sm space-y-6">
               <div className="space-y-2">
-                <Label htmlFor="fullName" className="text-xs font-bold uppercase tracking-wide text-muted-foreground">{t('settings.fullName', 'Ad Soyad')}</Label>
+                <Label htmlFor="fullName" className="text-xs font-bold tracking-wide text-muted-foreground">{t('settings.fullName', 'Ad Soyad')}</Label>
                 <div className="relative relative-group">
                   <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                   <Input
@@ -263,7 +263,7 @@ export default function SettingsPage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="email" className="text-xs font-bold uppercase tracking-wide text-muted-foreground">{t('settings.email', 'E-Posta Adresi')}</Label>
+                <Label htmlFor="email" className="text-xs font-bold tracking-wide text-muted-foreground">{t('settings.email', 'E-Posta Adresi')}</Label>
                 <div className="relative opacity-70">
                   <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                   <Input
@@ -278,7 +278,7 @@ export default function SettingsPage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="phone" className="text-xs font-bold uppercase tracking-wide text-muted-foreground">{t('settings.phone', 'Telefon Numarası')}</Label>
+                <Label htmlFor="phone" className="text-xs font-bold tracking-wide text-muted-foreground">{t('settings.phone', 'Telefon Numarası')}</Label>
                 <div className="relative">
                   <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                   <Input
@@ -328,7 +328,7 @@ export default function SettingsPage() {
             <div className="bg-card border rounded-2xl p-6 sm:p-8 shadow-sm">
               <form onSubmit={(e) => { e.preventDefault(); handleChangePassword(); }} className="space-y-6">
                 <div className="space-y-2">
-                  <Label htmlFor="currentPassword" className="text-xs font-bold uppercase tracking-wide text-muted-foreground">{t('settings.currentPassword', 'Mevcut Şifreniz')}</Label>
+                  <Label htmlFor="currentPassword" className="text-xs font-bold tracking-wide text-muted-foreground">{t('settings.currentPassword', 'Mevcut Şifreniz')}</Label>
                   <Input
                     id="currentPassword"
                     type="password"
@@ -342,7 +342,7 @@ export default function SettingsPage() {
                 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="newPassword" className="text-xs font-bold uppercase tracking-wide text-muted-foreground">{t('settings.newPassword', 'Yeni Şifre')}</Label>
+                    <Label htmlFor="newPassword" className="text-xs font-bold tracking-wide text-muted-foreground">{t('settings.newPassword', 'Yeni Şifre')}</Label>
                     <Input
                       id="newPassword"
                       type="password"
@@ -355,7 +355,7 @@ export default function SettingsPage() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="confirmPassword" className="text-xs font-bold uppercase tracking-wide text-muted-foreground">{t('settings.confirmPassword', 'Yeni Şifre (Tekrar)')}</Label>
+                    <Label htmlFor="confirmPassword" className="text-xs font-bold tracking-wide text-muted-foreground">{t('settings.confirmPassword', 'Yeni Şifre (Tekrar)')}</Label>
                     <Input
                       id="confirmPassword"
                       type="password"
@@ -405,7 +405,7 @@ export default function SettingsPage() {
             <div className="bg-card border rounded-2xl p-6 sm:p-8 shadow-sm space-y-8">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                 <div className="space-y-2">
-                  <Label className="text-xs font-bold uppercase tracking-wide text-muted-foreground">{t('settings.language', 'Arayüz Dili')}</Label>
+                  <Label className="text-xs font-bold tracking-wide text-muted-foreground">{t('settings.language', 'Arayüz Dili')}</Label>
                   <Select value={account?.preferences?.language || i18n.language} onValueChange={async (val) => await handlePreferenceSelect('language', val)}>
                     <SelectTrigger className="bg-background h-10">
                       <SelectValue />
@@ -418,7 +418,7 @@ export default function SettingsPage() {
                 </div>
                 
                 <div className="space-y-2">
-                  <Label className="text-xs font-bold uppercase tracking-wide text-muted-foreground">{t('settings.defaultCountry', 'Varsayılan Hedef Ülke')}</Label>
+                  <Label className="text-xs font-bold tracking-wide text-muted-foreground">{t('settings.defaultCountry', 'Varsayılan Hedef Ülke')}</Label>
                   <Select value={account?.preferences?.default_search_country || 'TR'} onValueChange={async (val) => await handlePreferenceSelect('default_search_country', val)}>
                     <SelectTrigger className="bg-background h-10">
                       <SelectValue />
@@ -441,7 +441,7 @@ export default function SettingsPage() {
                 </h4>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                   <div className="space-y-2">
-                    <Label className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">Varsayılan Format</Label>
+                    <Label className="text-[11px] font-bold tracking-wide text-muted-foreground">Varsayılan Format</Label>
                     <Select value={account?.preferences?.default_export_format || 'xlsx'} onValueChange={async (val) => await handlePreferenceSelect('default_export_format', val)}>
                       <SelectTrigger className="bg-background h-10">
                         <SelectValue />
@@ -454,7 +454,7 @@ export default function SettingsPage() {
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">Varsayılan Kapsam</Label>
+                    <Label className="text-[11px] font-bold tracking-wide text-muted-foreground">Varsayılan Kapsam</Label>
                     <Select value={account?.preferences?.default_export_scope || 'full'} onValueChange={async (val) => await handlePreferenceSelect('default_export_scope', val)}>
                       <SelectTrigger className="bg-background h-10">
                         <SelectValue />

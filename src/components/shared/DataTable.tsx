@@ -92,7 +92,7 @@ export function DataTable<T = Record<string, unknown>>({
                     <TableHead
                       key={col.key}
                       className={cn(
-                        "h-10 text-xs font-semibold text-muted-foreground uppercase tracking-wide",
+                        "h-10 text-xs font-semibold text-muted-foreground tracking-wide",
                         col.headerClassName
                       )}
                     >
