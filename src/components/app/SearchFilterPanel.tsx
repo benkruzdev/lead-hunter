@@ -227,173 +227,172 @@ export function SearchFilterPanel({
   const { t } = useTranslation();
 
   return (
-    <div className="bg-card rounded-xl border shadow-sm p-5 space-y-6 lg:sticky lg:top-4 overflow-y-auto max-h-[calc(100vh-2rem)]">
+    <div className="bg-card rounded-xl border shadow-sm p-5 space-y-5">
       
-      {/* Target Geography */}
-      <section className="space-y-4">
-        <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground border-b pb-2">
-          {t("searchPage.geographicTarget", "Geography (Required)")}
-        </h3>
-        
-        <div className="space-y-3">
-          <div className="space-y-1.5">
-            <Label className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-foreground">
-              <MapPin className="w-3.5 h-3.5 text-primary" />
-              {t("searchPage.country")}
-            </Label>
-            <CountrySelect
-              value={country}
-              onValueChange={setCountry}
-              placeholder={t("searchPage.selectCountry")}
-              searchPlaceholder={t("searchPage.searchCountry")}
-            />
-          </div>
+      {/* Primary fields grid */}
+      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Country */}
+        <div className="space-y-1.5">
+          <Label className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-foreground">
+            <MapPin className="w-3.5 h-3.5 text-primary" />
+            {t("searchPage.country")}
+          </Label>
+          <CountrySelect
+            value={country}
+            onValueChange={setCountry}
+            placeholder={t("searchPage.selectCountry")}
+            searchPlaceholder={t("searchPage.searchCountry")}
+          />
+        </div>
 
-          <div className="space-y-1.5">
-            <Label htmlFor="city-select" className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-foreground">
+        {/* City */}
+        <div className="space-y-1.5">
+          <Label htmlFor="city-select" className="flex items-center justify-between text-xs font-semibold uppercase tracking-wide text-foreground">
+             <span className="flex items-center gap-1.5">
                {t(countryEntry?.regionLabelKey ?? "searchPage.region")}
-               <span className="ml-auto text-[10px] font-normal normal-case tracking-normal text-destructive">*</span>
-            </Label>
-            {locationData ? (
-              <SearchableSelect
-                id="city-select"
-                data-onboarding="city-select"
-                value={city}
-                onValueChange={setCity}
-                options={locationData?.regions ?? []}
-                placeholder={t("searchPage.selectRegion")}
-                searchPlaceholder={t("searchPage.searchCity")}
-              />
-            ) : (
-               <Input
-                 id="city-select"
-                 placeholder={t(countryEntry?.regionLabelKey ?? "searchPage.region")}
-                 value={city}
-                 onChange={e => setCity(e.target.value)}
-                 required
-               />
-            )}
-          </div>
+             </span>
+             <span className="text-[10px] font-normal normal-case tracking-normal text-destructive">*</span>
+          </Label>
+          {locationData ? (
+            <SearchableSelect
+              id="city-select"
+              data-onboarding="city-select"
+              value={city}
+              onValueChange={setCity}
+              options={locationData?.regions ?? []}
+              placeholder={t("searchPage.selectRegion")}
+              searchPlaceholder={t("searchPage.searchCity")}
+            />
+          ) : (
+             <Input
+               id="city-select"
+               placeholder={t(countryEntry?.regionLabelKey ?? "searchPage.region")}
+               value={city}
+               onChange={e => setCity(e.target.value)}
+               required
+             />
+          )}
+        </div>
 
-          <div className="space-y-1.5">
-            <Label htmlFor="district-select" className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-foreground">
+        {/* District */}
+        <div className="space-y-1.5">
+          <Label htmlFor="district-select" className="flex items-center justify-between text-xs font-semibold uppercase tracking-wide text-foreground">
+             <span className="flex items-center gap-1.5">
                {t(countryEntry?.subregionLabelKey ?? "searchPage.subregion")}
-               <span className="ml-auto text-[10px] font-normal normal-case tracking-normal text-muted-foreground">Opt</span>
-            </Label>
-            {locationData ? (
-              <SearchableSelect
-                id="district-select"
-                data-onboarding="district-select"
-                value={district}
-                onValueChange={setDistrict}
-                options={availableDistricts}
-                placeholder={!city ? "Select City First" : "Select District"}
-                disabled={!city || availableDistricts.length === 0}
-              />
-            ) : (
-                <Input
-                 id="district-select"
-                 placeholder={t(countryEntry?.subregionLabelKey ?? "searchPage.subregion")}
-                 value={district}
-                 onChange={e => setDistrict(e.target.value)}
-                 disabled={!city}
-               />
-            )}
-          </div>
+             </span>
+             <span className="text-[10px] font-normal normal-case tracking-normal text-muted-foreground">Opt</span>
+          </Label>
+          {locationData ? (
+            <SearchableSelect
+              id="district-select"
+              data-onboarding="district-select"
+              value={district}
+              onValueChange={setDistrict}
+              options={availableDistricts}
+              placeholder={!city ? "Select City First" : "Select District"}
+              disabled={!city || availableDistricts.length === 0}
+            />
+          ) : (
+              <Input
+               id="district-select"
+               placeholder={t(countryEntry?.subregionLabelKey ?? "searchPage.subregion")}
+               value={district}
+               onChange={e => setDistrict(e.target.value)}
+               disabled={!city}
+             />
+          )}
         </div>
-      </section>
 
-      {/* Target Intent */}
-      <section className="space-y-4">
-        <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground border-b pb-2">
-          {t("searchPage.searchIntent", "Intent (Required)")}
-        </h3>
-
-        <div className="space-y-3">
-          <div className="space-y-1.5">
-            <Label htmlFor="category-input" className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-foreground">
-              <Tag className="w-3.5 h-3.5 text-primary" />
-              {t("searchPage.category")}
-               <span className="ml-auto text-[10px] font-normal normal-case tracking-normal text-destructive">*</span>
-            </Label>
-            <Input
-              data-onboarding="category-input"
-              id="category-input"
-              type="text"
-              placeholder={t("searchPage.categoryPlaceholder", "e.g. Restaurants, IT, Logistics")}
-              value={category}
-              onChange={e => setCategory(e.target.value)}
-            />
-          </div>
-
-          <div className="space-y-1.5 pt-1">
-             <Label className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-              <Search className="w-3.5 h-3.5" />
-              {t("searchPage.keyword")}
-               <span className="ml-auto text-[10px] font-normal normal-case tracking-normal">Opt</span>
-            </Label>
-            <Input
-              id="keyword-input"
-              type="text"
-              placeholder={t("searchPage.keywordPlaceholder", "Optional target keyword")}
-              value={keyword}
-              onChange={e => setKeyword(e.target.value)}
-              className="text-sm"
-            />
-          </div>
+        {/* Category */}
+        <div className="space-y-1.5">
+          <Label htmlFor="category-input" className="flex items-center justify-between text-xs font-semibold uppercase tracking-wide text-foreground">
+             <span className="flex items-center gap-1.5">
+               <Tag className="w-3.5 h-3.5 text-primary" />
+               {t("searchPage.category")}
+             </span>
+             <span className="text-[10px] font-normal normal-case tracking-normal text-destructive">*</span>
+          </Label>
+          <Input
+            data-onboarding="category-input"
+            id="category-input"
+            type="text"
+            placeholder={t("searchPage.categoryPlaceholder", "e.g. Restaurants")}
+            value={category}
+            onChange={e => setCategory(e.target.value)}
+          />
         </div>
-      </section>
+      </div>
 
-      {/* Quality Gates */}
-      <section className="space-y-4">
-         <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground border-b pb-2">
-          {t("searchPage.qualityGates", "Quality Thresholds")}
-        </h3>
-         <div className="space-y-4 pt-1">
-          <div className="space-y-2">
-            <Label className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-              <Star className="w-3.5 h-3.5" />
-              {t("searchPage.minRating")}: <span className="font-semibold text-foreground ml-1">{minRating[0].toFixed(1)}</span>
-            </Label>
-            <Slider
-              id="min-rating-slider"
-              value={minRating}
-              onValueChange={setMinRating}
-              min={0}
-              max={5}
-              step={0.1}
-              className="py-1"
-            />
-          </div>
+      {/* Secondary fields grid */}
+      <div className="grid sm:grid-cols-3 gap-4 pt-4 border-t border-dashed border-border/80">
+        {/* Keyword */}
+        <div className="space-y-1.5">
+           <Label className="flex items-center justify-between text-xs font-medium text-muted-foreground">
+             <span className="flex items-center gap-1.5">
+               <Search className="w-3.5 h-3.5" />
+               {t("searchPage.keyword")}
+             </span>
+             <span className="text-[10px] font-normal normal-case tracking-normal">Opt</span>
+          </Label>
+          <Input
+            id="keyword-input"
+            type="text"
+            placeholder={t("searchPage.keywordPlaceholder", "Optional target keyword")}
+            value={keyword}
+            onChange={e => setKeyword(e.target.value)}
+            className="text-sm"
+          />
+        </div>
 
-          <div className="space-y-1.5">
-            <Label className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-              <MessageSquare className="w-3.5 h-3.5" />
-              {t("searchPage.minReviews")}
-            </Label>
-            <Input
-              id="min-reviews-input"
-              type="number"
-              min="0"
-              placeholder={t("searchPage.minReviewsPlaceholder", "Minimum reviews")}
-              value={minReviews}
-              onChange={e => {
-                const value = Number(e.target.value);
-                setMinReviews(value < 0 ? "0" : e.target.value);
-              }}
-              className="text-sm"
-            />
-          </div>
-         </div>
-      </section>
+        {/* Rating */}
+        <div className="space-y-2">
+          <Label className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+            <Star className="w-3.5 h-3.5" />
+            {t("searchPage.minRating")}: <span className="font-semibold text-foreground ml-1">{minRating[0].toFixed(1)}</span>
+          </Label>
+          <Slider
+            id="min-rating-slider"
+            value={minRating}
+            onValueChange={setMinRating}
+            min={0}
+            max={5}
+            step={0.1}
+            className="py-1"
+          />
+        </div>
 
-      <div className="pt-4 pt-2 border-t">
+        {/* Reviews */}
+        <div className="space-y-1.5">
+          <Label className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+            <MessageSquare className="w-3.5 h-3.5" />
+            {t("searchPage.minReviews")}
+          </Label>
+          <Input
+            id="min-reviews-input"
+            type="number"
+            min="0"
+            placeholder={t("searchPage.minReviewsPlaceholder", "Minimum reviews")}
+            value={minReviews}
+            onChange={e => {
+              const value = Number(e.target.value);
+              setMinReviews(value < 0 ? "0" : e.target.value);
+            }}
+            className="text-sm"
+          />
+        </div>
+      </div>
+
+      {/* Action footer */}
+      <div className="pt-2 flex flex-col sm:flex-row items-center justify-between gap-4 mt-2">
+        <p className="text-[11px] text-muted-foreground order-2 sm:order-1">
+          {t("searchPage.initialSearchFree", "Initial page fetch is completely free.")}
+        </p>
         <Button
-            data-onboarding="search-button"
-            onClick={handleSearch}
-            size="lg"
-            className="w-full gap-2 text-base font-semibold shadow-sm"
-            disabled={!city || !category || isSearching}
+          data-onboarding="search-button"
+          onClick={handleSearch}
+          size="lg"
+          className="w-full sm:w-auto min-w-[200px] gap-2 text-base font-semibold shadow-sm order-1 sm:order-2"
+          disabled={!city || !category || isSearching}
         >
           {isSearching ? (
             <>
@@ -407,9 +406,6 @@ export function SearchFilterPanel({
             </>
           )}
         </Button>
-        <p className="text-center text-[10px] text-muted-foreground mt-2">
-          {t("searchPage.initialSearchFree", "Initial page fetch is completely free.")}
-        </p>
       </div>
 
     </div>
